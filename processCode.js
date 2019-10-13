@@ -1,6 +1,6 @@
 'use strict'
 
-function processCode(program) {
+const processCode = program => {
     const parserCtxSize = 36
     const astDoBlockSize = 12
     const allocatorSize = 16

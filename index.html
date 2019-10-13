@@ -27,7 +27,7 @@
 
     let timeoutId
 
-    function processCodeAndDisplay() {
+    const processCodeAndDisplay = () => {
       const code = document.getElementById('code-textarea').value
       if (!code) {
         document.getElementById('result-div').textContent = ''
@@ -47,7 +47,7 @@
       timeoutId = window.setTimeout(processCodeAndDisplay, 1000 * 2)
     }
 
-    textArea.addEventListener('input', function () {
+    textArea.addEventListener('input', () => {
       window.sessionStorage.setItem('code', textArea.value)
 
       if (timeoutId) {
@@ -55,6 +55,29 @@
       }
 
       timeoutId = window.setTimeout(processCodeAndDisplay, 1000 * 0.3)
+    })
+
+    textArea.addEventListener('keydown', event => {
+      if (event.isComposing || event.keyCode === 229) {
+        return
+      }
+
+      if (event.key != "Tab") {
+        return
+      }
+
+      event.preventDefault()
+
+      if (textArea.selectionStart || textArea.selectionStart === 0) {
+        const startPos = textArea.selectionStart
+        const endPos = textArea.selectionEnd
+
+        textArea.value = textArea.value.substring(0, startPos) + '\t' + textArea.value.substring(endPos, textArea.value.length)
+        textArea.selectionStart = startPos + 1
+        textArea.selectionEnd = startPos + 1
+      } else {
+        textArea.value += text
+      }
     })
   </script>
 </body>
