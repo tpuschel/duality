@@ -18,12 +18,20 @@ if(BUILD_SHARED_LIBS)
     )
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_compile_definitions(duality-core
+        PRIVATE _GNU_SOURCE
+    )
+endif()
+
 target_include_directories(duality-core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(duality-core PUBLIC duality-support)
+target_link_libraries(duality-core
+    PUBLIC duality-support
+)
 
 install(
     TARGETS duality-core
