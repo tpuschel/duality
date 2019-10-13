@@ -7,10 +7,15 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 #include <duality/support/assert.h>
 
 static void add_string(dy_array_t *string, dy_string_t s);
+
+#ifdef _WIN32
+static int asprintf(char **ret, const char *format, ...);
+#endif
 
 void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
 {
@@ -112,3 +117,25 @@ void add_string(dy_array_t *string, dy_string_t s)
         dy_array_add(string, s.ptr + i);
     }
 }
+
+#ifdef _WIN32
+int asprintf(char **ret, const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+
+    int len = _vscprintf(format, ap);
+    dy_assert(len >= 0);
+
+    char *buffer = malloc((size_t)len + 1 /* for '\0' */);
+
+    int ret = vsprintf(buffer, format, ap);
+    dy_assert(ret == len);
+
+    va_end(ap);
+
+    *ret = buffer;
+
+    return ret;
+}
+#endif
