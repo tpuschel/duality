@@ -1,3 +1,5 @@
 #code-textarea {
     font-family: Menlo, Monaco, 'Courier New', monospace;
+    font-size: 12px;
+    background-color: rgb(240, 240, 240);
 }
