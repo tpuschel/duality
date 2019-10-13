@@ -41,14 +41,14 @@
 
     const textArea = document.getElementById('code-textarea')
 
-    const savedData = window.sessionStorage.getItem('code')
+    const savedData = window.localStorage.getItem('code')
     if (savedData) {
       textArea.value = savedData
       timeoutId = window.setTimeout(processCodeAndDisplay, 1000 * 2)
     }
 
     textArea.addEventListener('input', () => {
-      window.sessionStorage.setItem('code', textArea.value)
+      window.localStorage.setItem('code', textArea.value)
 
       if (timeoutId) {
         window.clearTimeout(timeoutId)
