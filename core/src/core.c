@@ -124,18 +124,18 @@ int asprintf(char **ret, const char *format, ...)
     va_list ap;
     va_start(ap, format);
 
-    int len = _vscprintf(format, ap);
-    dy_assert(len >= 0);
+    int projected_len = _vscprintf(format, ap);
+    dy_assert(projected_len >= 0);
 
-    char *buffer = malloc((size_t)len + 1 /* for '\0' */);
+    char *buffer = malloc((size_t)projected_len + 1 /* for '\0' */);
 
-    int ret = vsprintf(buffer, format, ap);
-    dy_assert(ret == len);
+    int actual_len = vsprintf(buffer, format, ap);
+    dy_assert(projected_len = actual_len);
 
     va_end(ap);
 
     *ret = buffer;
 
-    return ret;
+    return actual_len;
 }
 #endif
