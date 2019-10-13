@@ -156,7 +156,7 @@ dy_ternary_t dy_check_value_map_elim(struct dy_check_ctx ctx, struct dy_core_val
         .value_map = value_map
     };
 
-    dy_ternary_t subtype_res = dy_is_subtype(ctx, dy_type_of(ctx, *elim.expr), value_map_expr);
+    dy_ternary_t subtype_res = dy_is_subtype(ctx, dy_type_of(ctx, expr), value_map_expr);
 
     *new_elim = (struct dy_core_value_map_elim){
         .expr = alloc_expr(ctx, expr),
@@ -255,6 +255,14 @@ dy_ternary_t dy_check_one_of(struct dy_check_ctx ctx, struct dy_core_pair one_of
         *new_expr = second;
         return DY_MAYBE;
     }
+
+    *new_expr = (struct dy_core_expr){
+        .tag = DY_CORE_EXPR_ONE_OF,
+        .one_of = {
+            .first = alloc_expr(ctx, first),
+            .second = alloc_expr(ctx, second),
+        }
+    };
 
     return DY_NO;
 }
