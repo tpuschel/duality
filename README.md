@@ -1,5 +1,7 @@
 # The Duality Programming Language
 
+![](https://github.com/tpuschel/duality/workflows/CI/badge.svg)
+
 (This is pre-alpha software; It might not even build at any time.)
 
 Duality is a simple programming language aiming to unify static and dynamic typing.
