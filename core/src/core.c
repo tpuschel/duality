@@ -130,7 +130,7 @@ int asprintf(char **ret, const char *format, ...)
     char *buffer = malloc((size_t)projected_len + 1 /* for '\0' */);
 
     int actual_len = vsprintf(buffer, format, ap);
-    dy_assert(projected_len = actual_len);
+    dy_assert(projected_len == actual_len);
 
     va_end(ap);
 

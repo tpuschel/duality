@@ -106,6 +106,7 @@ int main(int argc, const char *argv[])
     struct dy_core_expr result;
     is_valid = dy_eval_expr(check_ctx, checked_program, &result);
     if (is_valid == DY_NO) {
+        fprintf(stderr, "Program execution failed.\n");
         return -1;
     }
 
