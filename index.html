@@ -10,9 +10,13 @@
 </head>
 
 <body>
-  <textarea id="code-textarea" placeholder="Enter code here..." spellcheck="false"></textarea>
+  <div id="code-box">
+    <textarea id="code-textarea" placeholder="Enter code here..." spellcheck="false"></textarea>
 
-  <div id="result-div"></div>
+    <div id="code-result-divider"></div>
+
+    <div id="result-div"></div>
+  </div>
 
   <script src="dy.js"></script>
 
@@ -40,7 +44,7 @@
     const savedData = window.sessionStorage.getItem('code')
     if (savedData) {
       textArea.value = savedData
-      timeoutId = window.setTimeout(processCodeAndDisplay, 1000 * 0.3)
+      timeoutId = window.setTimeout(processCodeAndDisplay, 1000 * 2)
     }
 
     textArea.addEventListener('input', function () {
