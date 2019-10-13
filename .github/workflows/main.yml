@@ -3,16 +3,36 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-
+  build-windows:
     runs-on: windows-latest
 
     steps:
     - uses: actions/checkout@v1
-    - name: Build
+    - name: Build for Windows
       run: |
         cmake -S . -B build
         cmake --build build
+
+  build-ubuntu:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build for Ubuntu
+      run: |
+        curl -L https://github.com/Kitware/CMake/releases/download/v3.15.4/cmake-3.15.4-Linux-x86_64.tar.gz -o cmake.tar.gz
+        tar -xf cmake.tar.gz
+        ./cmake-3.15.4-Linux-x86_64/bin/cmake -S . -B build
+        ./cmake-3.15.4-Linux-x86_64/bin/cmake --build build
+
+  build-macos:
+    runs-on: macOS-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build for macOS
+      run: |
+        curl -L https://github.com/Kitware/CMake/releases/download/v3.15.4/cmake-3.15.4-Darwin-x86_64.tar.gz -o cmake.tar.gz
+        tar -xf cmake.tar.gz
+        ./cmake-3.15.4-Darwin-x86_64/CMake.app/Contents/bin/cmake -S . -B build
+        ./cmake-3.15.4-Darwin-x86_64/CMake.app/Contents/bin/cmake --build build
