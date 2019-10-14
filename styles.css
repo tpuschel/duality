@@ -15,11 +15,8 @@ html, body {
     outline: none;
 }
 
-#code-result-divider {
-    border-top: 1px solid black;
-}
-
 #result-div {
+    border-top: thin solid black;
     padding: 1ch;
 }
 
