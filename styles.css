@@ -12,6 +12,7 @@ html, body {
     padding: 1ch;
     flex-grow: 1;
     border-radius: 10px;
+    outline: none;
 }
 
 #code-result-divider {
