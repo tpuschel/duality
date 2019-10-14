@@ -1,6 +1,6 @@
 # The Duality Programming Language
 
-![](https://github.com/tpuschel/duality/workflows/CI/badge.svg)
+[![](https://github.com/tpuschel/duality/workflows/CI/badge.svg)](https://github.com/tpuschel/duality/actions?workflow=CI)
 
 (This is pre-alpha software; It might not even build at any time.)
 
@@ -16,7 +16,7 @@ In practice however, the build system only supports a limited set of compilers a
 but available in pretty much all C99 compilers.
 
 ### General requirements
-- [CMake](https://cmake.org) is the meta build system.
+- [CMake](https://cmake.org) is the meta build system. Only the *latest release* of CMake is ever supported.
 
 ##### Windows-specific requirements
 An installation of Visual Studio with these components is required:
@@ -32,7 +32,7 @@ These are the components required to build on Windows 10, 64-bit using Visual St
 Adjust accordingly for your version of Windows and Visual Studio.
 
 #### Configuring
-To build, simply run CMake:
+To configure a build, simply run CMake:
 ```
 cmake -S <path to source dir> -B <path to build dir; will be created if it doesn't exist>
 ```
@@ -45,7 +45,7 @@ CMake by default builds static libraries. If you want to build a shared one, pas
 To generate a ```compile_commands.json``` file for use with language servers, use the ```-D CMAKE_EXPORT_COMPILE_COMMANDS=ON``` flag.
 
 #### Building
-To build, either invoke the underlying generator or use CMake:
+To actually build, either invoke the underlying generator or use CMake:
 ```
 cmake --build <path to build dir>
 ```
@@ -63,7 +63,7 @@ Installation may require administrative privileges.
 ##### Example
 As an example, here's how to build and install a shared library, using gcc, in debug configuration, with ninja as the generator, while being in the same directory as the CMakeLists.txt:
 ```
-CC=gcc cmake -S . -B build -G Ninja -D BUILD_SHARED_LIBS=On -D CMAKE_BUILD_TYPE=Debug
+CC=gcc cmake -S . -B build -G Ninja -D BUILD_SHARED_LIBS=ON -D CMAKE_BUILD_TYPE=Debug
 
 cmake --build build
 
