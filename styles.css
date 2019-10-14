@@ -1,15 +1,12 @@
 html, body {
     height: 100%;
     width: 100%;
-    background-color: rgb(28, 30, 38);
 }
 
 #code-textarea {
     font-family: inherit;
     font-size: inherit;
-    font-weight: inherit;
     background-color: inherit;
-    color: inherit;
     resize: none;
     border: none;
     padding: 1ch;
@@ -17,7 +14,7 @@ html, body {
 }
 
 #code-result-divider {
-    border-top: 1px solid rgb(125, 125, 125);
+    border-top: 1px solid black;
 }
 
 #result-div {
@@ -26,14 +23,12 @@ html, body {
 
 #code-box {
     font-family: Menlo, Monaco, 'Courier New', monospace;
-    font-size: 13px;
-    color: rgb(200, 200, 200);
-    font-weight: 500;
-    width: 60ch;
-    height: 60ch;
+    font-size: 12px;
+    background-color: rgb(240, 240, 240);
+    width: min(80ch, 100vw);
+    height: 90vh;
     border-style: solid;
-    border-width: thin;
+    border-width: 1px;
     display: flex;
     flex-direction: column;
-    border-color: rgb(125, 125, 125);
 }
