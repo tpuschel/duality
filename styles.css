@@ -11,6 +11,7 @@ html, body {
     border: none;
     padding: 1ch;
     flex-grow: 1;
+    border-radius: 10px;
 }
 
 #code-result-divider {
@@ -31,4 +32,5 @@ html, body {
     border-width: 1px;
     display: flex;
     flex-direction: column;
+    border-radius: 10px;
 }
