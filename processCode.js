@@ -49,8 +49,11 @@ const processCode = program => {
     // Second, AST -> Core translation
     const astToCoreCtx = _malloc(astToCoreCtxSize)
 
-    // setting running_id
+    // creating running_id with initial value 0
     const runningId = _malloc(4)
+    setValue(runningId, 0, 'i32')
+
+    // setting running_id
     setValue(astToCoreCtx, runningId, 'i32')
 
     // setting allocator
