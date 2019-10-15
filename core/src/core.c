@@ -128,6 +128,7 @@ int asprintf(char **ret, const char *format, ...)
     dy_assert(projected_len >= 0);
 
     char *buffer = malloc((size_t)projected_len + 1 /* for '\0' */);
+    dy_assert(buffer != NULL);
 
     int actual_len = vsprintf(buffer, format, ap);
     dy_assert(projected_len == actual_len);
