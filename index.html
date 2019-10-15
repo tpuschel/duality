@@ -23,37 +23,41 @@
   <script>
     'use strict'
 
-    let timeoutId
-
-    const processCodeAndDisplay = () => {
-      const code = document.getElementById('code-textarea').value
-      if (!code) {
-        document.getElementById('result-div').textContent = ''
-        return
-      }
-
-      document.getElementById('result-div').textContent = processCode(code)
-
-      timeoutId = undefined
-    }
+    let timeoutId = undefined
 
     const textArea = document.getElementById('code-textarea')
 
-    const savedData = window.localStorage.getItem('code')
-    if (savedData) {
-      textArea.value = savedData
-      timeoutId = window.setTimeout(processCodeAndDisplay, 1000 * 2)
+    const processCodeAndDisplay = () => {
+      timeoutId = undefined
+
+      const resultDiv = document.getElementById('result-div')
+
+      if (textArea.value) {
+        resultDiv.textContent = processCode(textArea.value)
+      } else {
+        resultDiv.textContent = ''
+      }
     }
 
-    textArea.addEventListener('input', () => {
-      window.localStorage.setItem('code', textArea.value)
-
-      if (timeoutId) {
-        window.clearTimeout(timeoutId)
+    const onRuntimeInitialized = () => {
+      const savedData = window.localStorage.getItem('code')
+      if (savedData) {
+        textArea.value = savedData
+        processCodeAndDisplay()
       }
 
-      timeoutId = window.setTimeout(processCodeAndDisplay, 1000 * 0.3)
-    })
+      textArea.addEventListener('input', () => {
+        window.localStorage.setItem('code', textArea.value)
+
+        if (timeoutId) {
+          window.clearTimeout(timeoutId)
+        }
+
+        timeoutId = window.setTimeout(processCodeAndDisplay, 1000 * 0.3)
+      })
+    }
+
+    Module['onRuntimeInitialized'] = onRuntimeInitialized;
 
     textArea.addEventListener('keydown', event => {
       if (event.isComposing || event.keyCode === 229) {
