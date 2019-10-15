@@ -70,11 +70,13 @@
         const startPos = textArea.selectionStart
         const endPos = textArea.selectionEnd
 
-        textArea.value = textArea.value.substring(0, startPos) + '\t' + textArea.value.substring(endPos, textArea.value.length)
-        textArea.selectionStart = startPos + 1
-        textArea.selectionEnd = startPos + 1
+        const tabReplacement = '    '
+
+        textArea.value = textArea.value.substring(0, startPos) + tabReplacement + textArea.value.substring(endPos, textArea.value.length)
+        textArea.selectionStart = startPos + tabReplacement.length
+        textArea.selectionEnd = startPos + tabReplacement.length
       } else {
-        textArea.value += text
+        textArea.value += tabReplacement
       }
     })
   </script>
