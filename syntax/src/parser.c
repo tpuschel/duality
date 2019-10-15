@@ -129,14 +129,14 @@ bool dy_parse_variable(struct dy_parser_ctx ctx, dy_string_t *var)
     const void *data = ctx.text.ptr + ctx.index_in;
     size_t count = 0;
 
-    if (!parse_one_of(ctx, DY_STR_LIT("QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm"))) {
+    if (!parse_one_of(ctx, DY_STR_LIT("abcdefghijklmnopqrstuvwxyz"))) {
         return false;
     }
 
     ++count;
 
     for (;;) {
-        if (!parse_one_of(ctx, DY_STR_LIT("QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm1234567890-"))) {
+        if (!parse_one_of(ctx, DY_STR_LIT("abcdefghijklmnopqrstuvwxyz0123456789-?"))) {
             *var = (dy_string_t){
                 .ptr = data,
                 .size = count
