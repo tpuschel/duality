@@ -1,10 +1,32 @@
 'use strict'
 
+const dyStringSize = 8
+
+const unboundVarsList = unboundVars => {
+    const len = _dy_array_size(unboundVars)
+
+    let list = []
+
+    for (let i = 0; i < len; ++i) {
+        const varName = _malloc(dyStringSize)
+
+        _dy_array_get(unboundVars, i, varName)
+
+        const varNameJs = UTF8ToString(getValue(varName, 'i32'), getValue(varName + 4, 'i32'))
+
+        list.push(varNameJs)
+
+        _free(varName)
+    }
+
+    return list
+}
+
 const processCode = program => {
     const parserCtxSize = 36
     const astDoBlockSize = 12
     const allocatorSize = 16
-    const astToCoreCtxSize = 24
+    const astToCoreCtxSize = 28
     const boundVarsSize = 16
     const coreExprSize = 22
     const checkCtxSize = 20
@@ -66,10 +88,14 @@ const processCode = program => {
     const boundVars = _dy_array_create(parserCtx + 12, boundVarsSize, 8)
     setValue(astToCoreCtx + 20, boundVars, 'i32')
 
+    // setting unbound_vars
+    const unboundVars = _dy_array_create(parserCtx + 12, dyStringSize, 4)
+    setValue(astToCoreCtx + 24, unboundVars, 'i32')
+
     const coreExprResult = _malloc(coreExprSize)
     const astToCoreDidSucceed = _dy_ast_do_block_to_core(astToCoreCtx, resultDoBlock, coreExprResult)
     if (!astToCoreDidSucceed) {
-        return 'AST to Core translation failed.'
+        return 'Unbound variables: ' + unboundVarsList(unboundVars).reduce((accum, val) => accum + ', ' + val) + '.'
     }
 
 
