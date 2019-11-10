@@ -17,3 +17,7 @@ endif()
 if(NOT TARGET cli)
     add_subdirectory("cli")
 endif()
+
+if(NOT TARGET ide)
+    add_subdirectory("ide")
+endif()
