@@ -36,4 +36,3 @@ install(
     DIRECTORY include/
     TYPE INCLUDE
 )
-
