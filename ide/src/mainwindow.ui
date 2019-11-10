@@ -14,6 +14,11 @@
    <string>Duality IDE</string>
   </property>
   <widget class="QMenuBar" name="menubar"/>
+  <widget class="QTextEdit" name="textEdit">
+    <property name="acceptRichText">
+        <bool>false</bool>
+    </property>
+  </widget>
  </widget>
  <resources/>
  <connections/>
