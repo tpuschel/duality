@@ -6,8 +6,6 @@ find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
 add_executable(duality-ide
     "src/main.cpp"
-    "src/mainwindow.cpp"
-    "src/mainwindow.ui"
 )
 
 target_link_libraries(duality-ide
