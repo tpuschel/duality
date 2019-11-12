@@ -27,12 +27,39 @@ struct dy_ast_type_map {
     const struct dy_ast_expr *expr;
 };
 
-struct dy_ast_do_block_stmnt;
+struct dy_ast_do_block_equality {
+    const struct dy_ast_expr *e1;
+    const struct dy_ast_expr *e2;
+    const struct dy_ast_do_block *rest;
+};
+
+struct dy_ast_do_block_let {
+    dy_string_t arg_name;
+    const struct dy_ast_expr *expr;
+    const struct dy_ast_do_block *rest;
+};
+
+struct dy_ast_do_block_ignored_expr {
+    const struct dy_ast_expr *expr;
+    const struct dy_ast_do_block *rest;
+};
+
+enum dy_ast_do_block_tag {
+    DY_AST_DO_BLOCK_EQUALITY,
+    DY_AST_DO_BLOCK_LET,
+    DY_AST_DO_BLOCK_IGNORED_EXPR,
+    DY_AST_DO_BLOCK_END_EXPR
+};
 
 struct dy_ast_do_block {
-    const struct dy_ast_do_block_stmnt *stmnts;
-    size_t num_stmnts;
-    const struct dy_ast_expr *last_expr;
+    union {
+        struct dy_ast_do_block_equality equality;
+        struct dy_ast_do_block_let let;
+        struct dy_ast_do_block_ignored_expr ignored_expr;
+        const struct dy_ast_expr *end_expr;
+    };
+
+    enum dy_ast_do_block_tag tag;
 };
 
 struct dy_ast_list {
@@ -84,23 +111,6 @@ struct dy_ast_expr {
     };
 
     enum dy_ast_expr_tag tag;
-};
-
-enum dy_ast_do_block_stmnt_tag {
-    DY_AST_DO_BLOCK_STMNT_LET,
-    DY_AST_DO_BLOCK_STMNT_EQUALITY,
-    DY_AST_DO_BLOCK_STMNT_BARE_EXPR
-};
-
-struct dy_ast_do_block_stmnt {
-    union {
-        dy_string_t let_arg_name;
-        struct dy_ast_expr left_expr;
-    };
-
-    struct dy_ast_expr expr;
-
-    enum dy_ast_do_block_stmnt_tag tag;
 };
 
 #endif // DY_AST_H

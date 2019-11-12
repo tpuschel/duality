@@ -15,6 +15,12 @@ static bool ast_type_map_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_ty
 
 static bool ast_value_map_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_value_map value_map, enum dy_core_polarity polarity, struct dy_core_expr *expr);
 
+static bool do_block_equality_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_do_block_equality equality, struct dy_core_expr *expr);
+
+static bool do_block_let_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_do_block_let let, struct dy_core_expr *expr);
+
+static bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_do_block_ignored_expr ignored_expr, struct dy_core_expr *expr);
+
 bool dy_ast_expr_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_expr expr, struct dy_core_expr *core_expr)
 {
     switch (expr.tag) {
@@ -83,6 +89,8 @@ bool dy_ast_variable_to_core(struct dy_ast_to_core_ctx ctx, dy_string_t variable
         }
     }
 
+    dy_array_add(ctx.unbound_vars, &variable);
+
     return false;
 }
 
@@ -122,11 +130,9 @@ bool ast_type_map_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_type_map 
         .type_map = {
             .arg = {
                 .id = id,
-                .type = type
-            },
+                .type = type },
             .expr = alloc_expr(ctx, e),
-            .polarity = polarity
-        }
+            .polarity = polarity }
     };
 
     return true;
@@ -280,130 +286,176 @@ bool dy_ast_negative_value_map_to_core(struct dy_ast_to_core_ctx ctx, struct dy_
 
 bool dy_ast_do_block_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_do_block do_block, struct dy_core_expr *expr)
 {
-    if (do_block.num_stmnts == 0) {
-        return dy_ast_expr_to_core(ctx, *do_block.last_expr, expr);
-    }
-
-    struct dy_ast_do_block_stmnt stmnt = do_block.stmnts[0];
-
-    struct dy_ast_do_block sub_do_block = {
-        .stmnts = do_block.stmnts + 1,
-        .num_stmnts = do_block.num_stmnts - 1,
-        .last_expr = do_block.last_expr
-    };
-
-    struct dy_core_expr e1;
-    if (!dy_ast_expr_to_core(ctx, stmnt.expr, &e1)) {
-        return false;
-    }
-
-    switch (stmnt.tag) {
-    case DY_AST_DO_BLOCK_STMNT_EQUALITY: {
-        struct dy_core_expr left_expr;
-        if (!dy_ast_expr_to_core(ctx, stmnt.left_expr, &left_expr)) {
-            return false;
-        }
-
-        struct dy_core_expr rest;
-        if (!dy_ast_do_block_to_core(ctx, sub_do_block, &rest)) {
-            return false;
-        }
-
-        struct dy_check_ctx check_ctx = {
-            .running_id = ctx.running_id,
-            .allocator = ctx.allocator
-        };
-
-        struct dy_core_expr type_of_rest = dy_type_of(check_ctx, rest);
-
-        struct dy_core_expr positive_type_map = {
-            .tag = DY_CORE_EXPR_VALUE_MAP,
-            .value_map = {
-                .e1 = alloc_expr(ctx, left_expr),
-                .e2 = alloc_expr(ctx, rest),
-                .polarity = DY_CORE_POLARITY_POSITIVE
-            }
-        };
-
-        *expr = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-            .value_map_elim = {
-                .expr = alloc_expr(ctx, positive_type_map),
-                .value_map = {
-                    .e1 = alloc_expr(ctx, e1),
-                    .e2 = alloc_expr(ctx, type_of_rest),
-                    .polarity = DY_CORE_POLARITY_NEGATIVE
-                }
-            }
-        };
-
-        return true;
-    }
-    case DY_AST_DO_BLOCK_STMNT_BARE_EXPR:
-        // fallthrough
-    case DY_AST_DO_BLOCK_STMNT_LET: {
-        size_t id = (*ctx.running_id)++;
-
-        struct dy_check_ctx check_ctx = {
-            .running_id = ctx.running_id,
-            .allocator = ctx.allocator
-        };
-
-        struct dy_core_expr *type_of_e1 = alloc_expr(ctx, dy_type_of(check_ctx, e1));
-
-        size_t old_size;
-        if (stmnt.tag == DY_AST_DO_BLOCK_STMNT_LET) {
-            struct dy_ast_to_core_bound_var bound_var = {
-                .name = stmnt.let_arg_name,
-                .replacement_id = id,
-                .type = type_of_e1
-            };
-
-            old_size = dy_array_add(ctx.bound_vars, &bound_var);
-        } else {
-            old_size = dy_array_size(ctx.bound_vars);
-        }
-
-        struct dy_core_expr rest;
-        bool succeeded = dy_ast_do_block_to_core(ctx, sub_do_block, &rest);
-
-        dy_array_set_size(ctx.bound_vars, old_size);
-
-        if (!succeeded) {
-            return false;
-        }
-
-        struct dy_core_expr type_of_rest = dy_type_of(check_ctx, rest);
-
-        struct dy_core_expr positive_type_map = {
-            .tag = DY_CORE_EXPR_TYPE_MAP,
-            .type_map = {
-                .arg = {
-                    .id = id,
-                    .type = type_of_e1
-                },
-                .expr = alloc_expr(ctx, rest),
-                .polarity = DY_CORE_POLARITY_POSITIVE
-            }
-        };
-
-        *expr = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-            .value_map_elim = {
-                .expr = alloc_expr(ctx, positive_type_map),
-                .value_map = {
-                    .e1 = alloc_expr(ctx, e1),
-                    .e2 = alloc_expr(ctx, type_of_rest),
-                    .polarity = DY_CORE_POLARITY_NEGATIVE
-                }
-            }
-        };
-
-        return true;
-    }
+    switch (do_block.tag) {
+    case DY_AST_DO_BLOCK_END_EXPR:
+        return dy_ast_expr_to_core(ctx, *do_block.end_expr, expr);
+    case DY_AST_DO_BLOCK_LET:
+        return do_block_let_to_core(ctx, do_block.let, expr);
+    case DY_AST_DO_BLOCK_IGNORED_EXPR:
+        return do_block_ignored_expr_to_core(ctx, do_block.ignored_expr, expr);
+    case DY_AST_DO_BLOCK_EQUALITY:
+        return do_block_equality_to_core(ctx, do_block.equality, expr);
     }
 
     DY_IMPOSSIBLE_ENUM();
+}
+
+bool do_block_equality_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_do_block_equality equality, struct dy_core_expr *expr)
+{
+    struct dy_core_expr e1;
+    if (!dy_ast_expr_to_core(ctx, *equality.e1, &e1)) {
+        return false;
+    }
+
+    struct dy_core_expr e2;
+    if (!dy_ast_expr_to_core(ctx, *equality.e2, &e2)) {
+        return false;
+    }
+
+    struct dy_core_expr rest;
+    if (!dy_ast_do_block_to_core(ctx, *equality.rest, &rest)) {
+        return false;
+    }
+
+    struct dy_check_ctx check_ctx = {
+        .running_id = ctx.running_id,
+        .allocator = ctx.allocator
+    };
+
+    struct dy_core_expr type_of_rest = dy_type_of(check_ctx, rest);
+
+    struct dy_core_expr positive_type_map = {
+        .tag = DY_CORE_EXPR_VALUE_MAP,
+        .value_map = {
+            .e1 = alloc_expr(ctx, e1),
+            .e2 = alloc_expr(ctx, rest),
+            .polarity = DY_CORE_POLARITY_POSITIVE,
+        }
+    };
+
+    *expr = (struct dy_core_expr){
+        .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
+        .value_map_elim = {
+            .expr = alloc_expr(ctx, positive_type_map),
+            .value_map = {
+                .e1 = alloc_expr(ctx, e2),
+                .e2 = alloc_expr(ctx, type_of_rest),
+                .polarity = DY_CORE_POLARITY_NEGATIVE,
+            },
+        }
+    };
+
+    return true;
+}
+
+bool do_block_let_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_do_block_let let, struct dy_core_expr *expr)
+{
+    struct dy_core_expr e;
+    if (!dy_ast_expr_to_core(ctx, *let.expr, &e)) {
+        return false;
+    }
+
+    size_t id = (*ctx.running_id)++;
+
+    struct dy_check_ctx check_ctx = {
+        .running_id = ctx.running_id,
+        .allocator = ctx.allocator
+    };
+
+    struct dy_core_expr *type_of_e = alloc_expr(ctx, dy_type_of(check_ctx, e));
+
+    struct dy_ast_to_core_bound_var bound_var = {
+        .name = let.arg_name,
+        .replacement_id = id,
+        .type = type_of_e
+    };
+
+    size_t old_size = dy_array_add(ctx.bound_vars, &bound_var);
+
+    struct dy_core_expr rest;
+    bool succeeded = dy_ast_do_block_to_core(ctx, *let.rest, &rest);
+
+    dy_array_set_size(ctx.bound_vars, old_size);
+
+    if (!succeeded) {
+        return false;
+    }
+
+    struct dy_core_expr type_of_rest = dy_type_of(check_ctx, rest);
+
+    struct dy_core_expr positive_type_map = {
+        .tag = DY_CORE_EXPR_TYPE_MAP,
+        .type_map = {
+            .arg = {
+                .id = id,
+                .type = type_of_e,
+            },
+            .expr = alloc_expr(ctx, rest),
+            .polarity = DY_CORE_POLARITY_POSITIVE,
+        }
+    };
+
+    *expr = (struct dy_core_expr){
+        .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
+        .value_map_elim = {
+            .expr = alloc_expr(ctx, positive_type_map),
+            .value_map = {
+                .e1 = alloc_expr(ctx, e),
+                .e2 = alloc_expr(ctx, type_of_rest),
+                .polarity = DY_CORE_POLARITY_NEGATIVE,
+            },
+        }
+    };
+
+    return true;
+}
+
+bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_do_block_ignored_expr ignored_expr, struct dy_core_expr *expr)
+{
+    struct dy_core_expr e;
+    if (!dy_ast_expr_to_core(ctx, *ignored_expr.expr, &e)) {
+        return false;
+    }
+
+    size_t id = (*ctx.running_id)++;
+
+    struct dy_check_ctx check_ctx = {
+        .running_id = ctx.running_id,
+        .allocator = ctx.allocator
+    };
+
+    struct dy_core_expr rest;
+    if (!dy_ast_do_block_to_core(ctx, *ignored_expr.rest, &rest)) {
+        return false;
+    }
+
+    struct dy_core_expr type_of_rest = dy_type_of(check_ctx, rest);
+
+    struct dy_core_expr positive_type_map = {
+        .tag = DY_CORE_EXPR_TYPE_MAP,
+        .type_map = {
+            .arg = {
+                .id = id,
+                .type = alloc_expr(ctx, dy_type_of(check_ctx, e)),
+            },
+            .expr = alloc_expr(ctx, rest),
+            .polarity = DY_CORE_POLARITY_POSITIVE,
+        }
+    };
+
+    *expr = (struct dy_core_expr){
+        .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
+        .value_map_elim = {
+            .expr = alloc_expr(ctx, positive_type_map),
+            .value_map = {
+                .e1 = alloc_expr(ctx, e),
+                .e2 = alloc_expr(ctx, type_of_rest),
+                .polarity = DY_CORE_POLARITY_NEGATIVE,
+            },
+        }
+    };
+
+    return true;
 }
 
 bool dy_ast_value_map_elim_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_value_map_elim elim, struct dy_core_expr *expr)
@@ -424,8 +476,7 @@ bool dy_ast_value_map_elim_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_
         .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
         .value_map_elim = {
             .expr = alloc_expr(ctx, e1),
-            .value_map = e2.value_map
-        }
+            .value_map = e2.value_map }
     };
 
     return true;
@@ -449,8 +500,7 @@ bool dy_ast_type_map_elim_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_t
         .tag = DY_CORE_EXPR_TYPE_MAP_ELIM,
         .type_map_elim = {
             .expr = alloc_expr(ctx, e1),
-            .type_map = e2.type_map
-        }
+            .type_map = e2.type_map }
     };
 
     return true;

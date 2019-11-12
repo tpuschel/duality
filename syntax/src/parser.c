@@ -44,23 +44,17 @@ static struct dy_ast_expr *alloc_expr(struct dy_parser_ctx ctx, struct dy_ast_ex
 
 static void skip_whitespace_except_newline(struct dy_parser_ctx ctx);
 
-static bool parse_do_block_stmnt(struct dy_parser_ctx ctx, struct dy_ast_do_block_stmnt *stmnt);
-
 static void skip_whitespace(struct dy_parser_ctx ctx);
 
 static bool is_at_end(struct dy_parser_ctx ctx);
 
 static bool get_char(struct dy_parser_ctx ctx, char *c);
 
-static bool parse_one_of(struct dy_parser_ctx ctx, dy_string_t chars);
+static bool parse_one_of(struct dy_parser_ctx ctx, dy_string_t chars, enum dy_parser_error_choice_tag tag);
 
 static bool parse_exactly_one(struct dy_parser_ctx ctx, char c);
 
 static bool parse_bare_list(struct dy_parser_ctx ctx, struct dy_ast_list *list);
-
-static bool parse_let_stmnt(struct dy_parser_ctx ctx, struct dy_ast_do_block_stmnt *stmnt);
-
-static bool parse_stmnt_equal(struct dy_parser_ctx ctx, struct dy_ast_do_block_stmnt *stmnt);
 
 static bool parse_elimination(struct dy_parser_ctx ctx, struct dy_ast_expr left, struct dy_ast_expr *expr);
 
@@ -80,6 +74,18 @@ static bool skip_block_comment(struct dy_parser_ctx ctx);
 
 static bool parse_type_map(struct dy_parser_ctx ctx, dy_string_t arrow_literal, struct dy_ast_type_map *type_map);
 
+static bool parse_do_block_body(struct dy_parser_ctx ctx, struct dy_ast_do_block *do_block);
+
+static bool parse_do_block_body_equality(struct dy_parser_ctx ctx, struct dy_ast_do_block_equality *equality);
+
+static bool parse_do_block_body_let(struct dy_parser_ctx ctx, struct dy_ast_do_block_let *let);
+
+static bool parse_do_block_body_ignored_expr(struct dy_parser_ctx ctx, struct dy_ast_do_block_ignored_expr *ignored_expr);
+
+static bool skip_semicolon_or_newline(struct dy_parser_ctx ctx);
+
+static bool string_is_not_just_whitespace(dy_string_t s);
+
 struct dy_parser_transaction_multiple dy_parse_multiple_start(struct dy_parser_ctx *ctx)
 {
     size_t *out = ctx->index_out;
@@ -95,16 +101,55 @@ void dy_parse_multiple_succeeded(struct dy_parser_ctx ctx, struct dy_parser_tran
     *transaction.index_out = ctx.index_in;
 }
 
-struct dy_parser_transaction_choice dy_parse_choice_start(struct dy_parser_ctx ctx)
+struct dy_parser_transaction_choice dy_parse_choice_start(struct dy_parser_ctx *ctx)
 {
+    struct dy_parser_error *actual_error_ptr = ctx->error;
+    struct dy_parser_error *last_error = ctx->allocator.alloc(sizeof *last_error, ctx->allocator.env);
+    ctx->error = last_error;
+
     return (struct dy_parser_transaction_choice){
-        .initial_error_cnt = dy_array_size(ctx.errors)
+        .actual_error_ptr = actual_error_ptr,
+        .largest_text_index = ctx->index_in,
+        .last_error = last_error,
+        .accum_errors = dy_array_create(ctx->allocator, sizeof(struct dy_parser_error_without_index), 4)
     };
 }
 
-void dy_parse_choice_failed(struct dy_parser_ctx ctx, struct dy_parser_transaction_choice transaction)
+void dy_parse_choice_failed(struct dy_parser_transaction_choice *transaction)
 {
-    dy_array_set_size(ctx.errors, transaction.initial_error_cnt);
+    struct dy_parser_error last_error = *transaction->last_error;
+
+    if (last_error.text_index < transaction->largest_text_index) {
+        return;
+    }
+
+    if (last_error.text_index > transaction->largest_text_index) {
+        transaction->largest_text_index = last_error.text_index;
+
+        dy_array_set_size(transaction->accum_errors, 0);
+
+        dy_array_add(transaction->accum_errors, &last_error.error_without_index);
+
+        return;
+    }
+
+    dy_array_add(transaction->accum_errors, &last_error.error_without_index);
+}
+
+void dy_parse_all_choices_failed(struct dy_parser_ctx *ctx, struct dy_parser_transaction_choice transaction, enum dy_parser_error_choice_tag tag)
+{
+    ctx->error = transaction.actual_error_ptr;
+
+    *ctx->error = (struct dy_parser_error){
+        .text_index = transaction.largest_text_index,
+        .error_without_index = {
+            .tag = DY_PARSER_ERROR_CHOICE,
+            .choice = {
+                .errors_without_index = transaction.accum_errors,
+                .tag = tag,
+            },
+        }
+    };
 }
 
 bool dy_parse_literal(struct dy_parser_ctx ctx, dy_string_t s)
@@ -129,18 +174,29 @@ bool dy_parse_variable(struct dy_parser_ctx ctx, dy_string_t *var)
     const void *data = ctx.text.ptr + ctx.index_in;
     size_t count = 0;
 
-    if (!parse_one_of(ctx, DY_STR_LIT("abcdefghijklmnopqrstuvwxyz"))) {
+    if (!parse_one_of(ctx, DY_STR_LIT("abcdefghijklmnopqrstuvwxyz"), DY_PARSER_ERROR_CHOICE_LOWERCASE_LETTERS)) {
         return false;
     }
 
     ++count;
 
     for (;;) {
-        if (!parse_one_of(ctx, DY_STR_LIT("abcdefghijklmnopqrstuvwxyz0123456789-?"))) {
-            *var = (dy_string_t){
+        if (!parse_one_of(ctx, DY_STR_LIT("abcdefghijklmnopqrstuvwxyz0123456789-?"), DY_PARSER_ERROR_CHOICE_LOWERCASE_LETTERS_DIGITS_UNDERSCORE_AND_QUESTION_MARK)) {
+            dy_string_t final_var = {
                 .ptr = data,
                 .size = count
             };
+
+            if (dy_string_are_equal(final_var, DY_STR_LIT("list"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("try"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("let"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("choice"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("String"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("Type"))) {
+                return false;
+            }
+
+            *var = final_var;
 
             dy_parse_multiple_succeeded(ctx, tr);
 
@@ -182,25 +238,21 @@ bool skip_block_comment(struct dy_parser_ctx ctx)
     }
 
     for (;;) {
-        struct dy_parser_transaction_choice ctr = dy_parse_choice_start(ctx);
-
         if (skip_block_comment(ctx)) {
             continue;
         }
-
-        dy_parse_choice_failed(ctx, ctr);
 
         if (dy_parse_literal(ctx, DY_STR_LIT("*/"))) {
             dy_parse_multiple_succeeded(ctx, tr);
             return true;
         }
 
-        dy_parse_choice_failed(ctx, ctr);
-
         char c;
-        if (!get_char(ctx, &c)) {
-            return false;
+        if (get_char(ctx, &c)) {
+            continue;
         }
+
+        return false;
     }
 }
 
@@ -215,18 +267,17 @@ bool dy_parse_expr(struct dy_parser_ctx ctx, struct dy_ast_expr *expr)
 
     skip_whitespace_except_newline(ctx);
 
-    if (!parse_expr_further1(ctx, left, expr)) {
+    if (parse_expr_further1(ctx, left, expr)) {
+        dy_parse_multiple_succeeded(ctx, tr);
+        return true;
+    } else {
         return false;
     }
-
-    dy_parse_multiple_succeeded(ctx, tr);
-
-    return true;
 }
 
 bool parse_expr_non_left_recursive(struct dy_parser_ctx ctx, struct dy_ast_expr *expr)
 {
-    struct dy_parser_transaction_choice tr = dy_parse_choice_start(ctx);
+    struct dy_parser_transaction_choice tr = dy_parse_choice_start(&ctx);
 
     struct dy_ast_type_map positive_type_map;
     if (dy_parse_positive_type_map(ctx, &positive_type_map)) {
@@ -238,7 +289,7 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx ctx, struct dy_ast_expr 
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     struct dy_ast_type_map negative_type_map;
     if (dy_parse_negative_type_map(ctx, &negative_type_map)) {
@@ -250,7 +301,7 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx ctx, struct dy_ast_expr 
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     struct dy_ast_list list;
     if (dy_parse_list(ctx, &list)) {
@@ -262,7 +313,7 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx ctx, struct dy_ast_expr 
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     struct dy_ast_list choice;
     if (dy_parse_choice(ctx, &choice)) {
@@ -274,7 +325,7 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx ctx, struct dy_ast_expr 
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     struct dy_ast_list try_block;
     if (dy_parse_try_block(ctx, &try_block)) {
@@ -286,7 +337,7 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx ctx, struct dy_ast_expr 
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     struct dy_ast_do_block do_block;
     if (dy_parse_do_block(ctx, &do_block)) {
@@ -298,13 +349,13 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx ctx, struct dy_ast_expr 
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     if (parse_expr_parenthesized(ctx, expr)) {
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     if (dy_parse_literal(ctx, DY_STR_LIT("Type"))) {
         *expr = (struct dy_ast_expr){
@@ -314,7 +365,7 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx ctx, struct dy_ast_expr 
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     if (dy_parse_literal(ctx, DY_STR_LIT("String"))) {
         *expr = (struct dy_ast_expr){
@@ -324,7 +375,7 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx ctx, struct dy_ast_expr 
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     dy_string_t var;
     if (dy_parse_variable(ctx, &var)) {
@@ -336,7 +387,7 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx ctx, struct dy_ast_expr 
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     dy_string_t string;
     if (dy_parse_string(ctx, &string)) {
@@ -348,9 +399,9 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx ctx, struct dy_ast_expr 
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
-    // TODO: Error
+    dy_parse_all_choices_failed(&ctx, tr, DY_PARSER_ERROR_CHOICE_EXPRESSION);
 
     return false;
 }
@@ -389,28 +440,37 @@ bool dy_parse_string(struct dy_parser_ctx ctx, dy_string_t *string)
 
 bool parse_expr_further1(struct dy_parser_ctx ctx, struct dy_ast_expr left, struct dy_ast_expr *expr)
 {
-    struct dy_parser_transaction_choice tr = dy_parse_choice_start(ctx);
+    struct dy_parser_transaction_choice tr = dy_parse_choice_start(&ctx);
 
     if (parse_elimination(ctx, left, expr)) {
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     if (parse_positive_value_map(ctx, left, expr)) {
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     if (parse_negative_value_map(ctx, left, expr)) {
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
+
+    dy_string_t excess = {
+        .ptr = ctx.text.ptr + ctx.index_in,
+        .size = tr.largest_text_index - ctx.index_in
+    };
+
+    if (excess.size > 0 && string_is_not_just_whitespace(excess)) {
+        dy_parse_all_choices_failed(&ctx, tr, DY_PARSER_ERROR_CHOICE_NO_SUMMARY);
+        return false;
+    }
 
     *expr = left;
-
     return true;
 }
 
@@ -518,28 +578,37 @@ bool parse_expr_further2(struct dy_parser_ctx ctx, struct dy_ast_expr left, enum
 
 bool parse_expr_further3(struct dy_parser_ctx ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr)
 {
-    struct dy_parser_transaction_choice tr = dy_parse_choice_start(ctx);
+    struct dy_parser_transaction_choice tr = dy_parse_choice_start(&ctx);
 
     if (parse_elimination_further(ctx, left, op, right, expr)) {
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     if (parse_positive_value_map_further(ctx, left, op, right, expr)) {
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
     if (parse_negative_value_map_further(ctx, left, op, right, expr)) {
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
+
+    dy_string_t excess = {
+        .ptr = ctx.text.ptr + ctx.index_in,
+        .size = tr.largest_text_index - ctx.index_in
+    };
+
+    if (excess.size > 0 && string_is_not_just_whitespace(excess)) {
+        dy_parse_all_choices_failed(&ctx, tr, DY_PARSER_ERROR_CHOICE_NO_SUMMARY);
+        return false;
+    }
 
     *expr = combine_infix(ctx, left, op, right);
-
     return true;
 }
 
@@ -639,13 +708,13 @@ bool parse_bare_list(struct dy_parser_ctx ctx, struct dy_ast_list *list)
 
         skip_whitespace_except_newline(ctx);
 
-        struct dy_parser_transaction_choice ctr = dy_parse_choice_start(ctx);
+        struct dy_parser_transaction_choice ctr = dy_parse_choice_start(&ctx);
 
         if (dy_parse_literal(ctx, DY_STR_LIT("}"))) {
             break;
         }
 
-        dy_parse_choice_failed(ctx, ctr);
+        dy_parse_choice_failed(&ctr);
 
         if (dy_parse_literal(ctx, DY_STR_LIT(","))) {
             skip_whitespace(ctx);
@@ -662,7 +731,9 @@ bool parse_bare_list(struct dy_parser_ctx ctx, struct dy_ast_list *list)
             }
         }
 
-        dy_parse_choice_failed(ctx, ctr);
+        dy_parse_choice_failed(&ctr);
+
+        dy_parse_all_choices_failed(&ctx, ctr, DY_PARSER_ERROR_CHOICE_NO_SUMMARY);
 
         return false;
     }
@@ -749,65 +820,20 @@ bool dy_parse_do_block(struct dy_parser_ctx ctx, struct dy_ast_do_block *do_bloc
 
     skip_whitespace(ctx);
 
-    dy_array_t *stmnts = dy_array_create(ctx.allocator, sizeof(struct dy_ast_do_block_stmnt), 4);
-
-    for (;;) {
-        struct dy_ast_do_block_stmnt stmnt;
-        if (!parse_do_block_stmnt(ctx, &stmnt)) {
-            return false;
-        }
-
-        dy_array_add(stmnts, &stmnt);
-
-        skip_whitespace_except_newline(ctx);
-
-        struct dy_parser_transaction_choice ctr = dy_parse_choice_start(ctx);
-
-        if (dy_parse_literal(ctx, DY_STR_LIT("}"))) {
-            break;
-        }
-
-        dy_parse_choice_failed(ctx, ctr);
-
-        if (dy_parse_literal(ctx, DY_STR_LIT(";"))) {
-            skip_whitespace(ctx);
-            continue;
-        }
-
-        dy_parse_choice_failed(ctx, ctr);
-
-        if (dy_parse_literal(ctx, DY_STR_LIT("\n"))) {
-            skip_whitespace(ctx);
-
-            if (dy_parse_literal(ctx, DY_STR_LIT("}"))) {
-                break;
-            } else {
-                continue;
-            }
-        }
-
-        dy_parse_choice_failed(ctx, ctr);
-
+    struct dy_ast_do_block body;
+    if (!parse_do_block_body(ctx, &body)) {
         return false;
     }
 
-    struct dy_ast_do_block_stmnt last_stmnt;
-    dy_array_pop(stmnts, &last_stmnt);
+    skip_whitespace(ctx);
 
-    if (last_stmnt.tag != DY_AST_DO_BLOCK_STMNT_BARE_EXPR) {
-        // TODO: Error
+    if (!dy_parse_literal(ctx, DY_STR_LIT("}"))) {
         return false;
     }
 
-    *do_block = (struct dy_ast_do_block){
-        .stmnts = dy_array_buffer(stmnts),
-        .num_stmnts = dy_array_size(stmnts),
-        .last_expr = alloc_expr(ctx, last_stmnt.expr)
-    };
+    *do_block = body;
 
     dy_parse_multiple_succeeded(ctx, tr);
-
-    dy_array_destroy_instance(stmnts);
 
     return true;
 }
@@ -818,140 +844,91 @@ bool dy_parse_file(struct dy_parser_ctx ctx, struct dy_ast_do_block *do_block)
 
     skip_whitespace(ctx);
 
-    dy_array_t *stmnts = dy_array_create(ctx.allocator, sizeof(struct dy_ast_do_block_stmnt), 4);
-
-    for (;;) {
-        struct dy_ast_do_block_stmnt stmnt;
-        if (!parse_do_block_stmnt(ctx, &stmnt)) {
-            return false;
-        }
-
-        dy_array_add(stmnts, &stmnt);
-
-        skip_whitespace_except_newline(ctx);
-
-        if (is_at_end(ctx)) {
-            break;
-        }
-
-        struct dy_parser_transaction_choice ctr = dy_parse_choice_start(ctx);
-
-        if (dy_parse_literal(ctx, DY_STR_LIT(";"))) {
-            skip_whitespace(ctx);
-            continue;
-        }
-
-        dy_parse_choice_failed(ctx, ctr);
-
-        if (dy_parse_literal(ctx, DY_STR_LIT("\n"))) {
-            skip_whitespace(ctx);
-
-            if (is_at_end(ctx)) {
-                break;
-            } else {
-                continue;
-            }
-        }
-
-        dy_parse_choice_failed(ctx, ctr);
-
+    struct dy_ast_do_block body;
+    if (!parse_do_block_body(ctx, &body)) {
         return false;
     }
 
-    struct dy_ast_do_block_stmnt last_stmnt;
-    dy_array_pop(stmnts, &last_stmnt);
+    skip_whitespace(ctx);
 
-    if (last_stmnt.tag != DY_AST_DO_BLOCK_STMNT_BARE_EXPR) {
-        // TODO: Error
-        return false;
-    }
-
-    *do_block = (struct dy_ast_do_block){
-        .stmnts = dy_array_buffer(stmnts),
-        .num_stmnts = dy_array_size(stmnts),
-        .last_expr = alloc_expr(ctx, last_stmnt.expr)
-    };
+    *do_block = body;
 
     dy_parse_multiple_succeeded(ctx, tr);
-
-    dy_array_destroy_instance(stmnts);
 
     return true;
 }
 
-bool parse_do_block_stmnt(struct dy_parser_ctx ctx, struct dy_ast_do_block_stmnt *stmnt)
+bool parse_do_block_body(struct dy_parser_ctx ctx, struct dy_ast_do_block *do_block)
 {
-    struct dy_parser_transaction_choice tr = dy_parse_choice_start(ctx);
+    struct dy_parser_transaction_choice tr = dy_parse_choice_start(&ctx);
 
-    if (parse_let_stmnt(ctx, stmnt)) {
-        return true;
-    }
-
-    dy_parse_choice_failed(ctx, tr);
-
-    if (parse_stmnt_equal(ctx, stmnt)) {
-        return true;
-    }
-
-    dy_parse_choice_failed(ctx, tr);
-
-    struct dy_ast_expr expr;
-    if (dy_parse_expr(ctx, &expr)) {
-        *stmnt = (struct dy_ast_do_block_stmnt){
-            .tag = DY_AST_DO_BLOCK_STMNT_BARE_EXPR,
-            .expr = expr,
+    struct dy_ast_do_block_equality equality;
+    if (parse_do_block_body_equality(ctx, &equality)) {
+        *do_block = (struct dy_ast_do_block){
+            .tag = DY_AST_DO_BLOCK_EQUALITY,
+            .equality = equality
         };
 
         return true;
     }
 
-    dy_parse_choice_failed(ctx, tr);
+    dy_parse_choice_failed(&tr);
 
-    // TODO: Error
+    struct dy_ast_do_block_let let;
+    if (parse_do_block_body_let(ctx, &let)) {
+        *do_block = (struct dy_ast_do_block){
+            .tag = DY_AST_DO_BLOCK_LET,
+            .let = let
+        };
+
+        return true;
+    }
+
+    dy_parse_choice_failed(&tr);
+
+    struct dy_ast_do_block_ignored_expr ignored_expr;
+    if (parse_do_block_body_ignored_expr(ctx, &ignored_expr)) {
+        *do_block = (struct dy_ast_do_block){
+            .tag = DY_AST_DO_BLOCK_IGNORED_EXPR,
+            .ignored_expr = ignored_expr
+        };
+
+        return true;
+    }
+
+    dy_parse_choice_failed(&tr);
+
+    struct dy_ast_expr end_expr;
+    if (dy_parse_expr(ctx, &end_expr)) {
+        // This is uper hacky, it works though
+        if (tr.largest_text_index > *ctx.index_out) {
+            dy_string_t excess = {
+                .ptr = ctx.text.ptr + *ctx.index_out,
+                .size = tr.largest_text_index - *ctx.index_out
+            };
+
+            if (string_is_not_just_whitespace(excess)) {
+                dy_parse_all_choices_failed(&ctx, tr, DY_PARSER_ERROR_CHOICE_NO_SUMMARY);
+                return false;
+            }
+        }
+
+        *do_block = (struct dy_ast_do_block){
+            .tag = DY_AST_DO_BLOCK_END_EXPR,
+            .end_expr = alloc_expr(ctx, end_expr)
+        };
+
+        return true;
+    }
+
+    dy_parse_choice_failed(&tr);
+
+    dy_parse_all_choices_failed(&ctx, tr, DY_PARSER_ERROR_CHOICE_NO_SUMMARY);
 
     return false;
 }
 
-bool parse_let_stmnt(struct dy_parser_ctx ctx, struct dy_ast_do_block_stmnt *stmnt)
-{
-    struct dy_parser_transaction_multiple tr = dy_parse_multiple_start(&ctx);
-
-    if (!dy_parse_literal(ctx, DY_STR_LIT("let"))) {
-        return false;
-    }
-
-    skip_whitespace(ctx);
-
-    dy_string_t name;
-    if (!dy_parse_variable(ctx, &name)) {
-        return false;
-    }
-
-    skip_whitespace(ctx);
-
-    if (!dy_parse_literal(ctx, DY_STR_LIT("="))) {
-        return false;
-    }
-
-    skip_whitespace(ctx);
-
-    struct dy_ast_expr expr;
-    if (!dy_parse_expr(ctx, &expr)) {
-        return false;
-    }
-
-    dy_parse_multiple_succeeded(ctx, tr);
-
-    *stmnt = (struct dy_ast_do_block_stmnt){
-        .tag = DY_AST_DO_BLOCK_STMNT_LET,
-        .let_arg_name = name,
-        .expr = expr
-    };
-
-    return true;
-}
-
-bool parse_stmnt_equal(struct dy_parser_ctx ctx, struct dy_ast_do_block_stmnt *stmnt)
+bool parse_do_block_body_equality(struct dy_parser_ctx ctx, struct dy_ast_do_block_equality *equality)
 {
     struct dy_parser_transaction_multiple tr = dy_parse_multiple_start(&ctx);
 
@@ -960,28 +937,146 @@ bool parse_stmnt_equal(struct dy_parser_ctx ctx, struct dy_ast_do_block_stmnt *s
         return false;
     }
 
-    skip_whitespace(ctx);
+    skip_whitespace_except_newline(ctx);
 
     if (!dy_parse_literal(ctx, DY_STR_LIT("="))) {
         return false;
     }
 
-    skip_whitespace(ctx);
+    skip_whitespace_except_newline(ctx);
 
     struct dy_ast_expr e2;
     if (!dy_parse_expr(ctx, &e2)) {
         return false;
     }
 
+    skip_whitespace_except_newline(ctx);
+
+    if (!skip_semicolon_or_newline(ctx)) {
+        return false;
+    }
+
+    skip_whitespace(ctx);
+
+    struct dy_ast_do_block rest;
+    if (!parse_do_block_body(ctx, &rest)) {
+        return false;
+    }
+
     dy_parse_multiple_succeeded(ctx, tr);
 
-    *stmnt = (struct dy_ast_do_block_stmnt){
-        .tag = DY_AST_DO_BLOCK_STMNT_EQUALITY,
-        .left_expr = e1,
-        .expr = e2
+    *equality = (struct dy_ast_do_block_equality){
+        .e1 = alloc_expr(ctx, e1),
+        .e2 = alloc_expr(ctx, e2),
+        .rest = dy_alloc(&rest, sizeof rest, ctx.allocator)
     };
 
     return true;
+}
+
+bool parse_do_block_body_let(struct dy_parser_ctx ctx, struct dy_ast_do_block_let *let)
+{
+    struct dy_parser_transaction_multiple tr = dy_parse_multiple_start(&ctx);
+
+    if (!dy_parse_literal(ctx, DY_STR_LIT("let"))) {
+        return false;
+    }
+
+    skip_whitespace_except_newline(ctx);
+
+    dy_string_t name;
+    if (!dy_parse_variable(ctx, &name)) {
+        return false;
+    }
+
+    skip_whitespace_except_newline(ctx);
+
+    if (!dy_parse_literal(ctx, DY_STR_LIT("="))) {
+        return false;
+    }
+
+    skip_whitespace_except_newline(ctx);
+
+    struct dy_ast_expr expr;
+    if (!dy_parse_expr(ctx, &expr)) {
+        return false;
+    }
+
+    skip_whitespace_except_newline(ctx);
+
+    if (!skip_semicolon_or_newline(ctx)) {
+        return false;
+    }
+
+    skip_whitespace(ctx);
+
+    struct dy_ast_do_block rest;
+    if (!parse_do_block_body(ctx, &rest)) {
+        return false;
+    }
+
+    dy_parse_multiple_succeeded(ctx, tr);
+
+    *let = (struct dy_ast_do_block_let){
+        .arg_name = name,
+        .expr = alloc_expr(ctx, expr),
+        .rest = dy_alloc(&rest, sizeof rest, ctx.allocator)
+    };
+
+    return true;
+}
+
+bool parse_do_block_body_ignored_expr(struct dy_parser_ctx ctx, struct dy_ast_do_block_ignored_expr *ignored_expr)
+{
+    struct dy_parser_transaction_multiple tr = dy_parse_multiple_start(&ctx);
+
+    struct dy_ast_expr expr;
+    if (!dy_parse_expr(ctx, &expr)) {
+        return false;
+    }
+
+    skip_whitespace_except_newline(ctx);
+
+    if (!skip_semicolon_or_newline(ctx)) {
+        return false;
+    }
+
+    skip_whitespace(ctx);
+
+    struct dy_ast_do_block rest;
+    if (!parse_do_block_body(ctx, &rest)) {
+        return false;
+    }
+
+    dy_parse_multiple_succeeded(ctx, tr);
+
+    *ignored_expr = (struct dy_ast_do_block_ignored_expr){
+        .expr = alloc_expr(ctx, expr),
+        .rest = dy_alloc(&rest, sizeof rest, ctx.allocator)
+    };
+
+    return true;
+}
+
+bool skip_semicolon_or_newline(struct dy_parser_ctx ctx)
+{
+    struct dy_parser_transaction_choice tr = dy_parse_choice_start(&ctx);
+
+    if (dy_parse_literal(ctx, DY_STR_LIT(";"))) {
+        return true;
+    }
+
+    dy_parse_choice_failed(&tr);
+
+    if (dy_parse_literal(ctx, DY_STR_LIT("\n"))) {
+        return true;
+    }
+
+    dy_parse_choice_failed(&tr);
+
+    dy_parse_all_choices_failed(&ctx, tr, DY_PARSER_ERROR_CHOICE_NO_SUMMARY);
+
+    return false;
 }
 
 bool parse_expr_parenthesized(struct dy_parser_ctx ctx, struct dy_ast_expr *expr)
@@ -1168,25 +1263,25 @@ void skip_whitespace(struct dy_parser_ctx ctx)
     struct dy_parser_transaction_multiple tr = dy_parse_multiple_start(&ctx);
 
     for (;;) {
-        struct dy_parser_transaction_choice ctr = dy_parse_choice_start(ctx);
+        struct dy_parser_transaction_choice ctr = dy_parse_choice_start(&ctx);
 
-        if (parse_one_of(ctx, DY_STR_LIT(" \n\t"))) {
+        if (parse_one_of(ctx, DY_STR_LIT(" \n\t"), DY_PARSER_ERROR_CHOICE_NO_SUMMARY)) {
             continue;
         }
 
-        dy_parse_choice_failed(ctx, ctr);
+        dy_parse_choice_failed(&ctr);
 
         if (skip_block_comment(ctx)) {
             continue;
         }
 
-        dy_parse_choice_failed(ctx, ctr);
+        dy_parse_choice_failed(&ctr);
 
         if (skip_line_comment(ctx)) {
             continue;
         }
 
-        dy_parse_choice_failed(ctx, ctr);
+        dy_parse_choice_failed(&ctr);
 
         dy_parse_multiple_succeeded(ctx, tr);
 
@@ -1199,25 +1294,25 @@ void skip_whitespace_except_newline(struct dy_parser_ctx ctx)
     struct dy_parser_transaction_multiple tr = dy_parse_multiple_start(&ctx);
 
     for (;;) {
-        struct dy_parser_transaction_choice ctr = dy_parse_choice_start(ctx);
+        struct dy_parser_transaction_choice ctr = dy_parse_choice_start(&ctx);
 
-        if (parse_one_of(ctx, DY_STR_LIT(" \t"))) {
+        if (parse_one_of(ctx, DY_STR_LIT(" \t"), DY_PARSER_ERROR_CHOICE_NO_SUMMARY)) {
             continue;
         }
 
-        dy_parse_choice_failed(ctx, ctr);
+        dy_parse_choice_failed(&ctr);
 
         if (skip_block_comment(ctx)) {
             continue;
         }
 
-        dy_parse_choice_failed(ctx, ctr);
+        dy_parse_choice_failed(&ctr);
 
         if (skip_line_comment(ctx)) {
             continue;
         }
 
-        dy_parse_choice_failed(ctx, ctr);
+        dy_parse_choice_failed(&ctr);
 
         dy_parse_multiple_succeeded(ctx, tr);
 
@@ -1235,15 +1330,33 @@ bool is_at_end(struct dy_parser_ctx ctx)
     return ctx.index_in >= ctx.text.size;
 }
 
-bool parse_one_of(struct dy_parser_ctx ctx, dy_string_t chars)
+bool parse_one_of(struct dy_parser_ctx ctx, dy_string_t chars, enum dy_parser_error_choice_tag tag)
 {
-    if (is_at_end(ctx)) {
-        return false;
-    }
+    if (is_at_end(ctx) || !dy_string_matches_one_of(ctx.text.ptr[ctx.index_in], chars)) {
+        dy_array_t *errors = dy_array_create(ctx.allocator, sizeof(struct dy_parser_error_without_index), chars.size);
 
-    char c = ctx.text.ptr[ctx.index_in];
+        for (size_t i = 0; i < chars.size; ++i) {
+            char c = chars.ptr[i];
 
-    if (!dy_string_matches_one_of(c, chars)) {
+            struct dy_parser_error_without_index err = {
+                .tag = DY_PARSER_ERROR_EXPECTED_CHAR,
+                .expected_char = c,
+            };
+
+            dy_array_add(errors, &err);
+        }
+
+        *ctx.error = (struct dy_parser_error){
+            .error_without_index = {
+                .tag = DY_PARSER_ERROR_CHOICE,
+                .choice = {
+                    .errors_without_index = errors,
+                    .tag = tag,
+                },
+            },
+            .text_index = ctx.index_in
+        };
+
         return false;
     }
 
@@ -1254,13 +1367,15 @@ bool parse_one_of(struct dy_parser_ctx ctx, dy_string_t chars)
 
 bool parse_exactly_one(struct dy_parser_ctx ctx, char c)
 {
-    if (is_at_end(ctx)) {
-        return false;
-    }
+    if (is_at_end(ctx) || (c != ctx.text.ptr[ctx.index_in])) {
+        *ctx.error = (struct dy_parser_error){
+            .error_without_index = {
+                .tag = DY_PARSER_ERROR_EXPECTED_CHAR,
+                .expected_char = c,
+            },
+            .text_index = ctx.index_in
+        };
 
-    char c2 = ctx.text.ptr[ctx.index_in];
-
-    if (c != c2) {
         return false;
     }
 
@@ -1272,6 +1387,13 @@ bool parse_exactly_one(struct dy_parser_ctx ctx, char c)
 bool get_char(struct dy_parser_ctx ctx, char *c)
 {
     if (is_at_end(ctx)) {
+        *ctx.error = (struct dy_parser_error){
+            .error_without_index = {
+                .tag = DY_PARSER_ERROR_EXPECTED_ANY_CHAR,
+            },
+            .text_index = ctx.index_in
+        };
+
         return false;
     }
 
@@ -1280,4 +1402,15 @@ bool get_char(struct dy_parser_ctx ctx, char *c)
     *ctx.index_out = ctx.index_in + 1;
 
     return true;
+}
+
+bool string_is_not_just_whitespace(dy_string_t s)
+{
+    for (size_t i = 0; i < s.size; ++i) {
+        if (s.ptr[i] != ' ' && s.ptr[i] != '\n' && s.ptr[i] != '\t') {
+            return true;
+        }
+    }
+
+    return false;
 }

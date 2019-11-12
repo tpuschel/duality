@@ -22,6 +22,7 @@ struct dy_ast_to_core_ctx {
     size_t *running_id;
     struct dy_allocator allocator;
     dy_array_t *bound_vars;
+    dy_array_t *unbound_vars;
 };
 
 DY_SYNTAX_API bool dy_ast_expr_to_core(struct dy_ast_to_core_ctx ctx, struct dy_ast_expr expr, struct dy_core_expr *core_expr);
