@@ -2,22 +2,16 @@ cmake_minimum_required(VERSION 3.15)
 
 project(duality)
 
-if(NOT TARGET support)
-    add_subdirectory("support")
-endif()
+option(DY_BUILD_IDE "Build the IDE written in Qt" ON)
 
-if(NOT TARGET core)
-    add_subdirectory("core")
-endif()
+add_subdirectory("support")
 
-if(NOT TARGET syntax)
-    add_subdirectory("syntax")
-endif()
+add_subdirectory("core")
 
-if(NOT TARGET cli)
-    add_subdirectory("cli")
-endif()
+add_subdirectory("syntax")
 
-if(NOT TARGET ide)
+add_subdirectory("cli")
+
+if (DY_BUILD_IDE)
     add_subdirectory("ide")
 endif()
