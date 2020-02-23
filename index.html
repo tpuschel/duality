@@ -7,85 +7,96 @@
   <link rel="stylesheet" href="styles.css">
 
   <title>The Duality Programming Language</title>
+
+  <link rel="icon" href="favicon.png">
 </head>
 
 <body>
-  <a href="https://github.com/tpuschel/duality">Source on GitHub</a>
+  <header>
+    <nav>
+      <a class="current-link" href="/index.html">Home</a>
+      <a href="/documentation.html">Documentation</a>
+      <a href="/downloads.html">Downloads</a>
+    </nav>
+    <a href="https://github.com/tpuschel/duality">Source on GitHub</a>
+  </header>
 
-  <div id="code-box">
-    <textarea id="code-textarea" placeholder="Enter code here..." spellcheck="false"></textarea>
+  <main>
+    <div id="code-box">
+      <textarea id="code-textarea" placeholder="Enter code here..." spellcheck="false"></textarea>
 
-    <div id="result-div"></div>
-  </div>
+      <div id="result-div"></div>
+    </div>
 
-  <script src="dy.js"></script>
+    <script src="dy.js"></script>
 
-  <script src="processCode.js"></script>
+    <script src="processCode.js"></script>
 
-  <script>
-    'use strict'
+    <script>
+      'use strict'
 
-    let timeoutId = undefined
+      let timeoutId = undefined
 
-    const textArea = document.getElementById('code-textarea')
+      const textArea = document.getElementById('code-textarea')
 
-    const processCodeAndDisplay = () => {
-      timeoutId = undefined
-
-      const resultDiv = document.getElementById('result-div')
-
-      if (textArea.value) {
-        resultDiv.textContent = processCode(textArea.value)
-      } else {
-        resultDiv.textContent = ''
-      }
-    }
-
-    const onRuntimeInitialized = () => {
-      const savedData = window.localStorage.getItem('code')
-      if (savedData) {
-        textArea.value = savedData
-        processCodeAndDisplay()
-      }
-
-      textArea.addEventListener('input', () => {
+      const processCodeAndDisplay = () => {
         window.localStorage.setItem('code', textArea.value)
 
-        if (timeoutId) {
-          window.clearTimeout(timeoutId)
+        timeoutId = undefined
+
+        const resultDiv = document.getElementById('result-div')
+
+        if (textArea.value) {
+          resultDiv.textContent = processCode(textArea.value)
+        } else {
+          resultDiv.textContent = ''
+        }
+      }
+
+      const onRuntimeInitialized = () => {
+        const savedData = window.localStorage.getItem('code')
+        if (savedData) {
+          textArea.value = savedData
+          processCodeAndDisplay()
         }
 
-        timeoutId = window.setTimeout(processCodeAndDisplay, 1000 * 0.3)
+        textArea.addEventListener('input', () => {
+          if (timeoutId) {
+            window.clearTimeout(timeoutId)
+          }
+
+          timeoutId = window.setTimeout(processCodeAndDisplay, 1000 * 0.3)
+        })
+      }
+
+      Module['onRuntimeInitialized'] = onRuntimeInitialized;
+
+      textArea.addEventListener('keydown', event => {
+        if (event.isComposing || event.keyCode === 229) {
+          return
+        }
+
+        if (event.key != "Tab") {
+          return
+        }
+
+        event.preventDefault()
+
+        if (textArea.selectionStart || textArea.selectionStart === 0) {
+          const startPos = textArea.selectionStart
+          const endPos = textArea.selectionEnd
+
+          const tabReplacement = '    '
+
+          textArea.value = textArea.value.substring(0, startPos) + tabReplacement + textArea.value.substring(endPos, textArea.value.length)
+          textArea.selectionStart = startPos + tabReplacement.length
+          textArea.selectionEnd = startPos + tabReplacement.length
+        } else {
+          textArea.value += tabReplacement
+        }
       })
-    }
-
-    Module['onRuntimeInitialized'] = onRuntimeInitialized;
-
-    textArea.addEventListener('keydown', event => {
-      if (event.isComposing || event.keyCode === 229) {
-        return
-      }
-
-      if (event.key != "Tab") {
-        return
-      }
-
-      event.preventDefault()
-
-      if (textArea.selectionStart || textArea.selectionStart === 0) {
-        const startPos = textArea.selectionStart
-        const endPos = textArea.selectionEnd
-
-        const tabReplacement = '    '
-
-        textArea.value = textArea.value.substring(0, startPos) + tabReplacement + textArea.value.substring(endPos, textArea.value.length)
-        textArea.selectionStart = startPos + tabReplacement.length
-        textArea.selectionEnd = startPos + tabReplacement.length
-      } else {
-        textArea.value += tabReplacement
-      }
-    })
-  </script>
+    </script>
+  </main>
 </body>
 
 </html>

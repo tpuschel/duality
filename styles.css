@@ -1,6 +1,22 @@
-html, body {
-    height: 100%;
-    width: 100%;
+header {
+    display: flex;
+    justify-content: center;
+}
+
+header a {
+    color: black;
+    text-decoration: none;
+    margin: 1em;
+    font-size: large;
+}
+
+header .current-link {
+    text-decoration: underline;
+}
+
+nav {
+    display: flex;
+    justify-content: center
 }
 
 #code-textarea {
