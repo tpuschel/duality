@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
@@ -48,40 +48,13 @@ dy_array_t *dy_array_create_with_seperate_allocators(struct dy_allocator instanc
 size_t dy_array_add(dy_array_t *array, const void *value)
 {
     size_t size = array->num_elems;
-    memcpy(dy_array_add_uninit(array), value, array->elem_size);
+    dy_array_insert_keep_order(array, size, value);
     return size;
 }
 
-void *dy_array_add_uninit(dy_array_t *array)
+void dy_array_prepend_keep_order(dy_array_t *array, const void *value)
 {
-    if (array->num_elems == array->capacity) {
-        dy_assert(!dy_size_t_mul_overflow(array->capacity, 2, &array->capacity));
-
-        size_t capacity_in_bytes;
-        dy_assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
-
-        array->buffer = array->space_allocator.realloc(array->buffer, capacity_in_bytes, array->space_allocator.env);
-    }
-
-    ++array->num_elems;
-
-    return last(array);
-}
-
-void dy_array_prepend(dy_array_t *array, const void *value)
-{
-    if (array->num_elems == array->capacity) {
-        dy_assert(!dy_size_t_mul_overflow(array->capacity, 2, &array->capacity));
-
-        size_t capacity_in_bytes;
-        dy_assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
-
-        array->buffer = array->space_allocator.realloc(array->buffer, capacity_in_bytes, array->space_allocator.env);
-    }
-
-    memmove(pos(array, 1), pos(array, 0), array->elem_size * (array->num_elems - 1));
-    memcpy(pos(array, 0), value, array->elem_size);
-    ++array->elem_size;
+    dy_array_insert_keep_order(array, 0, value);
 }
 
 void dy_array_remove(dy_array_t *array, size_t index)
@@ -94,6 +67,24 @@ void dy_array_remove_keep_order(dy_array_t *array, size_t index)
 {
     memcpy(pos(array, index), pos(array, index + 1), array->elem_size * (array->num_elems - index - 1));
     --array->num_elems;
+}
+
+void dy_array_insert_keep_order(dy_array_t *array, size_t index, const void *value)
+{
+    dy_assert(index <= array->num_elems);
+
+    if (array->num_elems == array->capacity) {
+        dy_assert(!dy_size_t_mul_overflow(array->capacity, 2, &array->capacity));
+
+        size_t capacity_in_bytes;
+        dy_assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
+
+        array->buffer = array->space_allocator.realloc(array->buffer, capacity_in_bytes, array->space_allocator.env);
+    }
+
+    memmove(pos(array, index + 1), pos(array, index), array->elem_size * (array->num_elems - index));
+    memcpy(pos(array, index), value, array->elem_size);
+    ++array->num_elems;
 }
 
 void dy_array_get(const dy_array_t *array, size_t index, void *value)
@@ -109,6 +100,34 @@ void *dy_array_get_ptr(const dy_array_t *array, size_t index)
 void dy_array_set(dy_array_t *array, size_t index, const void *value)
 {
     memcpy(pos(array, index), value, array->elem_size);
+}
+
+void dy_array_set_excess_capacity(dy_array_t *array, size_t excess_capacity)
+{
+    size_t current_excess_capacity = array->capacity - array->num_elems;
+
+    if (current_excess_capacity >= excess_capacity) {
+        return;
+    }
+
+    size_t added_capacity = excess_capacity - current_excess_capacity;
+
+    dy_assert(!dy_size_t_add_overflow(array->capacity, added_capacity, &array->capacity));
+
+    size_t capacity_in_bytes;
+    dy_assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
+
+    array->buffer = array->space_allocator.realloc(array->buffer, capacity_in_bytes, array->space_allocator.env);
+}
+
+void dy_array_add_to_size(dy_array_t *array, size_t added_size)
+{
+    dy_assert(!dy_size_t_add_overflow(array->num_elems, added_size, &array->num_elems));
+}
+
+void *dy_array_excess_buffer(const dy_array_t *array)
+{
+    return pos(array, array->num_elems);
 }
 
 void *dy_array_buffer(const dy_array_t *array)

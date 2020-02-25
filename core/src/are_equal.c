@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
@@ -9,11 +9,11 @@
 #include <duality/support/assert.h>
 #include "substitute.h"
 
-static dy_ternary_t is_equal_to_both(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_pair both);
+static dy_ternary_t is_equal_to_both_positive(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_both both);
 
-static dy_ternary_t is_equal_to_any_of(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_pair any_of);
+static dy_ternary_t is_equal_to_both_negative(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_both both);
 
-static dy_ternary_t pair_is_equal_to_pair(struct dy_check_ctx ctx, struct dy_core_pair p1, struct dy_core_pair p2);
+static dy_ternary_t both_is_equal_to_both(struct dy_check_ctx ctx, struct dy_core_both p1, struct dy_core_both p2);
 
 static dy_ternary_t value_map_is_equal(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr expr);
 
@@ -29,24 +29,24 @@ static dy_ternary_t value_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_c
 
 static dy_ternary_t type_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_type_map_elim elim, struct dy_core_expr expr);
 
-static dy_ternary_t one_of_is_equal(struct dy_check_ctx ctx, struct dy_core_pair one_of, struct dy_core_expr expr);
+static dy_ternary_t one_of_is_equal(struct dy_check_ctx ctx, struct dy_core_one_of one_of, struct dy_core_expr expr);
 
 dy_ternary_t dy_are_equal(struct dy_check_ctx ctx, struct dy_core_expr e1, struct dy_core_expr e2)
 {
-    if (e1.tag == DY_CORE_EXPR_BOTH) {
-        return is_equal_to_both(ctx, e2, e1.both);
+    if (e1.tag == DY_CORE_EXPR_BOTH && e1.both.polarity == DY_CORE_POLARITY_POSITIVE) {
+        return is_equal_to_both_positive(ctx, e2, e1.both);
     }
 
-    if (e2.tag == DY_CORE_EXPR_BOTH) {
-        return is_equal_to_both(ctx, e1, e2.both);
+    if (e2.tag == DY_CORE_EXPR_BOTH && e2.both.polarity == DY_CORE_POLARITY_POSITIVE) {
+        return is_equal_to_both_positive(ctx, e1, e2.both);
     }
 
-    if (e1.tag == DY_CORE_EXPR_ANY_OF) {
-        return is_equal_to_any_of(ctx, e2, e1.any_of);
+    if (e1.tag == DY_CORE_EXPR_BOTH && e1.both.polarity == DY_CORE_POLARITY_NEGATIVE) {
+        return is_equal_to_both_negative(ctx, e2, e1.both);
     }
 
-    if (e2.tag == DY_CORE_EXPR_ANY_OF) {
-        return is_equal_to_any_of(ctx, e1, e2.any_of);
+    if (e2.tag == DY_CORE_EXPR_BOTH && e2.both.polarity == DY_CORE_POLARITY_NEGATIVE) {
+        return is_equal_to_both_negative(ctx, e1, e2.both);
     }
 
     if (e2.tag == DY_CORE_EXPR_UNKNOWN) {
@@ -78,8 +78,8 @@ dy_ternary_t dy_are_equal(struct dy_check_ctx ctx, struct dy_core_expr e1, struc
         return unknown_is_equal(ctx, e1.unknown, e2);
     case DY_CORE_EXPR_ONE_OF:
         return one_of_is_equal(ctx, e1.one_of, e2);
-    case DY_CORE_EXPR_TYPE_OF_TYPES:
-        if (e2.tag == DY_CORE_EXPR_TYPE_OF_TYPES) {
+    case DY_CORE_EXPR_END:
+        if (e2.tag == DY_CORE_EXPR_END && e1.end_polarity == e2.end_polarity) {
             return DY_YES;
         } else {
             return DY_NO;
@@ -100,47 +100,82 @@ dy_ternary_t dy_are_equal(struct dy_check_ctx ctx, struct dy_core_expr e1, struc
         } else {
             return DY_NO;
         }
+    case DY_CORE_EXPR_PRINT:
+        if (e2.tag == DY_CORE_EXPR_PRINT) {
+            return DY_YES;
+        } else {
+            return DY_NO;
+        }
     case DY_CORE_EXPR_BOTH:
-    case DY_CORE_EXPR_ANY_OF:
         dy_bail("should not be reachable!");
     }
 
     DY_IMPOSSIBLE_ENUM();
 }
 
-dy_ternary_t is_equal_to_both(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_pair both)
+dy_ternary_t is_equal_to_both_positive(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_both both)
 {
-    if (expr.tag == DY_CORE_EXPR_BOTH) {
-        return pair_is_equal_to_pair(ctx, expr.both, both);
+    if (expr.tag == DY_CORE_EXPR_BOTH && expr.both.polarity == DY_CORE_POLARITY_POSITIVE) {
+        return both_is_equal_to_both(ctx, expr.both, both);
     }
 
-    dy_ternary_t first_res = dy_are_equal(ctx, expr, *both.first);
-
-    dy_ternary_t second_res = dy_are_equal(ctx, expr, *both.second);
-
-    return dy_ternary_conjunction(first_res, second_res);
-}
-
-dy_ternary_t is_equal_to_any_of(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_pair any_of)
-{
-    if (expr.tag == DY_CORE_EXPR_ANY_OF) {
-        return pair_is_equal_to_pair(ctx, expr.any_of, any_of);
+    dy_ternary_t first_res = dy_are_equal(ctx, expr, *both.e1);
+    if (first_res == DY_NO) {
+        return DY_NO;
     }
 
-    dy_ternary_t first_res = dy_are_equal(ctx, expr, *any_of.first);
+    dy_ternary_t second_res = dy_are_equal(ctx, expr, *both.e2);
+    if (second_res == DY_NO) {
+        return DY_NO;
+    }
 
-    dy_ternary_t second_res = dy_are_equal(ctx, expr, *any_of.second);
+    if (first_res == DY_MAYBE || second_res == DY_MAYBE) {
+        return DY_MAYBE;
+    }
 
-    return dy_ternary_disjunction(first_res, second_res);
+    return DY_YES;
 }
 
-dy_ternary_t pair_is_equal_to_pair(struct dy_check_ctx ctx, struct dy_core_pair p1, struct dy_core_pair p2)
+dy_ternary_t is_equal_to_both_negative(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_both both)
 {
-    dy_ternary_t first_res = dy_are_equal(ctx, *p1.first, *p2.first);
+    if (expr.tag == DY_CORE_EXPR_BOTH && expr.both.polarity == DY_CORE_POLARITY_NEGATIVE) {
+        return both_is_equal_to_both(ctx, expr.both, both);
+    }
 
-    dy_ternary_t second_res = dy_are_equal(ctx, *p1.second, *p2.second);
+    dy_ternary_t first_res = dy_are_equal(ctx, expr, *both.e1);
+    if (first_res == DY_YES) {
+        return DY_YES;
+    }
 
-    return dy_ternary_conjunction(first_res, second_res);
+    dy_ternary_t second_res = dy_are_equal(ctx, expr, *both.e2);
+    if (second_res == DY_YES) {
+        return DY_YES;
+    }
+
+    if (first_res == DY_MAYBE || second_res == DY_MAYBE) {
+        return DY_MAYBE;
+    }
+
+    return DY_NO;
+}
+
+dy_ternary_t both_is_equal_to_both(struct dy_check_ctx ctx, struct dy_core_both p1, struct dy_core_both p2)
+{
+    dy_ternary_t first_res = dy_are_equal(ctx, *p1.e1, *p2.e1);
+    if (first_res == DY_NO) {
+        return DY_NO;
+    }
+
+    dy_ternary_t second_res = dy_are_equal(ctx, *p1.e2, *p2.e2);
+    if (second_res == DY_NO) {
+        return DY_NO;
+    }
+
+    if (first_res == DY_MAYBE || second_res == DY_MAYBE) {
+        return DY_MAYBE;
+    }
+
+    return DY_YES;
 }
 
 dy_ternary_t value_map_is_equal(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr expr)
@@ -154,15 +189,25 @@ dy_ternary_t value_map_is_equal(struct dy_check_ctx ctx, struct dy_core_value_ma
 
 dy_ternary_t value_map_is_equal_to_value_map(struct dy_check_ctx ctx, struct dy_core_value_map value_map1, struct dy_core_value_map value_map2)
 {
-    if (value_map1.polarity != value_map2.polarity) {
+    if (value_map1.polarity != value_map2.polarity || value_map1.is_implicit != value_map2.is_implicit) {
         return DY_NO;
     }
 
     dy_ternary_t first_res = dy_are_equal(ctx, *value_map1.e1, *value_map2.e1);
+    if (first_res == DY_NO) {
+        return DY_NO;
+    }
 
     dy_ternary_t second_res = dy_are_equal(ctx, *value_map1.e2, *value_map2.e2);
+    if (second_res == DY_NO) {
+        return DY_NO;
+    }
 
-    return dy_ternary_conjunction(first_res, second_res);
+    if (first_res == DY_MAYBE || second_res == DY_MAYBE) {
+        return DY_MAYBE;
+    }
+
+    return DY_YES;
 }
 
 dy_ternary_t type_map_is_equal(struct dy_check_ctx ctx, struct dy_core_type_map type_map, struct dy_core_expr expr)
@@ -176,29 +221,43 @@ dy_ternary_t type_map_is_equal(struct dy_check_ctx ctx, struct dy_core_type_map 
 
 dy_ternary_t type_map_is_equal_to_type_map(struct dy_check_ctx ctx, struct dy_core_type_map type_map1, struct dy_core_type_map type_map2)
 {
-    if (type_map1.polarity != type_map2.polarity) {
+    if (type_map1.polarity != type_map2.polarity || type_map1.is_implicit != type_map2.is_implicit) {
         return DY_NO;
     }
 
     struct dy_core_expr id_expr = {
         .tag = DY_CORE_EXPR_UNKNOWN,
-        .unknown = type_map1.arg
+        .unknown = {
+            .id = type_map1.arg_id,
+            .type = type_map1.arg_type,
+            .is_inference_var = false,
+        }
     };
 
-    return dy_are_equal(ctx, *type_map1.expr, substitute(ctx, type_map2.arg.id, id_expr, *type_map2.expr));
+    return dy_are_equal(ctx, *type_map1.expr, substitute(ctx, type_map2.arg_id, id_expr, *type_map2.expr));
 }
 
-dy_ternary_t one_of_is_equal(struct dy_check_ctx ctx, struct dy_core_pair one_of, struct dy_core_expr expr)
+dy_ternary_t one_of_is_equal(struct dy_check_ctx ctx, struct dy_core_one_of one_of, struct dy_core_expr expr)
 {
     if (expr.tag != DY_CORE_EXPR_ONE_OF) {
         return DY_MAYBE;
     }
 
     dy_ternary_t first_res = dy_are_equal(ctx, *one_of.first, *expr.one_of.first);
+    if (first_res == DY_NO) {
+        return DY_NO;
+    }
 
     dy_ternary_t second_res = dy_are_equal(ctx, *one_of.second, *expr.one_of.second);
+    if (second_res == DY_NO) {
+        return DY_NO;
+    }
 
-    return dy_ternary_conjunction(first_res, second_res);
+    if (first_res == DY_MAYBE || second_res == DY_MAYBE) {
+        return DY_MAYBE;
+    }
+
+    return DY_YES;
 }
 
 dy_ternary_t unknown_is_equal(struct dy_check_ctx ctx, struct dy_core_unknown unknown, struct dy_core_expr expr)
@@ -221,10 +280,20 @@ dy_ternary_t value_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_val
     }
 
     dy_ternary_t first_res = dy_are_equal(ctx, *elim.expr, *expr.value_map_elim.expr);
+    if (first_res == DY_NO) {
+        return DY_NO;
+    }
 
     dy_ternary_t second_res = value_map_is_equal_to_value_map(ctx, elim.value_map, expr.value_map_elim.value_map);
+    if (second_res == DY_NO) {
+        return DY_NO;
+    }
 
-    return dy_ternary_conjunction(first_res, second_res);
+    if (first_res == DY_MAYBE || second_res == DY_MAYBE) {
+        return DY_MAYBE;
+    }
+
+    return DY_YES;
 }
 
 dy_ternary_t type_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_type_map_elim elim, struct dy_core_expr expr)
@@ -234,8 +303,18 @@ dy_ternary_t type_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_type
     }
 
     dy_ternary_t first_res = dy_are_equal(ctx, *elim.expr, *expr.type_map_elim.expr);
+    if (first_res == DY_NO) {
+        return DY_NO;
+    }
 
     dy_ternary_t second_res = type_map_is_equal_to_type_map(ctx, elim.type_map, expr.type_map_elim.type_map);
+    if (second_res == DY_NO) {
+        return DY_NO;
+    }
 
-    return dy_ternary_conjunction(first_res, second_res);
+    if (first_res == DY_MAYBE || second_res == DY_MAYBE) {
+        return DY_MAYBE;
+    }
+
+    return DY_YES;
 }

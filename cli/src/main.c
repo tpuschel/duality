@@ -1,6 +1,7 @@
 /*
- * Copyright 2017 - 2019, Thorben Hasenpusch
- * Licensed under the MIT license.
+ * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ *
+ * SPDX-License-Identifier: MIT
  */
 
 #include <duality/syntax/parser.h>
@@ -8,6 +9,7 @@
 
 #include <duality/core/check.h>
 #include <duality/core/eval.h>
+#include <duality/core/constraint.h>
 
 #include <duality/support/assert.h>
 
@@ -16,14 +18,11 @@
 #include <assert.h>
 #include <string.h>
 
-static dy_string_t read_file_whole(const char *path);
-static dy_string_t read_stdin_until_eof(void);
+#include "lsp_server.h"
 
-static void *malloc_(size_t size, void *env);
-static void *realloc_(void *ptr, size_t size, void *env);
-static void free_(void *ptr, size_t size, void *env);
+static void read_chunk(dy_array_t *buffer, void *env);
 
-static const size_t INITIAL_STDIN_BUFFER_SIZE = 256;
+static const size_t CHUNK_SIZE = 1024;
 
 static void print_core_expr(struct dy_core_expr expr, struct dy_allocator allocator);
 
@@ -31,87 +30,92 @@ static void print_string(FILE *stream, dy_string_t s);
 
 static void print_unbound_vars_error(dy_array_t *unbound_vars);
 
-static void print_parser_error(dy_string_t text, size_t text_index, struct dy_parser_error_without_index error);
-
 int main(int argc, const char *argv[])
 {
-    dy_string_t program_text;
-    if (argc == 1) {
-        program_text = read_stdin_until_eof();
-    } else if (argc == 2) {
-        program_text = read_file_whole(argv[1]);
-    } else {
-        fprintf(stderr, "Too many arguments; accepting only up to one.\n");
-        return -1;
+    if (argc > 1 && strcmp(argv[1], "--server") == 0) {
+        return run_lsp_server();
     }
 
-    struct dy_allocator allocator = {
-        .alloc = malloc_,
-        .realloc = realloc_,
-        .free = free_,
-        .env = NULL
-    };
-
-    size_t running_id = 0;
-    size_t index_out;
-    struct dy_parser_error parser_error;
+    FILE *stream;
+    if (argc > 1) {
+        stream = fopen(argv[1], "r");
+        if (stream == NULL) {
+            perror("Error reading file: ");
+            return -1;
+        }
+    } else {
+        stream = stdin;
+    }
 
     struct dy_parser_ctx parser_ctx = {
-        .text = program_text,
-        .index_in = 0,
-        .index_out = &index_out,
-        .error = &parser_error,
-        .allocator = allocator
+        .stream = {
+            .get_chars = read_chunk,
+            .buffer = dy_array_create(dy_allocator_stdlib(), sizeof(char), CHUNK_SIZE),
+            .env = stream,
+            .current_index = 0,
+        },
+        .allocator = dy_allocator_stdlib(),
+        .arrays = dy_array_create(dy_allocator_stdlib(), sizeof(dy_array_t *), 32)
     };
 
     struct dy_ast_do_block program_ast;
-    if (!dy_parse_file(parser_ctx, &program_ast)) {
+    if (!dy_parse_file(&parser_ctx, &program_ast)) {
         fprintf(stderr, "Failed to parse program.\n");
-        print_parser_error(program_text, parser_error.text_index, parser_error.error_without_index);
         return -1;
     }
 
-    dy_array_t *unbound_vars = dy_array_create(allocator, sizeof(dy_string_t), 2);
+    size_t running_id = 0;
+    dy_array_t *unbound_vars = dy_array_create(dy_allocator_stdlib(), sizeof(dy_string_t), 2);
 
     struct dy_ast_to_core_ctx ast_to_core_ctx = {
         .running_id = &running_id,
-        .bound_vars = dy_array_create(allocator, sizeof(struct dy_ast_to_core_bound_var), 64),
-        .allocator = allocator,
+        .bound_vars = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_ast_to_core_bound_var), 64),
+        .allocator = dy_allocator_stdlib(),
         .unbound_vars = unbound_vars
     };
 
     struct dy_core_expr program;
-    if (!dy_ast_do_block_to_core(ast_to_core_ctx, program_ast, &program)) {
+    dy_array_t *sub_maps = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    if (!dy_ast_do_block_to_core(&ast_to_core_ctx, program_ast, &program, sub_maps)) {
         print_unbound_vars_error(unbound_vars);
         return -1;
     }
 
     printf("Core:\n");
-    print_core_expr(program, allocator);
+    print_core_expr(program, dy_allocator_stdlib());
     printf("\n");
 
     struct dy_check_ctx check_ctx = {
         .running_id = &running_id,
-        .allocator = allocator
+        .allocator = dy_allocator_stdlib(),
+        .successful_elims = dy_array_create(dy_allocator_stdlib(), sizeof(size_t), 32)
     };
 
     struct dy_core_expr checked_program;
-    dy_ternary_t is_valid = dy_check_expr(check_ctx, program, &checked_program);
-
-    if (is_valid == DY_NO) {
+    struct dy_constraint constraint;
+    bool have_constraint = false;
+    if (!dy_check_expr(check_ctx, program, &checked_program, &constraint, &have_constraint)) {
         fprintf(stderr, "Program failed check.\n");
         return -1;
     }
+    if (have_constraint) {
+        fprintf(stderr, "Constraint on top level??.\n");
+        return -1;
+    }
+
+    printf("Checked Core:\n");
+    print_core_expr(checked_program, dy_allocator_stdlib());
+    printf("\n");
 
     struct dy_core_expr result;
-    is_valid = dy_eval_expr(check_ctx, checked_program, &result);
+    dy_ternary_t is_valid = dy_eval_expr(check_ctx, checked_program, &result);
     if (is_valid == DY_NO) {
         fprintf(stderr, "Program execution failed.\n");
         return -1;
     }
 
     printf("Result:\n");
-    print_core_expr(result, allocator);
+    print_core_expr(result, dy_allocator_stdlib());
     printf("\n");
 
     return 0;
@@ -158,147 +162,17 @@ void print_core_expr(struct dy_core_expr expr, struct dy_allocator allocator)
     dy_array_destroy(s);
 }
 
-void print_parser_error(dy_string_t text, size_t text_index, struct dy_parser_error_without_index error)
+void read_chunk(dy_array_t *buffer, void *env)
 {
-    switch (error.tag) {
-    case DY_PARSER_ERROR_EXPECTED_ANY_CHAR:
-        fprintf(stderr, "Unexpected end of file.\n");
-        return;
-    case DY_PARSER_ERROR_EXPECTED_CHAR:
-        if (text_index == text.size) {
-            fprintf(stderr, "Unexpected end of file, expected '%c'.\n", error.expected_char);
-        } else {
-            fprintf(stderr, "Encountered '%c', expected '%c'.\n", text.ptr[text_index], error.expected_char);
-        }
+    FILE *stream = env;
 
-        return;
-    case DY_PARSER_ERROR_CHOICE: {
-        switch (error.choice.tag) {
-        case DY_PARSER_ERROR_CHOICE_EXPRESSION:
-            if (text_index == text.size) {
-                fprintf(stderr, "Unexpected end of file, expected an expression.\n");
-            } else {
-                fprintf(stderr, "Expected an expression instead of '%c'.\n", text.ptr[text_index]);
-            }
-            return;
-        case DY_PARSER_ERROR_CHOICE_LOWERCASE_LETTERS:
-            fprintf(stderr, "Expected a lowercase letter instead of '%c'.\n", text.ptr[text_index]);
-            return;
-        case DY_PARSER_ERROR_CHOICE_LOWERCASE_LETTERS_DIGITS_UNDERSCORE_AND_QUESTION_MARK:
-            fprintf(stderr, "Expected either a lowercase letter, a digit, an underscore or a question mark instead of '%c'.\n", text.ptr[text_index]);
-            return;
-        case DY_PARSER_ERROR_CHOICE_NO_SUMMARY:
-            break;
-        }
-
-        size_t num_choices = dy_array_size(error.choice.errors_without_index);
-        if (num_choices == 1) {
-            print_parser_error(text, text_index, *(struct dy_parser_error_without_index *)dy_array_buffer(error.choice.errors_without_index));
-            return;
-        }
-
-        printf("num choices: %zu\n", num_choices);
-
-        for (size_t i = 0; i < num_choices; ++i) {
-            struct dy_parser_error_without_index err;
-            dy_array_get(error.choice.errors_without_index, i, &err);
-
-            print_parser_error(text, text_index, err);
-        }
-
+    if (feof(stream) || ferror(stream)) {
         return;
     }
-    }
 
-    DY_IMPOSSIBLE_ENUM();
-}
+    dy_array_set_excess_capacity(buffer, CHUNK_SIZE);
 
-dy_string_t read_file_whole(const char *path)
-{
-    FILE *f = fopen(path, "r");
-    if (f == NULL) {
-        perror("Error");
-        exit(EXIT_FAILURE);
-    }
+    size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), CHUNK_SIZE, stream);
 
-    if (fseek(f, 0, SEEK_END) == -1) {
-        perror("Error");
-        exit(EXIT_FAILURE);
-    }
-
-    long file_size = ftell(f);
-    if (file_size == -1) {
-        perror("Error");
-        exit(EXIT_FAILURE);
-    }
-
-    rewind(f);
-
-    char *p = malloc((size_t)file_size);
-    assert(p != NULL);
-
-    fread(p, (size_t)file_size, 1, f);
-    if (ferror(f)) {
-        perror("Error");
-        exit(EXIT_FAILURE);
-    }
-
-    return (dy_string_t){
-        .ptr = p,
-        .size = (size_t)file_size
-    };
-}
-
-dy_string_t read_stdin_until_eof(void)
-{
-    char *p = malloc(INITIAL_STDIN_BUFFER_SIZE);
-    size_t size = 0;
-    size_t rest = INITIAL_STDIN_BUFFER_SIZE;
-
-    for (;;) {
-        size_t bytes_read = fread(p + size, 1, rest, stdin);
-        if (ferror(stdin)) {
-            perror("Error");
-            exit(EXIT_FAILURE);
-        }
-
-        size += bytes_read;
-        rest -= bytes_read;
-
-        if (feof(stdin)) {
-            break;
-        }
-
-        if (rest == 0) {
-            p = realloc(p, size * 2);
-            rest = size;
-        }
-    }
-
-    return (dy_string_t){
-        .ptr = p,
-        .size = size
-    };
-}
-
-void *malloc_(size_t size, void *env)
-{
-    (void)env;
-
-    return malloc(size);
-}
-
-void *realloc_(void *ptr, size_t size, void *env)
-{
-    (void)env;
-
-    return realloc(ptr, size);
-}
-
-void free_(void *ptr, size_t size, void *env)
-{
-    (void)env;
-    (void)size;
-
-    free(ptr);
+    dy_array_add_to_size(buffer, num_bytes_read);
 }

@@ -4,9 +4,9 @@ add_library(duality-core
     "src/check.c"
     "src/substitute.c"
     "src/is_subtype.c"
-    "src/ternary.c"
     "src/type_of.c"
     "src/core.c"
+    "src/constraint.c"
 )
 
 set_target_properties(duality-core PROPERTIES C_VISIBILITY_PRESET hidden)

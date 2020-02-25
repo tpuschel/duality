@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
@@ -18,9 +18,7 @@ DY_SUPPORT_API dy_array_t *dy_array_create_with_seperate_allocators(struct dy_al
 
 DY_SUPPORT_API size_t dy_array_add(dy_array_t *array, const void *value);
 
-DY_SUPPORT_API void *dy_array_add_uninit(dy_array_t *array);
-
-DY_SUPPORT_API void dy_array_prepend(dy_array_t *array, const void *value);
+DY_SUPPORT_API void dy_array_prepend_keep_order(dy_array_t *array, const void *value);
 
 DY_SUPPORT_API void dy_array_remove(dy_array_t *array, size_t index);
 
@@ -32,11 +30,19 @@ DY_SUPPORT_API void *dy_array_get_ptr(const dy_array_t *array, size_t index);
 
 DY_SUPPORT_API void dy_array_set(dy_array_t *array, size_t index, const void *value);
 
+DY_SUPPORT_API void dy_array_insert_keep_order(dy_array_t *array, size_t index, const void *value);
+
 DY_SUPPORT_API void *dy_array_buffer(const dy_array_t *array);
 
 DY_SUPPORT_API size_t dy_array_size(const dy_array_t *array);
 
 DY_SUPPORT_API size_t dy_array_capacity(const dy_array_t *array);
+
+DY_SUPPORT_API void dy_array_set_excess_capacity(dy_array_t *array, size_t excess_capacity);
+
+DY_SUPPORT_API void *dy_array_excess_buffer(const dy_array_t *array);
+
+DY_SUPPORT_API void dy_array_add_to_size(dy_array_t *array, size_t added_size);
 
 DY_SUPPORT_API void dy_array_set_size(dy_array_t *array, size_t size);
 

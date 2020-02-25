@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
@@ -22,33 +22,45 @@ enum dy_core_polarity {
 struct dy_core_unknown {
     size_t id;
     const struct dy_core_expr *type;
+    bool is_inference_var;
 };
 
 struct dy_core_value_map {
     const struct dy_core_expr *e1;
     const struct dy_core_expr *e2;
     enum dy_core_polarity polarity;
+    bool is_implicit;
 };
 
 struct dy_core_type_map {
-    struct dy_core_unknown arg;
+    size_t arg_id;
+    const struct dy_core_expr *arg_type;
     const struct dy_core_expr *expr;
     enum dy_core_polarity polarity;
+    bool is_implicit;
 };
 
 struct dy_core_value_map_elim {
+    size_t id;
     const struct dy_core_expr *expr;
     struct dy_core_value_map value_map;
 };
 
 struct dy_core_type_map_elim {
+    size_t id;
     const struct dy_core_expr *expr;
     struct dy_core_type_map type_map;
 };
 
-struct dy_core_pair {
+struct dy_core_one_of {
     const struct dy_core_expr *first;
     const struct dy_core_expr *second;
+};
+
+struct dy_core_both {
+    const struct dy_core_expr *e1;
+    const struct dy_core_expr *e2;
+    enum dy_core_polarity polarity;
 };
 
 enum dy_core_expr_tag {
@@ -58,11 +70,11 @@ enum dy_core_expr_tag {
     DY_CORE_EXPR_TYPE_MAP_ELIM,
     DY_CORE_EXPR_BOTH,
     DY_CORE_EXPR_ONE_OF,
-    DY_CORE_EXPR_ANY_OF,
     DY_CORE_EXPR_UNKNOWN,
-    DY_CORE_EXPR_TYPE_OF_TYPES,
+    DY_CORE_EXPR_END,
     DY_CORE_EXPR_STRING,
-    DY_CORE_EXPR_TYPE_OF_STRINGS
+    DY_CORE_EXPR_TYPE_OF_STRINGS,
+    DY_CORE_EXPR_PRINT
 };
 
 struct dy_core_expr {
@@ -71,11 +83,11 @@ struct dy_core_expr {
         struct dy_core_type_map type_map;
         struct dy_core_value_map_elim value_map_elim;
         struct dy_core_type_map_elim type_map_elim;
-        struct dy_core_pair both;
-        struct dy_core_pair one_of;
-        struct dy_core_pair any_of;
+        struct dy_core_both both;
+        struct dy_core_one_of one_of;
         struct dy_core_unknown unknown;
         dy_string_t string;
+        enum dy_core_polarity end_polarity;
     };
 
     enum dy_core_expr_tag tag;

@@ -1,0 +1,25 @@
+{
+    "name": "duality-basic",
+    "displayName": "duality-basic",
+    "description": "Basic Duality programming panguage features.",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.40.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [{
+            "id": "duality",
+            "aliases": ["Duality", "duality"],
+            "extensions": [".dy"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "duality",
+            "scopeName": "source.dy",
+            "path": "./syntaxes/duality.tmLanguage.json"
+        }]
+    }
+}

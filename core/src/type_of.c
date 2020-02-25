@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
@@ -14,59 +14,30 @@ struct dy_core_expr dy_type_of(struct dy_check_ctx ctx, struct dy_core_expr expr
 {
     switch (expr.tag) {
     case DY_CORE_EXPR_VALUE_MAP:
-        switch (expr.value_map.polarity) {
-        case DY_CORE_POLARITY_POSITIVE:
-            return (struct dy_core_expr){
-                .tag = DY_CORE_EXPR_VALUE_MAP,
-                .value_map = {
-                    .e1 = expr.value_map.e1,
-                    .e2 = alloc_expr(ctx, dy_type_of(ctx, *expr.value_map.e2)),
-                    .polarity = DY_CORE_POLARITY_POSITIVE,
-                }
-            };
-        case DY_CORE_POLARITY_NEGATIVE:
-            return (struct dy_core_expr){
-                .tag = DY_CORE_EXPR_TYPE_OF_TYPES
-            };
-        }
+        expr.value_map.e2 = alloc_expr(ctx, dy_type_of(ctx, *expr.value_map.e2));
+        expr.value_map.polarity = DY_CORE_POLARITY_POSITIVE;
+        return expr;
     case DY_CORE_EXPR_TYPE_MAP:
-        switch (expr.type_map.polarity) {
-        case DY_CORE_POLARITY_POSITIVE:
-            return (struct dy_core_expr){
-                .tag = DY_CORE_EXPR_TYPE_MAP,
-                .type_map = {
-                    .arg = expr.type_map.arg,
-                    .expr = alloc_expr(ctx, dy_type_of(ctx, *expr.type_map.expr)),
-                }
-            };
-        case DY_CORE_POLARITY_NEGATIVE:
-            return (struct dy_core_expr){
-                .tag = DY_CORE_EXPR_TYPE_OF_TYPES
-            };
-        }
+        expr.type_map.expr = alloc_expr(ctx, dy_type_of(ctx, *expr.type_map.expr));
+        expr.type_map.polarity = DY_CORE_POLARITY_POSITIVE;
+        return expr;
     case DY_CORE_EXPR_VALUE_MAP_ELIM:
         return *expr.value_map_elim.value_map.e2;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         return *expr.type_map_elim.type_map.expr;
     case DY_CORE_EXPR_BOTH:
+        expr.both.e1 = alloc_expr(ctx, dy_type_of(ctx, *expr.both.e1));
+        expr.both.e2 = alloc_expr(ctx, dy_type_of(ctx, *expr.both.e2));
+        expr.both.polarity = DY_CORE_POLARITY_POSITIVE;
+        return expr;
+    case DY_CORE_EXPR_ONE_OF:
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .first = alloc_expr(ctx, dy_type_of(ctx, *expr.both.first)),
-                .second = alloc_expr(ctx, dy_type_of(ctx, *expr.both.second)),
+                .e1 = alloc_expr(ctx, dy_type_of(ctx, *expr.one_of.first)),
+                .e2 = alloc_expr(ctx, dy_type_of(ctx, *expr.one_of.second)),
+                .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
-        };
-    case DY_CORE_EXPR_ONE_OF:
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_ANY_OF,
-            .any_of = {
-                .first = alloc_expr(ctx, dy_type_of(ctx, *expr.one_of.first)),
-                .second = alloc_expr(ctx, dy_type_of(ctx, *expr.one_of.second)),
-            }
-        };
-    case DY_CORE_EXPR_ANY_OF:
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_TYPE_OF_TYPES
         };
     case DY_CORE_EXPR_UNKNOWN:
         return *expr.unknown.type;
@@ -74,11 +45,23 @@ struct dy_core_expr dy_type_of(struct dy_check_ctx ctx, struct dy_core_expr expr
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_TYPE_OF_STRINGS
         };
-    case DY_CORE_EXPR_TYPE_OF_TYPES:
+    case DY_CORE_EXPR_END:
         // fallthrough
     case DY_CORE_EXPR_TYPE_OF_STRINGS:
         return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_TYPE_OF_TYPES
+            .tag = DY_CORE_EXPR_END,
+            .end_polarity = DY_CORE_POLARITY_POSITIVE
+        };
+    case DY_CORE_EXPR_PRINT:
+        return (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_TYPE_MAP,
+            .type_map = {
+                .arg_id = (*ctx.running_id)++,
+                .arg_type = alloc_expr(ctx, (struct dy_core_expr){ .tag = DY_CORE_EXPR_TYPE_OF_STRINGS }),
+                .expr = alloc_expr(ctx, (struct dy_core_expr){ .tag = DY_CORE_EXPR_END, .end_polarity = DY_CORE_POLARITY_POSITIVE }),
+                .polarity = DY_CORE_POLARITY_POSITIVE,
+                .is_implicit = false,
+            }
         };
     }
 

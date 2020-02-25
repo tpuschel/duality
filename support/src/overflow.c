@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
@@ -32,6 +32,16 @@ bool dy_saddl_overflow(long a, long b, long *c)
 bool dy_saddll_overflow(long long a, long long b, long long *c)
 {
     if (((b > 0) && (a > (LLONG_MAX - b))) || ((b < 0) && (a < (LLONG_MIN - b)))) {
+        return true;
+    } else {
+        *c = a + b;
+        return false;
+    }
+}
+
+bool dy_intmax_t_add_overflow(intmax_t a, intmax_t b, intmax_t *c)
+{
+    if (((b > 0) && (a > (INTMAX_MAX - b))) || ((b < 0) && (a < (INTMAX_MIN - b)))) {
         return true;
     } else {
         *c = a + b;
@@ -149,6 +159,35 @@ bool dy_smulll_overflow(long long a, long long b, long long *c)
             }
         } else {
             if ((a != 0) && (b < (LLONG_MAX / a))) {
+                return true;
+            }
+        }
+    }
+
+    *c = a * b;
+
+    return false;
+}
+
+bool dy_intmax_t_mul_overflow(intmax_t a, intmax_t b, intmax_t *c)
+{
+    if (a > 0) {
+        if (b > 0) {
+            if (a > (INTMAX_MAX / b)) {
+                return true;
+            }
+        } else {
+            if (b < (INTMAX_MIN / a)) {
+                return true;
+            }
+        }
+    } else {
+        if (b > 0) {
+            if (a < (INTMAX_MIN / b)) {
+                return true;
+            }
+        } else {
+            if ((a != 0) && (b < (INTMAX_MAX / a))) {
                 return true;
             }
         }

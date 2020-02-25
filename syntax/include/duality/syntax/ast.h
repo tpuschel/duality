@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
@@ -9,22 +9,27 @@
 
 #include <duality/support/string.h>
 
+#include <duality/support/range.h>
+
 struct dy_ast_expr;
 
 struct dy_ast_arg {
     dy_string_t name;
     bool has_name;
     const struct dy_ast_expr *type;
+    bool has_type;
 };
 
 struct dy_ast_value_map {
     const struct dy_ast_expr *e1;
     const struct dy_ast_expr *e2;
+    bool is_implicit;
 };
 
 struct dy_ast_type_map {
     struct dy_ast_arg arg;
     const struct dy_ast_expr *expr;
+    bool is_implicit;
 };
 
 struct dy_ast_do_block_equality {
@@ -77,6 +82,11 @@ struct dy_ast_type_map_elim {
     struct dy_ast_type_map type_map;
 };
 
+struct dy_ast_juxtaposition {
+    const struct dy_ast_expr *left;
+    const struct dy_ast_expr *right;
+};
+
 enum dy_ast_expr_tag {
     DY_AST_EXPR_VARIABLE,
     DY_AST_EXPR_LIST,
@@ -89,12 +99,16 @@ enum dy_ast_expr_tag {
     DY_AST_EXPR_VALUE_MAP_ELIM,
     DY_AST_EXPR_TYPE_MAP_ELIM,
     DY_AST_EXPR_DO_BLOCK,
-    DY_AST_EXPR_TYPE_TYPE,
+    DY_AST_EXPR_ALL,
+    DY_AST_EXPR_NOTHING,
     DY_AST_EXPR_STRING,
-    DY_AST_EXPR_TYPE_STRING
+    DY_AST_EXPR_TYPE_STRING,
+    DY_AST_EXPR_JUXTAPOSITION
 };
 
 struct dy_ast_expr {
+    struct dy_range text_range;
+
     union {
         dy_string_t string;
         dy_string_t variable;
@@ -108,6 +122,7 @@ struct dy_ast_expr {
         struct dy_ast_list list;
         struct dy_ast_list try_block;
         struct dy_ast_list choice;
+        struct dy_ast_juxtaposition juxtaposition;
     };
 
     enum dy_ast_expr_tag tag;

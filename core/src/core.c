@@ -1,6 +1,7 @@
 /*
- * Copyright 2017 - 2019, Thorben Hasenpusch
- * Licensed under the MIT license.
+ * Copyright 2017-2020, Thorben Hasenpusch
+ *
+ * SPDX-License-Identifier: MIT
  */
 
 #include <duality/core/core.h>
@@ -22,6 +23,9 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
     switch (expr.tag) {
     case DY_CORE_EXPR_VALUE_MAP:
         add_string(string, DY_STR_LIT("("));
+        if (expr.value_map.is_implicit) {
+            add_string(string, DY_STR_LIT("@"));
+        }
         dy_core_expr_to_string(*expr.value_map.e1, string);
         if (expr.value_map.polarity == DY_CORE_POLARITY_POSITIVE) {
             add_string(string, DY_STR_LIT(" -> "));
@@ -34,13 +38,17 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
     case DY_CORE_EXPR_TYPE_MAP: {
         add_string(string, DY_STR_LIT("("));
 
+        if (expr.type_map.is_implicit) {
+            add_string(string, DY_STR_LIT("@["));
+        } else {
+            add_string(string, DY_STR_LIT("["));
+        }
         char *c;
-        dy_assert(asprintf(&c, "%zu", expr.type_map.arg.id) != -1);
+        dy_assert(asprintf(&c, "%zu", expr.type_map.arg_id) != -1);
         add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
         free(c);
-
-        add_string(string, DY_STR_LIT(" ["));
-        dy_core_expr_to_string(*expr.type_map.arg.type, string);
+        add_string(string, DY_STR_LIT(" "));
+        dy_core_expr_to_string(*expr.type_map.arg_type, string);
         add_string(string, DY_STR_LIT("]"));
         if (expr.type_map.polarity == DY_CORE_POLARITY_POSITIVE) {
             add_string(string, DY_STR_LIT(" -> "));
@@ -51,52 +59,71 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         add_string(string, DY_STR_LIT(")"));
         return;
     }
-    case DY_CORE_EXPR_VALUE_MAP_ELIM:
+    case DY_CORE_EXPR_VALUE_MAP_ELIM: {
+        /*char *c;
+        dy_assert(asprintf(&c, "$%zu", expr.value_map_elim.id) != -1);
+        add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
+        free(c);*/
+
         dy_core_expr_to_string(*expr.value_map_elim.expr, string);
         add_string(string, DY_STR_LIT(" ! "));
+        if (expr.value_map_elim.value_map.is_implicit) {
+            add_string(string, DY_STR_LIT("@"));
+        }
         dy_core_expr_to_string(*expr.value_map_elim.value_map.e1, string);
         add_string(string, DY_STR_LIT(" ~> "));
         dy_core_expr_to_string(*expr.value_map_elim.value_map.e2, string);
         return;
+    }
     case DY_CORE_EXPR_TYPE_MAP_ELIM: {
         dy_core_expr_to_string(*expr.type_map_elim.expr, string);
         add_string(string, DY_STR_LIT(" ! "));
 
         char *c;
-        dy_assert(asprintf(&c, "%zu [", expr.type_map_elim.type_map.arg.id) != -1);
+        dy_assert(asprintf(&c, "%zu [", expr.type_map_elim.type_map.arg_id) != -1);
         add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
         free(c);
 
-        dy_core_expr_to_string(*expr.type_map_elim.type_map.arg.type, string);
+        dy_core_expr_to_string(*expr.type_map_elim.type_map.arg_type, string);
         add_string(string, DY_STR_LIT("]"));
         add_string(string, DY_STR_LIT(" ~> "));
         dy_core_expr_to_string(*expr.type_map_elim.type_map.expr, string);
         return;
     }
     case DY_CORE_EXPR_UNKNOWN: {
+        if (expr.unknown.is_inference_var) {
+            add_string(string, DY_STR_LIT("?"));
+        }
+
         char *c;
         dy_assert(asprintf(&c, "%zu", expr.unknown.id) != -1);
         add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
         free(c);
         return;
     }
-    case DY_CORE_EXPR_TYPE_OF_TYPES:
-        add_string(string, DY_STR_LIT("Type"));
+    case DY_CORE_EXPR_END:
+        if (expr.end_polarity == DY_CORE_POLARITY_POSITIVE) {
+            add_string(string, DY_STR_LIT("All"));
+        } else {
+            add_string(string, DY_STR_LIT("Nothing"));
+        }
+
         return;
     case DY_CORE_EXPR_BOTH:
-        dy_core_expr_to_string(*expr.both.first, string);
-        add_string(string, DY_STR_LIT(" and "));
-        dy_core_expr_to_string(*expr.both.second, string);
-        return;
-    case DY_CORE_EXPR_ANY_OF:
-        dy_core_expr_to_string(*expr.both.first, string);
-        add_string(string, DY_STR_LIT(" or "));
-        dy_core_expr_to_string(*expr.both.second, string);
+        dy_core_expr_to_string(*expr.both.e1, string);
+
+        if (expr.both.polarity == DY_CORE_POLARITY_POSITIVE) {
+            add_string(string, DY_STR_LIT(" and "));
+        } else {
+            add_string(string, DY_STR_LIT(" or "));
+        }
+
+        dy_core_expr_to_string(*expr.both.e2, string);
         return;
     case DY_CORE_EXPR_ONE_OF:
-        dy_core_expr_to_string(*expr.both.first, string);
+        dy_core_expr_to_string(*expr.one_of.first, string);
         add_string(string, DY_STR_LIT(" else "));
-        dy_core_expr_to_string(*expr.both.second, string);
+        dy_core_expr_to_string(*expr.one_of.second, string);
         return;
     case DY_CORE_EXPR_STRING:
         add_string(string, DY_STR_LIT("\""));
@@ -105,6 +132,9 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         return;
     case DY_CORE_EXPR_TYPE_OF_STRINGS:
         add_string(string, DY_STR_LIT("String"));
+        return;
+    case DY_CORE_EXPR_PRINT:
+        add_string(string, DY_STR_LIT("print"));
         return;
     }
 
