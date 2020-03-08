@@ -29,12 +29,6 @@ main {
     margin: auto
 }
 
-#doc-main {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-}
-
 main h4, h5 {
     text-align: center;
 }
@@ -49,27 +43,6 @@ main p, ul {
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: space-evenly;
-}
-
-#doc-main-content {
-    flex-grow: 1;
-}
-
-#doc-nav-sidebar {
-    width: 15em;
-}
-
-#doc-nav-sidebar p {
-    text-align: center;
-}
-
-#doc-nav-sidebar a, ol {
-    text-decoration: none;
-    list-style: inside;
-}
-
-#doc-dummy {
-    width: 15em;
 }
 
 #code-textarea {
