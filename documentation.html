@@ -21,7 +21,7 @@
     <a href="https://github.com/tpuschel/duality">Source on GitHub</a>
   </header>
 
-  <main>
+  <main id="doc-main">
     <div id="doc-nav-sidebar">
       <p> Navigation </p>
       <ol>
@@ -135,16 +135,40 @@
             the information upon which the rest of the program can act (see 'Direct branching' above).
           </p>
         </li>
+
+        <li>
+          <p>
+            Inheritance and indirect branching.
+          </p>
+          <p>
+            In nominally typed languages, inheritance is an explicit relationship applied at the type level.
+            It's used to represent the idea of an object partly being defined in another object's terms.
+          </p>
+          <p>
+            Duality, being a structurally typed language, fundamentally does not require explicit relationships
+            on a type level, nor does it follow the instanciation way of constructing objects.
+          </p>
+          <p>
+            Instead, Duality uses the 'list' construct to represent 'multiple things'.
+            These are unlike lists in other languages, and importantly, unlike tuples in languages like ML.
+            In every situation where a 'list' object is "used" (meaning, eliminated), it behaves like the first
+            object in the list that can be successfully eliminated.
+          </p>
+        </li>
       </ul>
 
       <p>
-        The list above is not exhaustive. What follows now is an introduction and examination of each of Duality's
+        The above list is not exhaustive. What follows now is an introduction and examination of each of Duality's
         constructs.
       </p>
 
       <h4 id="constructs"> Duality Language Constructs </h4>
 
       <h5 id="maps"> Maps </h5>
+
+      <p>
+
+      </p>
 
       <h5 id="list"> List & Choice </h5>
 

@@ -25,10 +25,12 @@ nav {
 
 main {
     line-height: 1.5em;
-    font-size: 16px;
+    margin: auto
+}
+
+#doc-main {
     display: flex;
     flex-direction: row;
-    margin: auto
 }
 
 main h4, h5 {
@@ -38,6 +40,12 @@ main h4, h5 {
 main p, ul {
     margin: 1em auto;
     max-width: 45em;
+}
+
+#welcome-content {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
 }
 
 #doc-main-content {
@@ -85,8 +93,8 @@ main p, ul {
     font-family: Menlo, Monaco, 'Courier New', monospace;
     font-size: 13px;
     background-color: rgb(240, 240, 240);
-    width: min(80ch, 100vw);
-    height: 90vh;
+    width: 80ch;
+    height: 50ch;
     border-style: solid;
     border-width: 1px;
     display: flex;
