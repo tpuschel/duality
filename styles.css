@@ -5,6 +5,7 @@
 header {
     display: flex;
     justify-content: center;
+    flex-wrap: wrap;
 }
 
 header a {
@@ -31,6 +32,7 @@ main {
 #doc-main {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
 }
 
 main h4, h5 {
@@ -45,6 +47,7 @@ main p, ul {
 #welcome-content {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     justify-content: space-evenly;
 }
 
@@ -93,7 +96,7 @@ main p, ul {
     font-family: Menlo, Monaco, 'Courier New', monospace;
     font-size: 13px;
     background-color: rgb(240, 240, 240);
-    width: 80ch;
+    width: 60ch;
     height: 50ch;
     border-style: solid;
     border-width: 1px;
