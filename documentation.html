@@ -22,40 +22,136 @@
   </header>
 
   <main>
-    <h4> Introduction </h4>
-    <p>
-      Duality is a high-level programming language aiming to unify and simplify various
-      contructs and concepts found in other programming languages. It presents a set of
-      minimal, coherent and orthogonal constructs that lead to highly expressive yet
-      easily understandable programs.
-    </p>
+    <div id="doc-nav-sidebar">
+      <p> Navigation </p>
+      <ol>
+        <li> <a href="#introduction">Introduction</a> </li>
+        <li>
+          <a href="#constructs">Constructs</a>
+          <ol>
+            <li> <a href="#maps">Maps</a> </li>
+            <li> <a href="#list">List & Choice</a> </li>
+            <li> <a href="#try">Try</a> </li>
+          </ol>
+        </li>
+      </ol>
+    </div>
 
-    <p>
-      In particular, Duality generalizes the following concepts commonly found in other
-      languages:
-    </p>
+    <div id="doc-main-content">
+      <h4 id="introduction"> Introduction </h4>
+      <p>
+        Duality is a high-level programming language aiming to unify and simplify various
+        contructs and concepts found in other programming languages. It presents a set of
+        minimal, coherent and orthogonal constructs that lead to highly expressive yet
+        easily understandable programs.
+      </p>
 
-    <ul>
-      <li>
-        <p>
-          Static and dynamic typing.
-        </p>
-        <p>
-          In Duality, there is no difference between checking a program for correctness
-          before a program has begun evaluating ("at compile time", or static) or after ("at run time", or dynamic).
-        </p>
-        <p>
-          Likewise, the representation of an expression in the Duality language does not differ between the checking
-          and evaluating phases.
-          That means that types exist at 'run time' just as much as at 'compile time'.
-        </p>
-        <p>
-          As a consequence of this design, types can influence program behavior both at all and uniformly in the
-          static and dynamic dimension.
-        </p>
-      </li>
+      <p>
+        In particular, Duality generalizes the following concepts commonly found in other languages:
+      </p>
 
-    </ul>
+      <ul>
+        <li>
+          <p>
+            Static and dynamic typing.
+          </p>
+          <p>
+            In Duality, there is no difference between checking a program for correctness
+            before a program has begun evaluating ("at compile time", or static) or after ("at run time", or dynamic).
+          </p>
+          <p>
+            Likewise, the representation of an expression in Duality does not differ between the checking
+            and evaluating phases. That means that types exist at 'run time' just as much as at 'compile time'.
+          </p>
+          <p>
+            As a consequence of this design, types can influence program behavior both at all and uniformly in the
+            static and the dynamic dimension.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Named-field objects ("structs", "records" etc.).
+          </p>
+          <p>
+            Fundamentally, something like a record combines the notion of 'multiple things' and the notion of a
+            map from a label to an expression. Even though a record is a combination (or composition) of
+            pre-existing notions, in most all languages these individual notions are not themselves independent
+            entities.
+          </p>
+          <p>
+            In Duality, the notion of 'multiple things' is represented by the construct called 'list', and the notion of
+            a map from a label to an expression is generalized to a map from an expression to another expression.
+            The entities that represent these notions are independently manipulable, and what other languages call a
+            record is simply the emergent behavior of two entirely orthogonal constructs.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Direct branching ("if-else", "switch-case", pattern matching).
+          </p>
+          <p>
+            In languages that feature it, pattern matching generalizes constructs such as "if-else" or "switch-case".
+          </p>
+          <p>
+            Duality goes one step further and recognizes that pattern matching, similar to the record situation, is
+            a combination of two existing notions that are much better off disentangled and given simple, irreducible
+            semantics.
+          </p>
+          <p>
+            First, the 'arm' of each pattern match can be more simply restated as just elimination. That is, application
+            of maps to arguments and so on.
+          </p>
+          <p>
+            Second, the nature of pattern matching execution as 'first try this arm, then the next, etc..' can be
+            restated more generally as a construct that acts upon the validity of its constituents, choosing the next
+            one as soon as the current one is determined to be invalid. In Duality, this is represented by the 'try'
+            construct which acts upon the information of the checking procedure to either reduce to or discard its
+            constituent expressions.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Equality.
+          </p>
+          <p>
+            Most languages feature operations or functions that determine the equality of its entities in a Boolean
+            fashion.
+          </p>
+          <p>
+            In Duality, no such pre-existing operations exist. In particular, there is not even a Boolean type.
+          </p>
+          <p>
+            As a consequence of the record situation, Duality introduced a kind of map that maps one expression to
+            another. This kind of map is used just like any other: by elimination ('applying to an argument').
+            The validity of such an elimination is determined by the equality of the input expression of the map and the
+            argument to the elimination.
+          </p>
+          <p>
+            And just like any elimination, the validity thereof is determined by the checking procedure. Thus, just like
+            checking the compatibility of types in the case of type maps ('functions'), the checking procedure provides
+            the information upon which the rest of the program can act (see 'Direct branching' above).
+          </p>
+        </li>
+      </ul>
+
+      <p>
+        The list above is not exhaustive. What follows now is an introduction and examination of each of Duality's
+        constructs.
+      </p>
+
+      <h4 id="constructs"> Duality Language Constructs </h4>
+
+      <h5 id="maps"> Maps </h5>
+
+      <h5 id="list"> List & Choice </h5>
+
+      <h5 id="try"> Try </h5>
+    </div>
+
+    <div id="doc-dummy"></div>
   </main>
 </body>
 

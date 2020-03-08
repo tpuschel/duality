@@ -26,15 +26,39 @@ nav {
 main {
     line-height: 1.5em;
     font-size: 16px;
+    display: flex;
+    flex-direction: row;
+    margin: auto
 }
 
-main h4 {
+main h4, h5 {
     text-align: center;
 }
 
 main p, ul {
     margin: 1em auto;
     max-width: 45em;
+}
+
+#doc-main-content {
+    flex-grow: 1;
+}
+
+#doc-nav-sidebar {
+    width: 15em;
+}
+
+#doc-nav-sidebar p {
+    text-align: center;
+}
+
+#doc-nav-sidebar a, ol {
+    text-decoration: none;
+    list-style: inside;
+}
+
+#doc-dummy {
+    width: 15em;
 }
 
 #code-textarea {
