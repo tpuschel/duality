@@ -1,3 +1,7 @@
+* {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
 header {
     display: flex;
     justify-content: center;
@@ -19,6 +23,20 @@ nav {
     justify-content: center
 }
 
+main {
+    line-height: 1.5em;
+    font-size: 16px;
+}
+
+main h4 {
+    text-align: center;
+}
+
+main p, ul {
+    margin: 1em auto;
+    max-width: 45em;
+}
+
 #code-textarea {
     font-family: inherit;
     font-size: inherit;
@@ -34,11 +52,14 @@ nav {
 #result-div {
     border-top: thin solid black;
     padding: 1ch;
+    font-family: inherit;
+    font-size: inherit;
+    text-align: left;
 }
 
 #code-box {
     font-family: Menlo, Monaco, 'Courier New', monospace;
-    font-size: 12px;
+    font-size: 13px;
     background-color: rgb(240, 240, 240);
     width: min(80ch, 100vw);
     height: 90vh;
