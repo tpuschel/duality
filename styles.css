@@ -19,6 +19,11 @@ header .current-link {
     text-decoration: underline;
 }
 
+#download-table {
+    margin: auto;
+    margin-top: 1em;
+}
+
 nav {
     display: flex;
     justify-content: center
