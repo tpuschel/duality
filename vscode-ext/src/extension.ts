@@ -5,7 +5,7 @@ let client: LanguageClient
 
 export function activate(context: vscode.ExtensionContext) {
 	const server: Executable = {
-		command: 'dy',
+		command: 'duality',
 		args: ['--server']
 	}
 
