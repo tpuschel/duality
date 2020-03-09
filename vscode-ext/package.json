@@ -2,7 +2,7 @@
 	"name": "duality",
 	"displayName": "Duality",
 	"description": "Language Support for the Duality Programming Language",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"preview": true,
 	"engines": {
 		"vscode": "^1.40.0"
@@ -10,7 +10,11 @@
 	"publisher": "puschel",
 	"homepage": "https://duality-lang.org",
 	"license": "MIT",
-	"repository": "github:tpuschel/duality",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/tpuschel/duality.git",
+		"directory": "vscode-ext"
+	},
 	"keywords": [
 		"programming",
 		"language",

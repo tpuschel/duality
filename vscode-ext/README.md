@@ -11,16 +11,7 @@ Adds support for the Duality programming language.
 
 LSP support requires an installation of the [Duality language server](https://duality-lang.org).
 
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: enable/disable this extension
-* `myExtension.thing`: set to `blah` to do something
+The `duality` binary hast to be in PATH.
 
 ## Known Issues
 
