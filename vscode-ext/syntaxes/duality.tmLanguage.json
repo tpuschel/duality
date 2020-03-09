@@ -17,7 +17,7 @@
 			"patterns": [
 				{
 					"name": "keyword.control.duality",
-					"match": "\\b(list|try|let|choice|do|rec)\\b"
+					"match": "\\b(list|try|let|def|choice|do|rec)\\b"
 				}
 			]
 		},
