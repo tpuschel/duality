@@ -75,5 +75,10 @@
 				"path": "./syntaxes/duality.tmLanguage.json"
 			}
 		]
+	},
+	"__metadata": {
+		"id": "c817afa5-b382-4bc7-a9ff-16ec4cfa3953",
+		"publisherDisplayName": "Thorben Hasenpusch",
+		"publisherId": "f376f3d1-6933-4ed5-b4c0-e2a66c21afee"
 	}
 }
