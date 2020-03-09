@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 project(duality
-    VERSION 0.1
+    VERSION 0.0.1
     DESCRIPTION "The Duality Programming Language"
     HOMEPAGE_URL "https://duality-lang.org"
     LANGUAGES C
