@@ -62,16 +62,16 @@ jobs:
     steps:
     - name: Download win artifact
       uses: actions/download-artifact@v1
-        with:
-          name: windows-latest
+      with:
+        name: windows-latest
     - name: Download linux artifact
       uses: actions/download-artifact@v1
-        with:
-          name: linux-latest
+      with:
+        name: linux-latest
     - name: Download darwin artifact
       uses: actions/download-artifact@v1
-        with:
-          name: darwin-latest
+      with:
+        name: darwin-latest
     - name: Upload to S3
       run: |
           echo "Not doing anything yet!"
