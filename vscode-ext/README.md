@@ -11,7 +11,7 @@ Adds support for the Duality programming language.
 
 LSP support requires an installation of the [Duality language server](https://duality-lang.org).
 
-The `duality` binary hast to be in PATH.
+The `duality` binary has to be in PATH.
 
 ## Known Issues
 
