@@ -71,5 +71,5 @@ jobs:
         aws s3 cp linux-latest/linux-latest.zip s3://duality-releases/linux-latest.zip --region us-east-1 --output text --acl public-read
         aws s3 cp darwin-latest/darwin-latest.zip s3://duality-releases/darwin-latest.zip --region us-east-1 --output text --acl public-read
       env:
-        AWS_ACCESS_KEY_ID: {{ secrets.aws_access_key_id }}
-        AWS_SECRET_ACCESS_KEY: {{ secrets.aws_secret_access_key }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.aws_access_key_id }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.aws_secret_access_key }}
