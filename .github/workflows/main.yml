@@ -10,7 +10,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: Build for Windows
       run: |
-        cmake -S . -B build -G "Visual Studio 16 2019" -A x64 -D CMAKE_C_FLAGS="/Wall" -D CPACK_PACKAGE_FILE_NAME=windows-latest
+        cmake -S . -B build -G "Visual Studio 16 2019" -A x64 -D BUILD_SHARED_LIBS=ON -D CMAKE_C_FLAGS="/Wall /wd4668 /wd4710 /wd4711 /wd5045 /wd4820 /wd4201 /wd4204" -D CPACK_PACKAGE_FILE_NAME=windows-latest
         cmake --build build --target package --config Release
     - name: Upload artifact
       uses: actions/upload-artifact@v1
@@ -25,7 +25,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: Build for Ubuntu
       run: |
-        CC=clang cmake -S . -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_FLAGS="-Weverything -Wno-padded -O2 -flto" -D CPACK_PACKAGE_FILE_NAME=linux-latest
+        cmake -S . -B build -D BUILD_SHARED_LIBS=ON -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_FLAGS="-Wall -Wextra -O2 -flto" -D CPACK_PACKAGE_FILE_NAME=linux-latest
         cmake --build build --target package
     - name: Upload artifact
       uses: actions/upload-artifact@v1
@@ -40,7 +40,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: Build for macOS
       run: |
-        cmake -S . -B build -G Xcode -D CPACK_PACKAGE_FILE_NAME=darwin-latest
+        cmake -S . -B build -G Xcode -D BUILD_SHARED_LIBS=ON -D CPACK_PACKAGE_FILE_NAME=darwin-latest
         cmake --build build --target package --config Release
     - name: Upload artifact
       uses: actions/upload-artifact@v1
