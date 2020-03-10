@@ -40,11 +40,13 @@ bool dy_stream_parse_literal(struct dy_stream *stream, dy_string_t literal)
         char c;
         if (!dy_stream_get_char(stream, &c)) {
             stream->current_index = start_index;
+            fprintf(stderr, "EOF parsing literal.\n");
             return false;
         }
 
         if (c != literal.ptr[i]) {
             stream->current_index = start_index;
+            fprintf(stderr, "%c doesn't match %c\n", c, literal.ptr[i]);
             return false;
         }
     }
@@ -107,5 +109,5 @@ void dy_stream_dump(struct dy_stream *stream, FILE *file)
     for (size_t i = stream->current_index; i < dy_array_size(stream->buffer); ++i) {
         fprintf(file, "%c", *(char *)dy_array_get_ptr(stream->buffer, i));
     }
-    fprintf(file, "[Stream dump - end]\n");
+    fprintf(file, "\n[Stream dump - end]\n");
 }
