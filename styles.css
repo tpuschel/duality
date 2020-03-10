@@ -47,7 +47,11 @@ main p, ul {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    justify-content: space-evenly;
+    justify-content: center;
+}
+
+#persuasion-list {
+    margin-left: 1em;
 }
 
 #code-textarea {
@@ -81,4 +85,5 @@ main p, ul {
     display: flex;
     flex-direction: column;
     border-radius: 10px;
+    margin-right: 1em;
 }
