@@ -20,6 +20,11 @@
 
 #include <duality/core/type_of.h>
 
+#ifdef _WIN32
+#    include <io.h>
+#    include <fcntl.h>
+#endif
+
 struct dy_stream_state {
     bool is_bounded;
     size_t bound_size_in_bytes;
@@ -93,8 +98,12 @@ static dy_json_t create_hover_response(dy_json_t id, dy_string_t type);
 static void null_stream(dy_array_t *buffer, void *env);
 struct dy_stream stream_from_string(struct dy_allocator allocator, dy_string_t s);
 
+static void set_io_to_binary(void);
+
 int run_lsp_server(void)
 {
+    set_io_to_binary();
+
     struct dy_stream_state stream_state = {
         .is_bounded = false
     };
@@ -1108,4 +1117,12 @@ void null_stream(dy_array_t *buffer, void *env)
     (void)buffer;
     (void)env;
     return;
+}
+
+void set_io_to_binary(void)
+{
+#ifdef _WIN32
+    dy_assert(_setmode(_fileno(stdin), _O_BINARY) != -1);
+    dy_assert(_setmode(_fileno(stdout), _O_BINARY) != -1);
+#endif
 }
