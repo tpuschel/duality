@@ -1,5 +1,13 @@
 # Change Log
 
+## [0.0.6] - 2020-03-10
+
+- Actually use the path in settings to call the executable.
+
+## [0.0.5] - 2020-03-10
+
+- Added setting to specify the path to the duality executable.
+
 ## [0.0.4] - 2020-03-09
 
 - Renamed LSP binary from 'dy' to 'duality'.

@@ -2,7 +2,7 @@
 	"name": "duality",
 	"displayName": "Duality",
 	"description": "Language Support for the Duality Programming Language",
-	"version": "0.0.4",
+	"version": "0.0.6",
 	"preview": true,
 	"engines": {
 		"vscode": "^1.40.0"
@@ -74,7 +74,17 @@
 				"scopeName": "source.dy",
 				"path": "./syntaxes/duality.tmLanguage.json"
 			}
-		]
+		],
+		"configuration": {
+			"title": "Duality",
+			"properties": {
+				"duality.path": {
+					"type": "string",
+					"description": "The path to the duality executable.",
+					"default": "duality"
+				}
+			}
+		}
 	},
 	"__metadata": {
 		"id": "c817afa5-b382-4bc7-a9ff-16ec4cfa3953",

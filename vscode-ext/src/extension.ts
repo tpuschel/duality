@@ -4,8 +4,13 @@ import { LanguageClient, Executable, LanguageClientOptions } from 'vscode-langua
 let client: LanguageClient
 
 export function activate(context: vscode.ExtensionContext) {
+	let path = vscode.workspace.getConfiguration('duality').get('path') as string
+	if (!path) {
+		path = "duality"
+	}
+
 	const server: Executable = {
-		command: 'duality',
+		command: path,
 		args: ['--server']
 	}
 

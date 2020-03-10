@@ -16,9 +16,3 @@ The `duality` binary has to be in PATH.
 ## Known Issues
 
 The language is still in its very early stages; expect things to be buggy!
-
-## Release Notes
-
-### 0.0.1
-
-Initial release.
