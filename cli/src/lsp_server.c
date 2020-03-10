@@ -20,6 +20,8 @@
 
 #include <duality/core/type_of.h>
 
+#include <duality/support/assert.h>
+
 #ifdef _WIN32
 #    include <io.h>
 #    include <fcntl.h>
