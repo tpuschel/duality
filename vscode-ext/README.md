@@ -1,15 +1,16 @@
 # Duality Language Support for VSCode
 
-Adds support for the Duality programming language.
+Adds support for the [Duality programming language](https://duality-lang.org).
 
 ## Features
 
 * Syntax highlighting
 * Language Server Protocol (LSP) support
+* Debug Adapter Protocol (DAP) support
 
 ## Requirements
 
-LSP support requires an installation of the [Duality language server](https://duality-lang.org).
+LSP & DAP support requires an installation of [Duality](https://duality-lang.org/downloads).
 
 ## Known Issues
 

@@ -36,6 +36,11 @@ int main(int argc, const char *argv[])
         return run_lsp_server();
     }
 
+    if (argc > 1 && strcmp(argv[1], "--debugger") == 0) {
+        fprintf(stderr, "DAP not yet implemented!\n");
+        return -1;
+    }
+
     FILE *stream;
     if (argc > 1) {
         stream = fopen(argv[1], "r");
