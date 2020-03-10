@@ -96,3 +96,16 @@ bool dy_stream_parse_size_t_decimal(struct dy_stream *stream, size_t *number)
 
     return true;
 }
+
+void dy_stream_dump(struct dy_stream *stream, FILE *file)
+{
+    fprintf(file, "[Stream dump - begin]\n");
+    for (size_t i = 0; i < stream->current_index; ++i) {
+        fprintf(file, "%c", *(char *)dy_array_get_ptr(stream->buffer, i));
+    }
+    fprintf(file, "[Stream dump - unread data]\n");
+    for (size_t i = stream->current_index; i < dy_array_size(stream->buffer); ++i) {
+        fprintf(file, "%c", *(char *)dy_array_get_ptr(stream->buffer, i));
+    }
+    fprintf(file, "[Stream dump - end]\n");
+}

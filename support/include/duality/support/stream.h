@@ -10,6 +10,8 @@
 #include <duality/support/array.h>
 #include <duality/support/string.h>
 
+#include <stdio.h>
+
 struct dy_stream {
     void (*get_chars)(dy_array_t *buffer, void *env);
     dy_array_t *buffer;
@@ -25,5 +27,7 @@ DY_SUPPORT_API void dy_stream_put_last_char_back(struct dy_stream *stream);
 DY_SUPPORT_API bool dy_stream_parse_literal(struct dy_stream *stream, dy_string_t literal);
 
 DY_SUPPORT_API bool dy_stream_parse_size_t_decimal(struct dy_stream *stream, size_t *number);
+
+DY_SUPPORT_API void dy_stream_dump(struct dy_stream *stream, FILE *file);
 
 #endif // DY_STREAM_H

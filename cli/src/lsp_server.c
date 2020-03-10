@@ -118,6 +118,7 @@ int run_lsp_server(void)
     for (;;) {
         size_t content_length_in_bytes;
         if (!parse_content_length(&stream, &content_length_in_bytes)) {
+            dy_stream_dump(&stream, stderr);
             return -1;
         }
 
@@ -128,6 +129,7 @@ int run_lsp_server(void)
 
         if (!dy_stream_parse_literal(&stream, DY_STR_LIT("\r\n"))) {
             fprintf(stderr, "No header CRLF.\n");
+            dy_stream_dump(&stream, stderr);
             return -1;
         }
 
@@ -137,6 +139,7 @@ int run_lsp_server(void)
         dy_json_t message;
         if (!utf8_to_json(&stream, &message)) {
             fprintf(stderr, "Parsing fail\n");
+            dy_stream_dump(&stream, stderr);
             return -1;
         }
 
