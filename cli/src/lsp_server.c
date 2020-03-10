@@ -127,8 +127,6 @@ int run_lsp_server(void)
     dy_array_t *response_buffer = dy_array_create(dy_allocator_stdlib(), sizeof(char), 1024);
 
     for (;;) {
-        fprintf(stderr, "Waiting for message...\n");
-
         size_t content_length_in_bytes;
         if (!parse_content_length(&stream, &content_length_in_bytes)) {
             dy_stream_dump(&stream, stderr);
