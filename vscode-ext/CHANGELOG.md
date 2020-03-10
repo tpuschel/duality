@@ -1,5 +1,9 @@
 # Change Log
 
+## [0.0.7] - 2020-03-10
+
+- Remove unnecessary remark in README.
+
 ## [0.0.6] - 2020-03-10
 
 - Actually use the path in settings to call the executable.

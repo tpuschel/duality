@@ -2,7 +2,7 @@
 	"name": "duality",
 	"displayName": "Duality",
 	"description": "Language Support for the Duality Programming Language",
-	"version": "0.0.6",
+	"version": "0.0.7",
 	"preview": true,
 	"engines": {
 		"vscode": "^1.40.0"
