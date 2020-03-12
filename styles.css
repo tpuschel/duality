@@ -1,21 +1,26 @@
-* {
+body {
     font-family: Arial, Helvetica, sans-serif;
 }
 
-header {
+nav {
     display: flex;
     justify-content: center;
     flex-wrap: wrap;
+    list-style: none;
 }
 
-header a {
+nav a {
     color: black;
     text-decoration: none;
     margin: 1em;
     font-size: large;
 }
 
-header .current-link {
+nav a:hover {
+    text-decoration: underline;
+}
+
+nav .current-link {
     text-decoration: underline;
 }
 
@@ -24,9 +29,12 @@ header .current-link {
     margin-top: 1em;
 }
 
-nav {
-    display: flex;
-    justify-content: center
+a:hover {
+    text-decoration: underline;
+}
+
+code {
+    white-space: nowrap;
 }
 
 main {
@@ -34,7 +42,7 @@ main {
     margin: auto
 }
 
-main h4, h5 {
+main h4, h5, h3 {
     text-align: center;
 }
 
@@ -51,7 +59,11 @@ main p, ul {
 }
 
 #persuasion-list {
-    margin-left: 1em;
+    margin-left: 2em;
+}
+
+#persuasion-list li {
+    margin-bottom: 0.5em;
 }
 
 #code-textarea {
@@ -85,5 +97,5 @@ main p, ul {
     display: flex;
     flex-direction: column;
     border-radius: 10px;
-    margin-right: 1em;
+    margin-right: 2em;
 }

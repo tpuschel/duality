@@ -17,17 +17,145 @@
       <a href="/index.html">Home</a>
       <a class="current-link" href="/documentation.html">Documentation</a>
       <a href="/downloads.html">Downloads</a>
+      <a href="https://github.com/tpuschel/duality">Source on GitHub</a>
     </nav>
-    <a href="https://github.com/tpuschel/duality">Source on GitHub</a>
   </header>
 
   <main id="doc-main">
-    <h4 id="introduction"> Introduction </h4>
+    <h3> Page is under construction! </h3>
+
+    <h4> Basics </h4>
+
     <p>
-      Duality is a high-level programming language aiming to unify and simplify various
-      contructs and concepts found in other programming languages. It presents a set of
-      minimal, coherent and orthogonal constructs that lead to highly expressive yet
-      easily understandable programs.
+      Every Duality program is an <em>expression</em>. An expression can be evaluated; that is, reduced to another
+      expression according to certain rules. Furthermore, all expressions have a built-in concept of <em>equality</em>
+      and of their <em>type</em>:
+    </p>
+
+    <ul>
+      <li>
+        <p>
+          Equality is the concept of distinguishing one expression from another.
+        </p>
+        <p>
+          Any expression can be substituted for an equal expression without evaluation behaving differently at all.
+        </p>
+        <p>
+          Fundamentally, an expression is always equal to itself.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          A type is a description of how an expression can be used.
+        </p>
+        <p>
+          Every time an expression is used, its type's compatibility to the expected type is tested.
+          This relation is called <em>subtyping</em>, and is syntactically represented by <code>&lt;:</code>.
+        </p>
+        <p>
+          Very importantly, types themselves are also expressions.
+        </p>
+      </li>
+    </ul>
+
+    <h4> Maps </h4>
+
+    <p>
+      There are two fundamental constructs in Duality that make use of equality and types to drive evaluation:
+      <ul>
+        <li>
+          <p>
+            Equality maps.
+          </p>
+
+          <p>
+            Grammar: <code> &lt;expr&gt; -> &lt;expr&gt; </code>
+          </p>
+
+          <p>
+            Type: <code> type(e1 -> e2) => e1 -> type(e2) </code>
+          </p>
+
+          <p>
+            An equality map maps one expression to another. For example, <code> "answer" -> "42" </code> is an example
+            of a equality map.
+          </p>
+        </li>
+        <li>
+          <p>
+            Type maps.
+          </p>
+
+          <p>
+            Grammar: <code> [&lt;variable&gt; &lt;expr&gt;] -> &lt;expr&gt; </code>
+          </p>
+
+          <p>
+            Type:
+            <code> type([var e1] -> e2) => [var e1] -> type(e2) </code>
+          </p>
+
+          <p>
+            Type maps are very similar to equality maps, only they map expressions <em>of a certain type</em> to another
+            expression. <code>[s String] -> print s</code> is an example of a type map.
+          </p>
+
+          <p>
+
+          </p>
+        </li>
+      </ul>
+    </p>
+
+    <h4> Elimination </h4>
+
+    <p>
+      Elimination is the process of "using" something. Its purpose is to provide appropriate "input" to a map so that
+      it can be reduced to its "output" part, thus driving evaluation.
+    </p>
+
+    <p>
+      Mirroring the two kinds of maps, there are two kinds of eliminations, depending on what kind of map is used
+      as the eliminator.
+    </p>
+
+    <ul>
+      <li>
+        <p>
+          Equality map elimination.
+        </p>
+
+        <p>
+          Grammar: <code> &lt;expr&gt; ! &lt;expr&gt; ~> &lt;expr&gt; </code>
+        </p>
+
+        <p>
+          Type: <code> type(e1 ! e2 ~> e3) => e3 </code>
+        </p>
+
+        <p>
+
+        </p>
+      </li>
+
+      <li>
+        <p>
+          Type map elimination.
+        </p>
+
+        <p>
+          Grammar: <code> &lt;expr&gt; ! [&lt;variable&gt; &lt;expr&gt;] ~> &lt;expr&gt; </code>
+        </p>
+
+        <p>
+          Type: <code> type(e1 ! [var e2] ~> e3) => e3 </code>
+        </p>
+      </li>
+    </ul>
+
+    <p style="margin-top: 20em;">
+      [The following will be reworked and split up at some point]
     </p>
 
     <p>
@@ -140,23 +268,6 @@
         </p>
       </li>
     </ul>
-
-    <p>
-      The above list is not exhaustive. What follows now is an introduction and examination of each of Duality's
-      constructs.
-    </p>
-
-    <h4 id="constructs"> Duality Language Constructs </h4>
-
-    <h5 id="maps"> Maps </h5>
-
-    <p>
-
-    </p>
-
-    <h5 id="list"> List & Choice </h5>
-
-    <h5 id="try"> Try </h5>
   </main>
 </body>
 
