@@ -9,10 +9,16 @@
 
 #include <duality/core/check.h>
 
+struct dy_constraint_range {
+    struct dy_core_expr subtype;
+    bool have_subtype;
+    struct dy_core_expr supertype;
+    bool have_supertype;
+};
+
 struct dy_constraint_single {
     size_t id;
-    enum dy_core_polarity polarity_position;
-    struct dy_core_expr expr;
+    struct dy_constraint_range range;
 };
 
 struct dy_constraint_multiple {
@@ -35,6 +41,6 @@ struct dy_constraint {
     enum dy_constraint_tag tag;
 };
 
-bool dy_constraint_solve(struct dy_check_ctx ctx, struct dy_constraint constraint, size_t id, struct dy_core_expr *subtype, bool *have_subtype, struct dy_core_expr *supertype, bool *have_supertype, struct dy_constraint *new_constraint, bool *have_new_constraint);
+DY_CORE_API struct dy_constraint_range dy_constraint_collect(struct dy_check_ctx ctx, struct dy_constraint constraint, size_t id);
 
 #endif // DY_CONSTRAINT_H

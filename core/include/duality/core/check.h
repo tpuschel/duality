@@ -14,10 +14,17 @@
 #include <duality/support/allocator.h>
 #include <duality/support/array.h>
 
+struct dy_bound_constraint {
+    size_t id;
+    struct dy_core_expr type;
+    enum dy_core_polarity polarity;
+};
+
 struct dy_check_ctx {
     size_t *running_id;
     struct dy_allocator allocator;
     dy_array_t *successful_elims;
+    dy_array_t *bound_constraints;
 };
 
 struct dy_constraint;

@@ -11,14 +11,14 @@
 #include <duality/core/eval.h>
 #include <duality/core/constraint.h>
 
+#include <duality/lsp/server.h>
+
 #include <duality/support/assert.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-
-#include "lsp_server.h"
 
 static void read_chunk(dy_array_t *buffer, void *env);
 
@@ -33,7 +33,7 @@ static void print_unbound_vars_error(dy_array_t *unbound_vars);
 int main(int argc, const char *argv[])
 {
     if (argc > 1 && strcmp(argv[1], "--server") == 0) {
-        return run_lsp_server();
+        return dy_lsp_run_server(stdin, stdout);
     }
 
     if (argc > 1 && strcmp(argv[1], "--debugger") == 0) {

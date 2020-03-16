@@ -63,4 +63,37 @@ struct dy_json_member {
 
 typedef struct dy_json_value dy_json_t;
 
+static inline dy_json_t dy_json_integer(long value)
+{
+    return (dy_json_t){
+        .tag = DY_JSON_VALUE_NUMBER,
+        .number = {
+            .tag = DY_JSON_NUMBER_INTEGER,
+            .integer = value,
+        }
+    };
+}
+
+static inline dy_json_t dy_json_string(dy_string_t value)
+{
+    return (dy_json_t){
+        .tag = DY_JSON_VALUE_STRING,
+        .string = value
+    };
+}
+
+static inline dy_json_t dy_json_true(void)
+{
+    return (dy_json_t){
+        .tag = DY_JSON_VALUE_TRUE
+    };
+}
+
+static inline dy_json_t dy_json_null(void)
+{
+    return (dy_json_t){
+        .tag = DY_JSON_VALUE_NULL
+    };
+}
+
 #endif // DY_JSON_H

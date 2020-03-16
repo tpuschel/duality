@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "utf8_to_json.h"
+#include <duality/support/utf8_to_json.h>
 
 #include <duality/support/overflow.h>
 
@@ -30,7 +30,7 @@ static bool parse_integer(struct dy_stream *stream, long *integer);
 
 static bool hex_char(char c, uint8_t *hex);
 
-bool utf8_to_json(struct dy_stream *stream, dy_json_t *json)
+bool dy_utf8_to_json(struct dy_stream *stream, dy_json_t *json)
 {
     size_t start_index = stream->current_index;
 
@@ -260,7 +260,7 @@ bool parse_object_member(struct dy_stream *stream, struct dy_json_member *member
     }
 
     struct dy_json_value value;
-    if (!utf8_to_json(stream, &value)) {
+    if (!dy_utf8_to_json(stream, &value)) {
         fprintf(stderr, "Failed json member parse.\n");
         stream->current_index = start_index;
         return false;
@@ -519,7 +519,7 @@ bool parse_array_elements_storage(struct dy_stream *stream, dy_array_t *element_
     size_t start_index = stream->current_index;
 
     struct dy_json_value value;
-    if (!utf8_to_json(stream, &value)) {
+    if (!dy_utf8_to_json(stream, &value)) {
         stream->current_index = start_index;
         return false;
     }

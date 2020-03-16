@@ -20,6 +20,8 @@
 static struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_expr expr);
 static struct dy_constraint *alloc_constraint(struct dy_check_ctx ctx, struct dy_constraint constraint);
 
+static bool is_bound(size_t id, struct dy_core_expr expr);
+
 bool dy_check_expr(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_expr *new_expr, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     switch (expr.tag) {
@@ -169,14 +171,7 @@ bool dy_check_type_map(struct dy_check_ctx ctx, struct dy_core_type_map type_map
     }
 
     if (type_map.is_implicit && have_c2) {
-        struct dy_core_expr subtype;
-        bool have_subtype = false;
-        struct dy_core_expr supertype;
-        bool have_supertype = false;
-        have_c2 = false;
-        if (!dy_constraint_solve(ctx, c2, type_map.arg_id, &subtype, &have_subtype, &supertype, &have_supertype, &c2, &have_c2)) {
-            return false;
-        }
+        struct dy_constraint_range solution = dy_constraint_collect(ctx, c2, type_map.arg_id);
 
         if (have_c1 && have_c2) {
             *constraint = (struct dy_constraint){
@@ -198,23 +193,33 @@ bool dy_check_type_map(struct dy_check_ctx ctx, struct dy_core_type_map type_map
 
         switch (type_map.polarity) {
         case DY_CORE_POLARITY_POSITIVE:
-            if (have_supertype) {
-                *new_expr = substitute(ctx, type_map.arg_id, supertype, expr);
-                return true;
+            if (!solution.have_supertype) {
+                fprintf(stderr, "Empty solution not allowed yet!\n");
+                return false;
             }
 
-            fprintf(stderr, "Parametric implicit arg! Not allowed yet..\n");
+            if (is_bound(type_map.arg_id, solution.supertype)) {
+                // is recursive
+                fprintf(stderr, "Recursive types are not allowed yet!\n");
+                return false;
+            }
 
-            return false;
+            *new_expr = substitute(ctx, type_map.arg_id, solution.supertype, expr);
+            return true;
         case DY_CORE_POLARITY_NEGATIVE:
-            if (have_subtype) {
-                *new_expr = substitute(ctx, type_map.arg_id, subtype, expr);
-                return true;
+            if (!solution.have_subtype) {
+                fprintf(stderr, "Empty solution not allowed yet!\n");
+                return false;
             }
 
-            fprintf(stderr, "Parametric implicit arg! Not allowed yet..\n");
+            if (is_bound(type_map.arg_id, solution.subtype)) {
+                // is recursive
+                fprintf(stderr, "Recursive types are not allowed yet!\n");
+                return false;
+            }
 
-            return false;
+            *new_expr = substitute(ctx, type_map.arg_id, solution.subtype, expr);
+            return true;
         }
 
         DY_IMPOSSIBLE_ENUM();
@@ -603,6 +608,50 @@ bool dy_check_one_of(struct dy_check_ctx ctx, struct dy_core_one_of one_of, stru
     *new_expr = second;
 
     return true;
+}
+
+bool is_bound(size_t id, struct dy_core_expr expr)
+{
+    switch (expr.tag) {
+    case DY_CORE_EXPR_VALUE_MAP:
+        return is_bound(id, *expr.value_map.e1) || is_bound(id, *expr.value_map.e2);
+    case DY_CORE_EXPR_TYPE_MAP:
+        if (is_bound(id, *expr.type_map.arg_type)) {
+            return true;
+        }
+
+        if (id == expr.type_map.arg_id) {
+            return false;
+        }
+
+        return is_bound(id, *expr.type_map.expr);
+    case DY_CORE_EXPR_VALUE_MAP_ELIM:
+        return is_bound(id, *expr.value_map_elim.expr) || is_bound(id, *expr.value_map_elim.value_map.e1) || is_bound(id, *expr.value_map_elim.value_map.e2);
+    case DY_CORE_EXPR_TYPE_MAP_ELIM:
+        if (is_bound(id, *expr.type_map_elim.expr) || is_bound(id, *expr.type_map_elim.type_map.arg_type)) {
+            return true;
+        }
+
+        if (id == expr.type_map_elim.type_map.arg_id) {
+            return false;
+        }
+
+        return is_bound(id, *expr.type_map_elim.type_map.expr);
+    case DY_CORE_EXPR_BOTH:
+        return is_bound(id, *expr.both.e1) || is_bound(id, *expr.both.e2);
+    case DY_CORE_EXPR_ONE_OF:
+        return is_bound(id, *expr.one_of.first) || is_bound(id, *expr.one_of.second);
+    case DY_CORE_EXPR_UNKNOWN:
+        return expr.unknown.id == id;
+    case DY_CORE_EXPR_STRING:
+        // fallthrough
+    case DY_CORE_EXPR_TYPE_OF_STRINGS:
+        // fallthrough
+    case DY_CORE_EXPR_END:
+        // fallthrough
+    case DY_CORE_EXPR_PRINT:
+        return false;
+    }
 }
 
 struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_expr expr)

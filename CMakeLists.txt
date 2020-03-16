@@ -13,6 +13,10 @@ add_subdirectory("core")
 
 add_subdirectory("syntax")
 
+add_subdirectory("lsp")
+
+add_subdirectory("dap")
+
 add_subdirectory("cli")
 
 set(CPACK_PACKAGE_VENDOR "The Duality Programming Language Authors")

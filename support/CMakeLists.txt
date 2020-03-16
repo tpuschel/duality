@@ -5,6 +5,8 @@ add_library(duality-support
     "src/overflow.c"
     "src/allocator.c"
     "src/stream.c"
+    "src/utf8_to_json.c"
+    "src/json_to_utf8.c"
 )
 
 set_target_properties(duality-support PROPERTIES C_VISIBILITY_PRESET hidden)

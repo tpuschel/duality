@@ -16,6 +16,8 @@
 
 #include <stdio.h>
 
+static dy_ternary_t dy_is_subtype_sub(struct dy_check_ctx ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+
 static dy_ternary_t value_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_value_map);
 
 static dy_ternary_t positive_value_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
@@ -73,8 +75,11 @@ dy_ternary_t dy_is_subtype_sub(struct dy_check_ctx ctx, struct dy_core_expr subt
             .tag = DY_CONSTRAINT_SINGLE,
             .single = {
                 .id = subtype.unknown.id,
-                .polarity_position = DY_CORE_POLARITY_POSITIVE,
-                .expr = supertype,
+                .range = {
+                    .have_subtype = false,
+                    .have_supertype = true,
+                    .supertype = supertype,
+                },
             }
         };
 
@@ -88,8 +93,11 @@ dy_ternary_t dy_is_subtype_sub(struct dy_check_ctx ctx, struct dy_core_expr subt
             .tag = DY_CONSTRAINT_SINGLE,
             .single = {
                 .id = supertype.unknown.id,
-                .polarity_position = DY_CORE_POLARITY_NEGATIVE,
-                .expr = subtype,
+                .range = {
+                    .have_supertype = false,
+                    .have_subtype = true,
+                    .subtype = subtype,
+                },
             }
         };
 
@@ -603,18 +611,22 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
         }
 
         fprintf(stderr, "Solving for %zu\n", type_map.arg_id);
-
-        struct dy_core_expr c_subtype;
-        bool have_c_subtype = false;
-        struct dy_core_expr c_supertype;
-        bool have_c_supertype = false;
         bool have_c2 = false;
-        if (!dy_constraint_solve(ctx, c, type_map.arg_id, &c_subtype, &have_c_subtype, &c_supertype, &have_c_supertype, &c, &have_c2)) {
-            return DY_NO;
-        }
+        struct dy_constraint_range solution = dy_constraint_collect(ctx, c, type_map.arg_id);
 
-        if (have_c_supertype) {
-            *new_subtype_expr = substitute(ctx, id, c_supertype, e);
+        if (solution.have_supertype) {
+            e = substitute(ctx, id, solution.supertype, e);
+
+            if (have_c) {
+                fprintf(stderr, "New constraints, ignoring for now..\n");
+            }
+
+            if (dy_is_subtype(ctx, dy_type_of(ctx, e), supertype, &c, &have_c2, e, &e) == DY_NO) {
+                fprintf(stderr, "Failed!\n");
+                return DY_NO;
+            }
+
+            *new_subtype_expr = e;
             *did_transform_subtype_expr = true;
         } else {
             struct dy_core_expr all = {

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "json_to_utf8.h"
+#include <duality/support/json_to_utf8.h>
 
 #include <duality/support/assert.h>
 
@@ -16,7 +16,7 @@ static void object_to_utf8(struct dy_json_object object, dy_array_t *utf8);
 static void number_to_utf8(struct dy_json_number number, dy_array_t *utf8);
 static void string_to_utf8(dy_string_t string, dy_array_t *utf8);
 
-void json_to_utf8(dy_json_t json, dy_array_t *utf8)
+void dy_json_to_utf8(dy_json_t json, dy_array_t *utf8)
 {
     switch (json.tag) {
     case DY_JSON_VALUE_TRUE:
@@ -63,12 +63,12 @@ void array_to_utf8(struct dy_json_array array, dy_array_t *utf8)
     dy_array_add(utf8, &(char){ '[' });
 
     if (array.num_values >= 1) {
-        json_to_utf8(array.values[0], utf8);
+        dy_json_to_utf8(array.values[0], utf8);
     }
 
     for (size_t i = 1; i < array.num_values; ++i) {
         dy_array_add(utf8, &(char){ ',' });
-        json_to_utf8(array.values[i], utf8);
+        dy_json_to_utf8(array.values[i], utf8);
     }
 
     dy_array_add(utf8, &(char){ ']' });
@@ -81,14 +81,14 @@ void object_to_utf8(struct dy_json_object object, dy_array_t *utf8)
     if (object.num_members >= 1) {
         string_to_utf8(object.members[0].string, utf8);
         dy_array_add(utf8, &(char){ ':' });
-        json_to_utf8(object.members[0].value, utf8);
+        dy_json_to_utf8(object.members[0].value, utf8);
     }
 
     for (size_t i = 1; i < object.num_members; ++i) {
         dy_array_add(utf8, &(char){ ',' });
         string_to_utf8(object.members[i].string, utf8);
         dy_array_add(utf8, &(char){ ':' });
-        json_to_utf8(object.members[i].value, utf8);
+        dy_json_to_utf8(object.members[i].value, utf8);
     }
 
     dy_array_add(utf8, &(char){ '}' });

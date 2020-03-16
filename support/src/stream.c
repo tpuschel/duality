@@ -10,16 +10,12 @@
 
 bool dy_stream_get_char(struct dy_stream *stream, char *c)
 {
-    if (stream->current_index < dy_array_size(stream->buffer)) {
-        dy_array_get(stream->buffer, stream->current_index, c);
-        ++stream->current_index;
-        return true;
-    }
-
-    stream->get_chars(stream->buffer, stream->env);
-
     if (stream->current_index == dy_array_size(stream->buffer)) {
-        return false;
+        stream->get_chars(stream->buffer, stream->env);
+
+        if (stream->current_index == dy_array_size(stream->buffer)) {
+            return false;
+        }
     }
 
     dy_array_get(stream->buffer, stream->current_index, c);

@@ -7,10 +7,10 @@
 #ifndef DY_UTF8_TO_JSON_H
 #define DY_UTF8_TO_JSON_H
 
-#include "json.h"
+#include <duality/support/json.h>
 
 #include <duality/support/stream.h>
 
-bool utf8_to_json(struct dy_stream *stream, dy_json_t *json);
+DY_SUPPORT_API bool dy_utf8_to_json(struct dy_stream *stream, dy_json_t *json);
 
 #endif // DY_UTF8_TO_JSON_H
