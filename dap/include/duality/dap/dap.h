@@ -4,9 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <duality/dap/dap.h>
+#ifndef DY_DAP_H
+#define DY_DAP_H
 
-// Empty stub for now so Windows doesn't complain.
-void stub(void)
-{
-}
+#endif // DY_DAP_H
