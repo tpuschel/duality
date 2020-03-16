@@ -6,7 +6,6 @@
 
 #include <duality/dap/dap.h>
 
-// Empty stub for now so Windows doesn't complain.
-void stub(void)
+void dy_dap_dummy(void)
 {
 }
