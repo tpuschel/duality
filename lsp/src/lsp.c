@@ -503,9 +503,10 @@ bool dy_lsp_hover(dy_lsp_ctx_t *ctx, dy_string_t uri, long line_number, long utf
 
             *result = hover_result(ctx, type_string);
             return true;
+        } else {
+            *result = dy_json_null();
+            return true;
         }
-
-        break;
     }
 
     *error = invalid_request(ctx, DY_STR_LIT("Could not find the document."));
