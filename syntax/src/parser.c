@@ -763,7 +763,7 @@ bool parse_bare_list(struct dy_parser_ctx *ctx, struct dy_ast_list *list)
             continue;
         }
 
-        if (dy_parse_literal(ctx, DY_STR_LIT("\n"))) {
+        if (dy_parse_literal(ctx, DY_STR_LIT("\n")) || dy_parse_literal(ctx, DY_STR_LIT("\r\n"))) {
             skip_whitespace(ctx);
 
             if (dy_parse_literal(ctx, DY_STR_LIT("}"))) {
@@ -1089,7 +1089,7 @@ bool skip_semicolon_or_newline(struct dy_parser_ctx *ctx)
         return true;
     }
 
-    if (dy_parse_literal(ctx, DY_STR_LIT("\n"))) {
+    if (dy_parse_literal(ctx, DY_STR_LIT("\n")) || dy_parse_literal(ctx, DY_STR_LIT("\r\n"))) {
         return true;
     }
 
@@ -1349,7 +1349,7 @@ void skip_whitespace(struct dy_parser_ctx *ctx)
 {
     for (;;) {
         char c;
-        if (parse_one_of(ctx, DY_STR_LIT(" \n\t"), &c)) {
+        if (parse_one_of(ctx, DY_STR_LIT(" \r\n\t"), &c)) {
             continue;
         }
 
