@@ -28,6 +28,12 @@ void dy_stream_put_last_char_back(struct dy_stream *stream)
     --stream->current_index;
 }
 
+void dy_stream_reset(struct dy_stream *stream)
+{
+    dy_array_set_size(stream->buffer, 0);
+    stream->current_index = 0;
+}
+
 bool dy_stream_parse_literal(struct dy_stream *stream, dy_string_t literal)
 {
     size_t start_index = stream->current_index;

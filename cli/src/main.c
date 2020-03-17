@@ -69,6 +69,8 @@ int main(int argc, const char *argv[])
         return -1;
     }
 
+    dy_array_destroy(parser_ctx.stream.buffer);
+
     size_t running_id = 0;
     dy_array_t *unbound_vars = dy_array_create(dy_allocator_stdlib(), sizeof(dy_string_t), 2);
 

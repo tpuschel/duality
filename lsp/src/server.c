@@ -81,6 +81,8 @@ bool dy_lsp_process_message(dy_lsp_ctx_t *ctx, struct dy_stream *stream)
         return false;
     }
 
+    dy_stream_reset(stream);
+
     return dy_lsp_handle_message(ctx, message);
 }
 

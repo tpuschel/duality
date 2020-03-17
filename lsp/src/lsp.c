@@ -749,7 +749,9 @@ void process_document(struct document *doc)
     };
 
     struct dy_ast_do_block ast;
-    if (!dy_parse_file(&parser_ctx, &ast)) {
+    bool parsing_succeeded = dy_parse_file(&parser_ctx, &ast);
+    dy_array_destroy(parser_ctx.stream.buffer);
+    if (!parsing_succeeded) {
         doc->ast_is_valid = false;
         doc->core_is_valid = false;
         return;
