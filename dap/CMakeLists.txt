@@ -1,5 +1,6 @@
 add_library(duality-dap
     "src/dap.c"
+    "src/server.c"
 )
 
 set_target_properties(duality-dap PROPERTIES C_VISIBILITY_PRESET hidden)
