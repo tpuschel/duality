@@ -41,6 +41,8 @@ struct dy_core_expr dy_type_of(struct dy_check_ctx ctx, struct dy_core_expr expr
         };
     case DY_CORE_EXPR_UNKNOWN:
         return *expr.unknown.type;
+    case DY_CORE_EXPR_INFERENCE_CTX:
+        return dy_type_of(ctx, *expr.inference_ctx.expr);
     case DY_CORE_EXPR_STRING:
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_TYPE_OF_STRINGS

@@ -559,9 +559,11 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
             .unknown = {
                 .id = id,
                 .type = type_map.arg_type,
-                .is_inference_var = false,
+                .is_inference_var = true,
             }
         };
+
+        struct dy_core_expr new_type = substitute(ctx, type_map.arg_id, unknown, *type_map.expr);
 
         struct dy_core_expr e = {
             .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
@@ -570,28 +572,17 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
                 .expr = alloc_expr(ctx, subtype_expr),
                 .value_map = {
                     .e1 = alloc_expr(ctx, unknown),
-                    .e2 = alloc_expr(ctx, substitute(ctx, type_map.arg_id, unknown, *type_map.expr)),
+                    .e2 = alloc_expr(ctx, new_type),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = true,
                 },
             }
         };
 
-        struct dy_core_expr inference_unknown = {
-            .tag = DY_CORE_EXPR_UNKNOWN,
-            .unknown = {
-                .id = type_map.arg_id,
-                .type = type_map.arg_type,
-                .is_inference_var = true,
-            },
-        };
-
-        struct dy_core_expr type_map_expr = substitute(ctx, type_map.arg_id, inference_unknown, *type_map.expr);
-
         struct dy_constraint c;
         bool have_c = false;
         bool did_transform_e = false;
-        dy_ternary_t result = dy_is_subtype_sub(ctx, type_map_expr, supertype, &c, &have_c, e, &e, &did_transform_e);
+        dy_ternary_t result = dy_is_subtype_sub(ctx, new_type, supertype, &c, &have_c, e, &e, &did_transform_e);
         if (result == DY_NO) {
             return DY_NO;
         }
@@ -610,35 +601,54 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
             return result;
         }
 
-        fprintf(stderr, "Solving for %zu\n", type_map.arg_id);
-        bool have_c2 = false;
-        struct dy_constraint_range solution = dy_constraint_collect(ctx, c, type_map.arg_id);
+        dy_array_t *ids = dy_array_create(ctx.allocator, sizeof(size_t), 4);
+        dy_binding_contraints(ctx, id, c, have_c, ids);
 
-        if (solution.have_supertype) {
-            e = substitute(ctx, id, solution.supertype, e);
+        if (dy_array_size(ids) != 0) {
+            struct dy_bound_constraint bound_constraint = {
+                .id = id,
+                .type = *type_map.arg_type,
+                .binding_ids = ids
+            };
 
-            if (have_c) {
-                fprintf(stderr, "New constraints, ignoring for now..\n");
-            }
-
-            if (dy_is_subtype(ctx, dy_type_of(ctx, e), supertype, &c, &have_c2, e, &e) == DY_NO) {
-                fprintf(stderr, "Failed!\n");
-                return DY_NO;
-            }
+            dy_array_add(ctx.bound_constraints, &bound_constraint);
 
             *new_subtype_expr = e;
             *did_transform_subtype_expr = true;
+
+            if (have_c) {
+                *constraint = c;
+                *did_generate_constraint = true;
+            }
+
+            return result;
+        }
+
+        dy_array_destroy(ids);
+
+        struct dy_constraint_range solution = dy_constraint_collect(ctx, c, id);
+
+        if (solution.have_supertype) {
+            e = substitute(ctx, id, solution.supertype, e);
         } else {
             struct dy_core_expr all = {
                 .tag = DY_CORE_EXPR_END,
                 .end_polarity = DY_CORE_POLARITY_POSITIVE
             };
 
-            *new_subtype_expr = substitute(ctx, id, all, e);
-            *did_transform_subtype_expr = true;
+            e = substitute(ctx, id, all, e);
         }
 
-        if (have_c2) {
+        have_c = false;
+        result = dy_is_subtype(ctx, dy_type_of(ctx, e), supertype, &c, &have_c, e, &e);
+        if (result == DY_NO) {
+            return DY_NO;
+        }
+
+        *new_subtype_expr = e;
+        *did_transform_subtype_expr = true;
+
+        if (have_c) {
             *constraint = c;
             *did_generate_constraint = true;
         }
@@ -759,29 +769,31 @@ dy_ternary_t positive_both_is_subtype(struct dy_check_ctx ctx, struct dy_core_bo
     struct dy_core_expr e1 = subtype_expr;
     bool did_transform_e1 = false;
     dy_ternary_t first_res = dy_is_subtype_sub(ctx, *both.e1, expr, &c1, &have_c1, e1, &e1, &did_transform_e1);
-    if (first_res == DY_YES) {
-        *constraint = c1;
-        *did_generate_constraint = have_c1;
-        *new_subtype_expr = e1;
-        *did_transform_subtype_expr = did_transform_e1;
-        return DY_YES;
-    }
 
     struct dy_constraint c2;
     bool have_c2 = false;
     struct dy_core_expr e2 = subtype_expr;
     bool did_transform_e2 = false;
     dy_ternary_t second_res = dy_is_subtype_sub(ctx, *both.e2, expr, &c2, &have_c2, e2, &e2, &did_transform_e2);
-    if (second_res == DY_YES && first_res == DY_NO) {
+
+    if (first_res == DY_NO && second_res == DY_NO) {
+        return DY_NO;
+    }
+
+    if (second_res == DY_NO) {
+        *constraint = c1;
+        *did_generate_constraint = have_c1;
+        *new_subtype_expr = e1;
+        *did_transform_subtype_expr = did_transform_e1;
+        return first_res;
+    }
+
+    if (first_res == DY_NO) {
         *constraint = c2;
         *did_generate_constraint = have_c2;
         *new_subtype_expr = e2;
         *did_transform_subtype_expr = did_transform_e2;
-        return DY_YES;
-    }
-
-    if (first_res == DY_NO && second_res == DY_NO) {
-        return DY_NO;
+        return second_res;
     }
 
     if (have_c1 && have_c2) {
@@ -794,26 +806,22 @@ dy_ternary_t positive_both_is_subtype(struct dy_check_ctx ctx, struct dy_core_bo
             }
         };
         *did_generate_constraint = true;
-    } else if (have_c1) {
-        *constraint = c1;
-        *did_generate_constraint = true;
-    } else if (have_c2) {
-        *constraint = c2;
-        *did_generate_constraint = true;
     }
 
-    *new_subtype_expr = (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_BOTH,
-        .both = {
-            .e1 = alloc_expr(ctx, e1),
-            .e2 = alloc_expr(ctx, e2),
-            .polarity = DY_CORE_POLARITY_POSITIVE,
-        }
-    };
+    if (did_transform_e1 || did_transform_e2) {
+        *new_subtype_expr = (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_BOTH,
+            .both = {
+                .e1 = alloc_expr(ctx, e1),
+                .e2 = alloc_expr(ctx, e2),
+                .polarity = DY_CORE_POLARITY_POSITIVE,
+            }
+        };
 
-    *did_transform_subtype_expr = true;
+        *did_transform_subtype_expr = true;
+    }
 
-    return DY_MAYBE;
+    return first_res;
 }
 
 dy_ternary_t negative_both_is_subtype(struct dy_check_ctx ctx, struct dy_core_both both, struct dy_core_expr expr, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
@@ -838,6 +846,22 @@ dy_ternary_t negative_both_is_subtype(struct dy_check_ctx ctx, struct dy_core_bo
         return DY_NO;
     }
 
+    if (second_result == DY_NO) {
+        *constraint = c1;
+        *did_generate_constraint = have_c1;
+        *new_subtype_expr = e1;
+        *did_transform_subtype_expr = did_transform_e1;
+        return DY_MAYBE;
+    }
+
+    if (first_result == DY_NO) {
+        *constraint = c2;
+        *did_generate_constraint = have_c2;
+        *new_subtype_expr = e2;
+        *did_transform_subtype_expr = did_transform_e2;
+        return DY_MAYBE;
+    }
+
     if (have_c1 && have_c2) {
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
@@ -847,12 +871,6 @@ dy_ternary_t negative_both_is_subtype(struct dy_check_ctx ctx, struct dy_core_bo
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
-        *did_generate_constraint = true;
-    } else if (have_c1) {
-        *constraint = c1;
-        *did_generate_constraint = true;
-    } else if (have_c2) {
-        *constraint = c2;
         *did_generate_constraint = true;
     }
 
@@ -948,29 +966,31 @@ dy_ternary_t is_subtype_of_negative_both(struct dy_check_ctx ctx, struct dy_core
     struct dy_core_expr e1 = subtype_expr;
     bool did_transform_e1 = false;
     dy_ternary_t first_res = dy_is_subtype_sub(ctx, expr, *both.e1, &c1, &have_c1, e1, &e1, &did_transform_e1);
-    if (first_res == DY_YES) {
-        *constraint = c1;
-        *did_generate_constraint = have_c1;
-        *new_subtype_expr = e1;
-        *did_transform_subtype_expr = did_transform_e1;
-        return DY_YES;
-    }
 
     struct dy_constraint c2;
     bool have_c2 = false;
     struct dy_core_expr e2 = subtype_expr;
     bool did_transform_e2 = false;
     dy_ternary_t second_res = dy_is_subtype_sub(ctx, expr, *both.e2, &c2, &have_c2, e2, &e2, &did_transform_e2);
-    if (second_res == DY_YES && first_res == DY_NO) {
+
+    if (first_res == DY_NO && second_res == DY_NO) {
+        return DY_NO;
+    }
+
+    if (second_res == DY_NO) {
+        *constraint = c1;
+        *did_generate_constraint = have_c1;
+        *new_subtype_expr = e1;
+        *did_transform_subtype_expr = did_transform_e1;
+        return first_res;
+    }
+
+    if (first_res == DY_NO) {
         *constraint = c2;
         *did_generate_constraint = have_c2;
         *new_subtype_expr = e2;
         *did_transform_subtype_expr = did_transform_e2;
-        return DY_YES;
-    }
-
-    if (first_res == DY_NO && second_res == DY_NO) {
-        return DY_NO;
+        return second_res;
     }
 
     if (have_c1 && have_c2) {
@@ -982,12 +1002,6 @@ dy_ternary_t is_subtype_of_negative_both(struct dy_check_ctx ctx, struct dy_core
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
-        *did_generate_constraint = true;
-    } else if (have_c1) {
-        *constraint = c1;
-        *did_generate_constraint = true;
-    } else if (have_c2) {
-        *constraint = c2;
         *did_generate_constraint = true;
     }
 
@@ -1004,7 +1018,11 @@ dy_ternary_t is_subtype_of_negative_both(struct dy_check_ctx ctx, struct dy_core
         *did_transform_subtype_expr = true;
     }
 
-    return DY_MAYBE;
+    if (first_res == DY_MAYBE && second_res == DY_MAYBE) {
+        return DY_MAYBE;
+    }
+
+    return DY_YES;
 }
 
 dy_ternary_t both_is_subtype_of_both(struct dy_check_ctx ctx, struct dy_core_both p1, struct dy_core_both p2, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)

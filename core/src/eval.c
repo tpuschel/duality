@@ -138,46 +138,32 @@ dy_ternary_t dy_eval_value_map_elim(struct dy_check_ctx ctx, struct dy_core_valu
         }
     };
 
-    bool check_elim = true;
-    for (size_t i = 0, size = dy_array_size(ctx.successful_elims); i < size; ++i) {
-        size_t id;
-        dy_array_get(ctx.successful_elims, i, &id);
-
-        if (id == elim.id) {
-            check_elim = false;
-            break;
-        }
+    struct dy_constraint constraint;
+    bool have_constraint = false;
+    dy_ternary_t result = dy_is_subtype_no_transformation(ctx, dy_type_of(ctx, left), value_map, &constraint, &have_constraint);
+    if (result == DY_NO) {
+        return DY_NO;
     }
 
-    if (check_elim) {
-        struct dy_constraint constraint;
-        bool have_constraint = false;
-        dy_ternary_t result = dy_is_subtype_no_transformation(ctx, dy_type_of(ctx, left), value_map, &constraint, &have_constraint);
-        if (result == DY_NO) {
-            return DY_NO;
-        }
+    if (have_constraint) {
+        fprintf(stderr, "Constraint on eval??\n");
+        return DY_NO;
+    }
 
-        if (have_constraint) {
-            fprintf(stderr, "Constraint on eval??\n");
-            return DY_NO;
-        }
+    if (result == DY_MAYBE) {
+        *new_expr = (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
+            .value_map_elim = {
+                .id = elim.id,
+                .expr = alloc_expr(ctx, left),
+                .value_map = value_map.value_map,
+            }
+        };
 
-        if (result == DY_MAYBE) {
-            *new_expr = (struct dy_core_expr){
-                .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-                .value_map_elim = {
-                    .id = elim.id,
-                    .expr = alloc_expr(ctx, left),
-                    .value_map = value_map.value_map,
-                }
-            };
-
-            return DY_MAYBE;
-        }
+        return DY_MAYBE;
     }
 
     if (left.tag == DY_CORE_EXPR_PRINT) {
-        fprintf(stderr, "<duality print> ");
         for (size_t i = 0; i < right.string.size; ++i) {
             fprintf(stderr, "%c", right.string.ptr[i]);
         }

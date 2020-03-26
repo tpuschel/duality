@@ -872,8 +872,7 @@ bool type_of_expr_at_byte_offset(size_t *running_id, struct dy_text_range_core_m
 
     struct dy_check_ctx check_ctx = {
         .running_id = running_id,
-        .allocator = dy_allocator_stdlib(),
-        .successful_elims = dy_array_create(dy_allocator_stdlib(), sizeof(size_t), 32)
+        .allocator = dy_allocator_stdlib()
     };
 
     *type = dy_type_of(check_ctx, map.expr);

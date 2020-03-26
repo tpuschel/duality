@@ -30,6 +30,8 @@ static void print_string(FILE *stream, dy_string_t s);
 
 static void print_unbound_vars_error(dy_array_t *unbound_vars);
 
+static void print_constraint(struct dy_constraint c);
+
 int main(int argc, const char *argv[])
 {
     if (argc > 1 && strcmp(argv[1], "--server") == 0) {
@@ -95,7 +97,7 @@ int main(int argc, const char *argv[])
     struct dy_check_ctx check_ctx = {
         .running_id = &running_id,
         .allocator = dy_allocator_stdlib(),
-        .successful_elims = dy_array_create(dy_allocator_stdlib(), sizeof(size_t), 32)
+        .bound_constraints = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_bound_constraint), 64)
     };
 
     struct dy_core_expr checked_program;
@@ -105,14 +107,18 @@ int main(int argc, const char *argv[])
         fprintf(stderr, "Program failed check.\n");
         return -1;
     }
-    if (have_constraint) {
-        fprintf(stderr, "Constraint on top level??.\n");
-        return -1;
-    }
 
     printf("Checked Core:\n");
     print_core_expr(checked_program, dy_allocator_stdlib());
     printf("\n");
+
+
+    if (have_constraint) {
+        fprintf(stderr, "Constraint on top level??.\n");
+        print_constraint(constraint);
+        fprintf(stderr, "\n");
+        return -1;
+    }
 
     struct dy_core_expr result;
     dy_ternary_t is_valid = dy_eval_expr(check_ctx, checked_program, &result);
@@ -121,7 +127,7 @@ int main(int argc, const char *argv[])
         return -1;
     }
 
-    printf("Result:\n");
+    printf("Result: ");
     print_core_expr(result, dy_allocator_stdlib());
     printf("\n");
 
@@ -182,4 +188,34 @@ void read_chunk(dy_array_t *buffer, void *env)
     size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), CHUNK_SIZE, stream);
 
     dy_array_add_to_size(buffer, num_bytes_read);
+}
+
+void print_constraint(struct dy_constraint c)
+{
+    switch (c.tag) {
+    case DY_CONSTRAINT_SINGLE:
+        if (c.single.range.have_subtype) {
+            print_core_expr(c.single.range.subtype, dy_allocator_stdlib());
+            printf(" <: ");
+        }
+        printf("%zu", c.single.id);
+        if (c.single.range.have_supertype) {
+            printf(" <: ");
+            print_core_expr(c.single.range.supertype, dy_allocator_stdlib());
+        }
+        break;
+    case DY_CONSTRAINT_MULTIPLE:
+        printf("(");
+        print_constraint(*c.multiple.c1);
+        switch (c.multiple.polarity) {
+        case DY_CORE_POLARITY_POSITIVE:
+            printf(" & ");
+            break;
+        case DY_CORE_POLARITY_NEGATIVE:
+            printf(" | ");
+            break;
+        }
+        print_constraint(*c.multiple.c2);
+        printf(")");
+    }
 }

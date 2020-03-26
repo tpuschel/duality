@@ -59,6 +59,26 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         add_string(string, DY_STR_LIT(")"));
         return;
     }
+    case DY_CORE_EXPR_INFERENCE_CTX: {
+        add_string(string, DY_STR_LIT("("));
+
+        add_string(string, DY_STR_LIT("?["));
+        char *c;
+        dy_assert(asprintf(&c, "%zu", expr.inference_ctx.id) != -1);
+        add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
+        free(c);
+        add_string(string, DY_STR_LIT(" "));
+        dy_core_expr_to_string(*expr.inference_ctx.type, string);
+        add_string(string, DY_STR_LIT("]"));
+        if (expr.inference_ctx.polarity == DY_CORE_POLARITY_POSITIVE) {
+            add_string(string, DY_STR_LIT(" -> "));
+        } else {
+            add_string(string, DY_STR_LIT(" ~> "));
+        }
+        dy_core_expr_to_string(*expr.inference_ctx.expr, string);
+        add_string(string, DY_STR_LIT(")"));
+        return;
+    }
     case DY_CORE_EXPR_VALUE_MAP_ELIM: {
         /*char *c;
         dy_assert(asprintf(&c, "$%zu", expr.value_map_elim.id) != -1);

@@ -54,6 +54,10 @@ struct dy_core_expr substitute(struct dy_check_ctx ctx, size_t id, struct dy_cor
         expr.type_map_elim.expr = alloc_expr(ctx, substitute(ctx, id, sub, *expr.type_map_elim.expr));
         expr.type_map_elim.type_map = substitute_type_map(ctx, id, sub, expr.type_map_elim.type_map);
         return expr;
+    case DY_CORE_EXPR_INFERENCE_CTX:
+        expr.inference_ctx.type = alloc_expr(ctx, substitute(ctx, id, sub, *expr.inference_ctx.type));
+        expr.inference_ctx.expr = alloc_expr(ctx, substitute(ctx, id, sub, *expr.inference_ctx.expr));
+        return expr;
     }
 
     DY_IMPOSSIBLE_ENUM();

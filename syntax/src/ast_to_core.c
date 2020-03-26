@@ -231,13 +231,12 @@ bool ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map
         };
 
         *expr = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_TYPE_MAP,
-            .type_map = {
-                .arg_id = unknown.id,
-                .arg_type = unknown.type,
+            .tag = DY_CORE_EXPR_INFERENCE_CTX,
+            .inference_ctx = {
+                .id = unknown.id,
+                .type = unknown.type,
                 .expr = alloc_expr(ctx, result_type_map),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
-                .is_implicit = true,
             }
         };
 
@@ -493,7 +492,7 @@ bool do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_
         .unknown = {
             .id = (*ctx->running_id)++,
             .type = alloc_expr(ctx, (struct dy_core_expr){ .tag = DY_CORE_EXPR_END, .end_polarity = DY_CORE_POLARITY_POSITIVE }),
-            .is_inference_var = false,
+            .is_inference_var = true,
         }
     };
 
@@ -512,13 +511,12 @@ bool do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_
     };
 
     *expr = (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_TYPE_MAP,
-        .type_map = {
-            .arg_id = result_type.unknown.id,
-            .arg_type = result_type.unknown.type,
+        .tag = DY_CORE_EXPR_INFERENCE_CTX,
+        .inference_ctx = {
+            .id = result_type.unknown.id,
+            .type = result_type.unknown.type,
             .expr = alloc_expr(ctx, elim),
             .polarity = DY_CORE_POLARITY_NEGATIVE,
-            .is_implicit = true,
         }
     };
 
@@ -578,13 +576,12 @@ bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block
     };
 
     struct dy_core_expr result_type_map = {
-        .tag = DY_CORE_EXPR_TYPE_MAP,
-        .type_map = {
-            .arg_id = unknown.id,
-            .arg_type = unknown.type,
+        .tag = DY_CORE_EXPR_INFERENCE_CTX,
+        .inference_ctx = {
+            .id = unknown.id,
+            .type = unknown.type,
             .expr = alloc_expr(ctx, positive_type_map),
             .polarity = DY_CORE_POLARITY_POSITIVE,
-            .is_implicit = true,
         }
     };
 
@@ -593,7 +590,7 @@ bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block
         .unknown = {
             .id = (*ctx->running_id)++,
             .type = alloc_expr(ctx, (struct dy_core_expr){ .tag = DY_CORE_EXPR_END, .end_polarity = DY_CORE_POLARITY_POSITIVE }),
-            .is_inference_var = false,
+            .is_inference_var = true,
         }
     };
 
@@ -612,13 +609,12 @@ bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block
     };
 
     *expr = (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_TYPE_MAP,
-        .type_map = {
-            .arg_id = result_type.unknown.id,
-            .arg_type = result_type.unknown.type,
+        .tag = DY_CORE_EXPR_INFERENCE_CTX,
+        .inference_ctx = {
+            .id = result_type.unknown.id,
+            .type = result_type.unknown.type,
             .expr = alloc_expr(ctx, elim),
             .polarity = DY_CORE_POLARITY_NEGATIVE,
-            .is_implicit = true,
         }
     };
 
@@ -667,13 +663,12 @@ bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast
     };
 
     struct dy_core_expr result_type_map = {
-        .tag = DY_CORE_EXPR_TYPE_MAP,
-        .type_map = {
-            .arg_id = unknown.id,
-            .arg_type = unknown.type,
+        .tag = DY_CORE_EXPR_INFERENCE_CTX,
+        .inference_ctx = {
+            .id = unknown.id,
+            .type = unknown.type,
             .expr = alloc_expr(ctx, positive_type_map),
             .polarity = DY_CORE_POLARITY_POSITIVE,
-            .is_implicit = true,
         }
     };
 
@@ -682,7 +677,7 @@ bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast
         .unknown = {
             .id = (*ctx->running_id)++,
             .type = alloc_expr(ctx, (struct dy_core_expr){ .tag = DY_CORE_EXPR_END, .end_polarity = DY_CORE_POLARITY_POSITIVE }),
-            .is_inference_var = false,
+            .is_inference_var = true,
         }
     };
 
@@ -701,13 +696,12 @@ bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast
     };
 
     *expr = (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_TYPE_MAP,
-        .type_map = {
-            .arg_id = result_type.unknown.id,
-            .arg_type = result_type.unknown.type,
+        .tag = DY_CORE_EXPR_INFERENCE_CTX,
+        .inference_ctx = {
+            .id = result_type.unknown.id,
+            .type = result_type.unknown.type,
             .expr = alloc_expr(ctx, elim),
             .polarity = DY_CORE_POLARITY_NEGATIVE,
-            .is_implicit = true,
         }
     };
 
@@ -835,13 +829,12 @@ bool dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
     };
 
     *expr = (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_TYPE_MAP,
-        .type_map = {
-            .arg_id = unknown.id,
-            .arg_type = unknown.type,
+        .tag = DY_CORE_EXPR_INFERENCE_CTX,
+        .inference_ctx = {
+            .id = unknown.id,
+            .type = unknown.type,
             .expr = alloc_expr(ctx, elim),
             .polarity = DY_CORE_POLARITY_NEGATIVE,
-            .is_implicit = true,
         }
     };
 
@@ -863,6 +856,6 @@ struct dy_core_unknown create_inference_var(struct dy_ast_to_core_ctx *ctx)
     return (struct dy_core_unknown){
         .id = (*ctx->running_id)++,
         .type = alloc_expr(ctx, type_all),
-        .is_inference_var = false
+        .is_inference_var = true
     };
 }

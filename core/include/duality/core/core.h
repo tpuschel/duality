@@ -63,6 +63,13 @@ struct dy_core_both {
     enum dy_core_polarity polarity;
 };
 
+struct dy_core_inference_ctx {
+    size_t id;
+    const struct dy_core_expr *type;
+    const struct dy_core_expr *expr;
+    enum dy_core_polarity polarity;
+};
+
 enum dy_core_expr_tag {
     DY_CORE_EXPR_VALUE_MAP,
     DY_CORE_EXPR_TYPE_MAP,
@@ -72,6 +79,7 @@ enum dy_core_expr_tag {
     DY_CORE_EXPR_ONE_OF,
     DY_CORE_EXPR_UNKNOWN,
     DY_CORE_EXPR_END,
+    DY_CORE_EXPR_INFERENCE_CTX,
     DY_CORE_EXPR_STRING,
     DY_CORE_EXPR_TYPE_OF_STRINGS,
     DY_CORE_EXPR_PRINT
@@ -86,6 +94,7 @@ struct dy_core_expr {
         struct dy_core_both both;
         struct dy_core_one_of one_of;
         struct dy_core_unknown unknown;
+        struct dy_core_inference_ctx inference_ctx;
         dy_string_t string;
         enum dy_core_polarity end_polarity;
     };
