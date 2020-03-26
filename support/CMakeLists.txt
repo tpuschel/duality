@@ -9,6 +9,13 @@ add_library(duality-support
     "src/json_to_utf8.c"
 )
 
+include(CheckIncludeFile)
+
+check_include_file(execinfo.h HAVE_EXECINFO)
+if(HAVE_EXECINFO)
+    target_compile_definitions(duality-support PRIVATE DY_HAVE_EXECINFO)
+endif()
+
 set_target_properties(duality-support PROPERTIES C_VISIBILITY_PRESET hidden)
 
 if(BUILD_SHARED_LIBS)
