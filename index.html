@@ -56,8 +56,8 @@
             <a href="https://microsoft.github.io/debug-adapter-protocol/">Debug Adapter Protocol</a> support
           </li>
           <li>
-            <a href="https://marketplace.visualstudio.com/items?itemName=puschel.duality">Plugin</a> for Visual Studio
-            Code
+            <a href="https://marketplace.visualstudio.com/items?itemName=puschel.duality">Extension</a> for Visual
+            Studio Code
           </li>
         </ul>
       </div>
@@ -68,7 +68,7 @@
       for a deeper look at the language!
     </p>
 
-    <script src="dy.js"></script>
+    <script src="duality.js"></script>
 
     <script src="processCode.js"></script>
 
@@ -77,14 +77,14 @@
 
       let timeoutId = undefined
 
-      const textArea = document.getElementById('code-textarea')
+      let textArea = document.getElementById('code-textarea')
 
-      const processCodeAndDisplay = () => {
+      let processCodeAndDisplay = () => {
         window.localStorage.setItem('code', textArea.value)
 
         timeoutId = undefined
 
-        const resultDiv = document.getElementById('result-div')
+        let resultDiv = document.getElementById('result-div')
 
         if (textArea.value) {
           resultDiv.textContent = processCode(textArea.value)
@@ -93,8 +93,8 @@
         }
       }
 
-      const onRuntimeInitialized = () => {
-        const savedData = window.localStorage.getItem('code')
+      Module['onRuntimeInitialized'] = () => {
+        let savedData = window.localStorage.getItem('code')
         if (savedData) {
           textArea.value = savedData
           processCodeAndDisplay()
@@ -109,8 +109,6 @@
         })
       }
 
-      Module['onRuntimeInitialized'] = onRuntimeInitialized;
-
       textArea.addEventListener('keydown', event => {
         if (event.isComposing || event.keyCode === 229) {
           return
@@ -123,10 +121,10 @@
         event.preventDefault()
 
         if (textArea.selectionStart || textArea.selectionStart === 0) {
-          const startPos = textArea.selectionStart
-          const endPos = textArea.selectionEnd
+          let startPos = textArea.selectionStart
+          let endPos = textArea.selectionEnd
 
-          const tabReplacement = '    '
+          let tabReplacement = '    '
 
           textArea.value = textArea.value.substring(0, startPos) + tabReplacement + textArea.value.substring(endPos, textArea.value.length)
           textArea.selectionStart = startPos + tabReplacement.length

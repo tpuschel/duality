@@ -1,18 +1,18 @@
 'use strict'
 
-const dyStringSize = 8
+let dyStringSize = 8
 
-const unboundVarsList = unboundVars => {
-    const len = _dy_array_size(unboundVars)
+let unboundVarsList = unboundVars => {
+    let len = _dy_array_size(unboundVars)
 
     let list = []
 
     for (let i = 0; i < len; ++i) {
-        const varName = _malloc(dyStringSize)
+        let varName = _malloc(dyStringSize)
 
         _dy_array_get(unboundVars, i, varName)
 
-        const varNameJs = UTF8ToString(getValue(varName, 'i32'), getValue(varName + 4, 'i32'))
+        let varNameJs = UTF8ToString(getValue(varName, 'i32'), getValue(varName + 4, 'i32'))
 
         list.push(varNameJs)
 
@@ -22,57 +22,52 @@ const unboundVarsList = unboundVars => {
     return list
 }
 
-const processCode = program => {
-    const parserCtxSize = 36
-    const astDoBlockSize = 12
-    const allocatorSize = 16
-    const astToCoreCtxSize = 28
-    const boundVarsSize = 16
-    const coreExprSize = 22
-    const checkCtxSize = 20
+let streamCallbackPointer = addFunction((buffer, env) => { }, 'vii')
 
-    const cText = allocate(intArrayFromString(program, true), 'i8', ALLOC_NORMAL)
-    const cTextLength = lengthBytesUTF8(program)
+let processCode = program => {
+    let allocatorPtr = _malloc(16)
+    _dy_allocator_stdlib(allocatorPtr)
+
+    let cText = allocate(intArrayFromString(program, true), 'i8', ALLOC_NORMAL)
+    let cTextLength = lengthBytesUTF8(program)
+
+    let textBuffer = _dy_array_create(allocatorPtr, 1, cTextLength)
+    _memcpy(_dy_array_buffer(textBuffer), cText, cTextLength)
+    _dy_array_set_size(textBuffer, cTextLength)
+
+    let zero = 0
+
 
     // First, parsing
-    const parserCtx = _malloc(parserCtxSize)
+    let parserCtx = _malloc(36)
 
-    // setting text
-    setValue(parserCtx, cText, 'i32')
-    setValue(parserCtx + 4, cTextLength, 'i32')
-
-    // setting index_in
-    setValue(parserCtx + 8, 0, 'i32')
+    setValue(parserCtx, streamCallbackPointer, 'i32') // stream
+    setValue(parserCtx + 4, textBuffer, 'i32') // buffer
+    setValue(parserCtx + 8, zero, 'i32') // env
+    setValue(parserCtx + 12, zero, 'i32') // current_index
 
     // setting allocator
-    const allocatorPtr = _malloc(allocatorSize)
-    _dy_allocator_stdlib(allocatorPtr)
-    setValue(parserCtx + 12, getValue(allocatorPtr, 'i32'), 'i32')
-    setValue(parserCtx + 16, getValue(allocatorPtr + 4, 'i32'), 'i32')
-    setValue(parserCtx + 20, getValue(allocatorPtr + 8, 'i32'), 'i32')
-    setValue(parserCtx + 24, getValue(allocatorPtr + 12, 'i32'), 'i32')
+    setValue(parserCtx + 16, getValue(allocatorPtr, 'i32'), 'i32')
+    setValue(parserCtx + 20, getValue(allocatorPtr + 4, 'i32'), 'i32')
+    setValue(parserCtx + 24, getValue(allocatorPtr + 8, 'i32'), 'i32')
+    setValue(parserCtx + 28, getValue(allocatorPtr + 12, 'i32'), 'i32')
 
-    // setting index_out
-    const indexOutPtr = _malloc(4)
-    setValue(parserCtx + 28, indexOutPtr, 'i32')
-
-    // setting errors
-    const errors = _dy_array_create(parserCtx + 12, 8, 1)
-    setValue(parserCtx + 32, errors, 'i32')
+    let stringArrays = _dy_array_create(allocatorPtr, 4, 4)
+    setValue(parserCtx + 32, stringArrays, 'i32') // arrays
 
     // actually parse
-    const resultDoBlock = _malloc(astDoBlockSize)
-    const parseDidSucceed = _dy_parse_file(parserCtx, resultDoBlock)
+    let resultDoBlock = _malloc(20)
+    let parseDidSucceed = _dy_parse_file(parserCtx, resultDoBlock)
     if (!parseDidSucceed) {
         return 'Parsing failed.'
     }
 
 
     // Second, AST -> Core translation
-    const astToCoreCtx = _malloc(astToCoreCtxSize)
+    let astToCoreCtx = _malloc(28)
 
     // creating running_id with initial value 0
-    const runningId = _malloc(4)
+    let runningId = _malloc(4)
     setValue(runningId, 0, 'i32')
 
     // setting running_id
@@ -85,22 +80,26 @@ const processCode = program => {
     setValue(astToCoreCtx + 16, getValue(allocatorPtr + 12, 'i32'), 'i32')
 
     // setting bound_vars
-    const boundVars = _dy_array_create(parserCtx + 12, boundVarsSize, 8)
+    let boundVars = _dy_array_create(allocatorPtr, 16, 8)
     setValue(astToCoreCtx + 20, boundVars, 'i32')
 
     // setting unbound_vars
-    const unboundVars = _dy_array_create(parserCtx + 12, dyStringSize, 4)
+    let unboundVars = _dy_array_create(allocatorPtr, dyStringSize, 4)
     setValue(astToCoreCtx + 24, unboundVars, 'i32')
 
-    const coreExprResult = _malloc(coreExprSize)
-    const astToCoreDidSucceed = _dy_ast_do_block_to_core(astToCoreCtx, resultDoBlock, coreExprResult)
+    let sourceMaps = _dy_array_create(allocatorPtr, 44, 4)
+
+    let coreExprSize = 32
+
+    let coreExprResult = _malloc(coreExprSize)
+    let astToCoreDidSucceed = _dy_ast_do_block_to_core(astToCoreCtx, resultDoBlock, coreExprResult, sourceMaps)
     if (!astToCoreDidSucceed) {
         return 'Unbound variables: ' + unboundVarsList(unboundVars).reduce((accum, val) => accum + ', ' + val) + '.'
     }
 
 
     // Third, checking
-    const checkingCtx = _malloc(checkCtxSize)
+    let checkingCtx = _malloc(24)
 
     // Setting running_id
     setValue(checkingCtx, runningId, 'i32')
@@ -111,22 +110,28 @@ const processCode = program => {
     setValue(checkingCtx + 12, getValue(allocatorPtr + 8, 'i32'), 'i32')
     setValue(checkingCtx + 16, getValue(allocatorPtr + 12, 'i32'), 'i32')
 
-    const checkDidSucceed = _dy_check_expr(checkingCtx, coreExprResult)
-    if (checkDidSucceed == 1) {
-        // Fail
+    let boundConstraints = _dy_array_create(allocatorPtr, 40, 8)
+    setValue(checkingCtx + 20, boundConstraints, 'i32')
+
+    let constraint = _malloc(16)
+    let have_constraint = _malloc(4)
+
+    let checkDidSucceed = _dy_check_expr(checkingCtx, coreExprResult, coreExprResult, constraint, have_constraint)
+    if (!checkDidSucceed) {
         return 'Failed check.'
     }
 
 
     // Lastly, evaluating
-    const newCoreExpr = _malloc(coreExprSize)
-    const evalDidSucceed = _dy_eval_expr(checkingCtx, coreExprResult, newCoreExpr)
+    let newCoreExpr = _malloc(coreExprSize)
+    let evalDidSucceed = _dy_eval_expr(checkingCtx, coreExprResult, newCoreExpr)
     if (evalDidSucceed == 1) {
         // Fail
         return 'Evaluation failed.'
     }
 
-    const coreExprStringDyArray = _dy_array_create(parserCtx + 12, 1, 64)
+
+    let coreExprStringDyArray = _dy_array_create(allocatorPtr, 1, 64)
     _dy_core_expr_to_string(newCoreExpr, coreExprStringDyArray)
 
     return 'Result: ' + UTF8ToString(_dy_array_buffer(coreExprStringDyArray), _dy_array_size(coreExprStringDyArray))
