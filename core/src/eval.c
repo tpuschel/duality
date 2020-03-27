@@ -167,10 +167,7 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_
         }
         fprintf(stderr, "\n");
 
-        *new_expr = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_STRING,
-            .string = DY_STR_LIT("<print successful>")
-        };
+        *new_expr = right;
 
         return DY_YES;
     }
