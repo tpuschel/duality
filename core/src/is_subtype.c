@@ -18,10 +18,10 @@
 
 static dy_ternary_t dy_is_subtype_sub(struct dy_check_ctx ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
-static dy_ternary_t value_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_value_map);
+static dy_ternary_t expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_expr_map);
 
-static dy_ternary_t positive_value_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
-static dy_ternary_t negative_value_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+static dy_ternary_t positive_expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+static dy_ternary_t negative_expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
 static dy_ternary_t type_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_type_map type_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 static dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_type_map type_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
@@ -138,18 +138,18 @@ dy_ternary_t dy_is_subtype_sub(struct dy_check_ctx ctx, struct dy_core_expr subt
         return is_subtype_of_negative_both(ctx, subtype, supertype.both, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
 
-    if (supertype.tag == DY_CORE_EXPR_VALUE_MAP_ELIM || supertype.tag == DY_CORE_EXPR_TYPE_MAP_ELIM || supertype.tag == DY_CORE_EXPR_UNKNOWN || supertype.tag == DY_CORE_EXPR_ONE_OF) {
+    if (supertype.tag == DY_CORE_EXPR_EXPR_MAP_ELIM || supertype.tag == DY_CORE_EXPR_TYPE_MAP_ELIM || supertype.tag == DY_CORE_EXPR_UNKNOWN || supertype.tag == DY_CORE_EXPR_ONE_OF) {
         return dy_are_equal(ctx, subtype, supertype);
     }
 
     switch (subtype.tag) {
-    case DY_CORE_EXPR_VALUE_MAP:
-        return value_map_is_subtype(ctx, subtype.value_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+    case DY_CORE_EXPR_EXPR_MAP:
+        return expr_map_is_subtype(ctx, subtype.expr_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     case DY_CORE_EXPR_TYPE_MAP:
         return type_map_is_subtype(ctx, subtype.type_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     case DY_CORE_EXPR_END:
         dy_bail("should not be reached");
-    case DY_CORE_EXPR_VALUE_MAP_ELIM:
+    case DY_CORE_EXPR_EXPR_MAP_ELIM:
         // fallthrough
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         // fallthrough
@@ -170,53 +170,52 @@ dy_ternary_t dy_is_subtype_sub(struct dy_check_ctx ctx, struct dy_core_expr subt
     DY_IMPOSSIBLE_ENUM();
 }
 
-dy_ternary_t value_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
+dy_ternary_t expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
-    switch (value_map.polarity) {
+    switch (expr_map.polarity) {
     case DY_CORE_POLARITY_POSITIVE:
-        return positive_value_map_is_subtype(ctx, value_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        return positive_expr_map_is_subtype(ctx, expr_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     case DY_CORE_POLARITY_NEGATIVE:
-        return negative_value_map_is_subtype(ctx, value_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        return negative_expr_map_is_subtype(ctx, expr_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
 
     DY_IMPOSSIBLE_ENUM();
 }
 
-dy_ternary_t positive_value_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
+dy_ternary_t positive_expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
-    if (supertype.tag == DY_CORE_EXPR_VALUE_MAP && value_map.is_implicit == supertype.value_map.is_implicit) {
-        dy_ternary_t are_equal = dy_are_equal(ctx, *value_map.e1, *supertype.value_map.e1);
+    if (supertype.tag == DY_CORE_EXPR_EXPR_MAP && expr_map.is_implicit == supertype.expr_map.is_implicit) {
+        dy_ternary_t are_equal = dy_are_equal(ctx, *expr_map.e1, *supertype.expr_map.e1);
         if (are_equal == DY_NO) {
             return DY_NO;
         }
 
-        struct dy_core_expr subtype_expr_vmap_e2 = {
-            .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-            .value_map_elim = {
-                .id = (*ctx.running_id)++,
+        struct dy_core_expr subtype_expr_emap_e2 = {
+            .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
+            .expr_map_elim = {
                 .expr = alloc_expr(ctx, subtype_expr),
-                .value_map = {
-                    .e1 = value_map.e1,
-                    .e2 = value_map.e2,
+                .expr_map = {
+                    .e1 = expr_map.e1,
+                    .e2 = expr_map.e2,
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = false,
                 },
             }
         };
 
-        struct dy_core_expr transformed_subtype_expr_vmap_e2;
-        bool did_transform_subtype_expr_vmap_e2 = false;
-        dy_ternary_t is_subtype = dy_is_subtype_sub(ctx, *value_map.e2, *supertype.value_map.e2, constraint, did_generate_constraint, subtype_expr_vmap_e2, &transformed_subtype_expr_vmap_e2, &did_transform_subtype_expr_vmap_e2);
+        struct dy_core_expr transformed_subtype_expr_emap_e2;
+        bool did_transform_subtype_expr_emap_e2 = false;
+        dy_ternary_t is_subtype = dy_is_subtype_sub(ctx, *expr_map.e2, *supertype.expr_map.e2, constraint, did_generate_constraint, subtype_expr_emap_e2, &transformed_subtype_expr_emap_e2, &did_transform_subtype_expr_emap_e2);
         if (is_subtype == DY_NO) {
             return DY_NO;
         }
 
-        if (did_transform_subtype_expr_vmap_e2) {
+        if (did_transform_subtype_expr_emap_e2) {
             *new_subtype_expr = (struct dy_core_expr){
-                .tag = DY_CORE_EXPR_VALUE_MAP,
-                .value_map = {
-                    .e1 = value_map.e1,
-                    .e2 = alloc_expr(ctx, transformed_subtype_expr_vmap_e2),
+                .tag = DY_CORE_EXPR_EXPR_MAP,
+                .expr_map = {
+                    .e1 = expr_map.e1,
+                    .e2 = alloc_expr(ctx, transformed_subtype_expr_emap_e2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
                     .is_implicit = false,
                 }
@@ -232,24 +231,23 @@ dy_ternary_t positive_value_map_is_subtype(struct dy_check_ctx ctx, struct dy_co
         return DY_YES;
     }
 
-    if (supertype.tag == DY_CORE_EXPR_TYPE_MAP && supertype.type_map.polarity == DY_CORE_POLARITY_NEGATIVE && value_map.is_implicit == supertype.type_map.is_implicit) {
+    if (supertype.tag == DY_CORE_EXPR_TYPE_MAP && supertype.type_map.polarity == DY_CORE_POLARITY_NEGATIVE && expr_map.is_implicit == supertype.type_map.is_implicit) {
         struct dy_constraint c1;
         bool have_c1 = false;
-        struct dy_core_expr vmap_e1 = *value_map.e1;
-        bool did_transform_vmap_e1 = false;
-        dy_ternary_t is_subtype_in = dy_is_subtype_sub(ctx, dy_type_of(ctx, *value_map.e1), *supertype.type_map.arg_type, &c1, &have_c1, vmap_e1, &vmap_e1, &did_transform_vmap_e1);
+        struct dy_core_expr emap_e1 = *expr_map.e1;
+        bool did_transform_emap_e1 = false;
+        dy_ternary_t is_subtype_in = dy_is_subtype_sub(ctx, dy_type_of(ctx, *expr_map.e1), *supertype.type_map.arg_type, &c1, &have_c1, emap_e1, &emap_e1, &did_transform_emap_e1);
         if (is_subtype_in == DY_NO) {
             return DY_NO;
         }
 
-        struct dy_core_expr vmap_e2 = {
-            .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-            .value_map_elim = {
-                .id = (*ctx.running_id)++,
+        struct dy_core_expr emap_e2 = {
+            .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
+            .expr_map_elim = {
                 .expr = alloc_expr(ctx, subtype_expr),
-                .value_map = {
-                    .e1 = value_map.e1,
-                    .e2 = value_map.e2,
+                .expr_map = {
+                    .e1 = expr_map.e1,
+                    .e2 = expr_map.e2,
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = false,
                 },
@@ -258,20 +256,20 @@ dy_ternary_t positive_value_map_is_subtype(struct dy_check_ctx ctx, struct dy_co
 
         struct dy_constraint c2;
         bool have_c2 = false;
-        bool did_transform_vmap_e2 = false;
-        dy_ternary_t is_subtype_out = dy_is_subtype_sub(ctx, *value_map.e2, *supertype.type_map.expr, &c2, &have_c2, vmap_e2, &vmap_e2, &did_transform_vmap_e2);
+        bool did_transform_emap_e2 = false;
+        dy_ternary_t is_subtype_out = dy_is_subtype_sub(ctx, *expr_map.e2, *supertype.type_map.expr, &c2, &have_c2, emap_e2, &emap_e2, &did_transform_emap_e2);
         if (is_subtype_out == DY_NO) {
             return DY_NO;
         }
 
-        if (did_transform_vmap_e1 || did_transform_vmap_e2) {
+        if (did_transform_emap_e1 || did_transform_emap_e2) {
             *new_subtype_expr = (struct dy_core_expr){
-                .tag = DY_CORE_EXPR_VALUE_MAP,
-                .value_map = {
-                    .e1 = alloc_expr(ctx, vmap_e1),
-                    .e2 = alloc_expr(ctx, vmap_e2),
-                    .polarity = value_map.polarity,
-                    .is_implicit = value_map.is_implicit,
+                .tag = DY_CORE_EXPR_EXPR_MAP,
+                .expr_map = {
+                    .e1 = alloc_expr(ctx, emap_e1),
+                    .e2 = alloc_expr(ctx, emap_e2),
+                    .polarity = expr_map.polarity,
+                    .is_implicit = expr_map.is_implicit,
                 }
             };
 
@@ -306,42 +304,41 @@ dy_ternary_t positive_value_map_is_subtype(struct dy_check_ctx ctx, struct dy_co
     return DY_NO;
 }
 
-dy_ternary_t negative_value_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
+dy_ternary_t negative_expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
-    if (supertype.tag == DY_CORE_EXPR_VALUE_MAP && supertype.value_map.polarity == DY_CORE_POLARITY_NEGATIVE && value_map.is_implicit == supertype.value_map.is_implicit) {
-        dy_ternary_t are_equal = dy_are_equal(ctx, *value_map.e1, *supertype.value_map.e1);
+    if (supertype.tag == DY_CORE_EXPR_EXPR_MAP && supertype.expr_map.polarity == DY_CORE_POLARITY_NEGATIVE && expr_map.is_implicit == supertype.expr_map.is_implicit) {
+        dy_ternary_t are_equal = dy_are_equal(ctx, *expr_map.e1, *supertype.expr_map.e1);
         if (are_equal == DY_NO) {
             return DY_NO;
         }
 
-        struct dy_core_expr vmap_e2 = {
-            .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-            .value_map_elim = {
-                .id = (*ctx.running_id)++,
+        struct dy_core_expr emap_e2 = {
+            .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
+            .expr_map_elim = {
                 .expr = alloc_expr(ctx, subtype_expr),
-                .value_map = {
-                    .e1 = value_map.e1,
-                    .e2 = value_map.e2,
+                .expr_map = {
+                    .e1 = expr_map.e1,
+                    .e2 = expr_map.e2,
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = false,
                 },
             }
         };
 
-        bool did_transform_vmap_e2 = false;
-        dy_ternary_t is_subtype = dy_is_subtype_sub(ctx, *value_map.e2, *supertype.value_map.e2, constraint, did_generate_constraint, vmap_e2, &vmap_e2, &did_transform_vmap_e2);
+        bool did_transform_emap_e2 = false;
+        dy_ternary_t is_subtype = dy_is_subtype_sub(ctx, *expr_map.e2, *supertype.expr_map.e2, constraint, did_generate_constraint, emap_e2, &emap_e2, &did_transform_emap_e2);
         if (is_subtype == DY_NO) {
             return DY_NO;
         }
 
-        if (did_transform_vmap_e2) {
+        if (did_transform_emap_e2) {
             *new_subtype_expr = (struct dy_core_expr){
-                .tag = DY_CORE_EXPR_VALUE_MAP,
-                .value_map = {
-                    .e1 = value_map.e1,
-                    .e2 = alloc_expr(ctx, vmap_e2),
-                    .polarity = value_map.polarity,
-                    .is_implicit = value_map.is_implicit,
+                .tag = DY_CORE_EXPR_EXPR_MAP,
+                .expr_map = {
+                    .e1 = expr_map.e1,
+                    .e2 = alloc_expr(ctx, emap_e2),
+                    .polarity = expr_map.polarity,
+                    .is_implicit = expr_map.is_implicit,
                 }
             };
 
@@ -372,10 +369,10 @@ dy_ternary_t type_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_type_ma
 
 dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_core_type_map type_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
-    if (supertype.tag == DY_CORE_EXPR_VALUE_MAP && supertype.value_map.polarity == DY_CORE_POLARITY_NEGATIVE && type_map.is_implicit == supertype.value_map.is_implicit) {
+    if (supertype.tag == DY_CORE_EXPR_EXPR_MAP && supertype.expr_map.polarity == DY_CORE_POLARITY_NEGATIVE && type_map.is_implicit == supertype.expr_map.is_implicit) {
         struct dy_core_unknown var = {
             .id = (*ctx.running_id)++,
-            .type = alloc_expr(ctx, dy_type_of(ctx, *supertype.value_map.e1)),
+            .type = alloc_expr(ctx, dy_type_of(ctx, *supertype.expr_map.e1)),
             .is_inference_var = false
         };
 
@@ -392,15 +389,14 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
             return DY_NO;
         }
 
-        struct dy_core_expr vmap_e1 = substitute(ctx, var.id, *supertype.value_map.e1, var_expr);
-        struct dy_core_expr new_type_map_expr = substitute(ctx, type_map.arg_id, vmap_e1, *type_map.expr);
+        struct dy_core_expr emap_e1 = substitute(ctx, var.id, *supertype.expr_map.e1, var_expr);
+        struct dy_core_expr new_type_map_expr = substitute(ctx, type_map.arg_id, emap_e1, *type_map.expr);
 
-        struct dy_core_expr vmap_e2 = {
-            .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-            .value_map_elim = {
-                .id = (*ctx.running_id)++,
+        struct dy_core_expr emap_e2 = {
+            .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
+            .expr_map_elim = {
                 .expr = alloc_expr(ctx, subtype_expr),
-                .value_map = {
+                .expr_map = {
                     .e1 = alloc_expr(ctx, var_expr),
                     .e2 = alloc_expr(ctx, new_type_map_expr),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
@@ -411,19 +407,19 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
 
         struct dy_constraint c2;
         bool have_c2 = false;
-        bool did_transform_vmap_e2 = false;
-        dy_ternary_t is_subtype_out = dy_is_subtype_sub(ctx, new_type_map_expr, *supertype.value_map.e2, &c2, &have_c2, vmap_e2, &vmap_e2, &did_transform_vmap_e2);
+        bool did_transform_emap_e2 = false;
+        dy_ternary_t is_subtype_out = dy_is_subtype_sub(ctx, new_type_map_expr, *supertype.expr_map.e2, &c2, &have_c2, emap_e2, &emap_e2, &did_transform_emap_e2);
         if (is_subtype_out == DY_NO) {
             return DY_NO;
         }
 
-        if (did_transform_var_expr || did_transform_vmap_e2) {
+        if (did_transform_var_expr || did_transform_emap_e2) {
             *new_subtype_expr = (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_TYPE_MAP,
                 .type_map = {
                     .arg_id = var.id,
                     .arg_type = var.type,
-                    .expr = alloc_expr(ctx, vmap_e2),
+                    .expr = alloc_expr(ctx, emap_e2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
                     .is_implicit = false,
                 }
@@ -489,12 +485,11 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
         struct dy_core_expr transformed_arg_expr = substitute(ctx, var.id, supertype_arg_expr, var_expr);
         struct dy_core_expr new_type_map_expr = substitute(ctx, type_map.arg_id, transformed_arg_expr, *type_map.expr);
 
-        struct dy_core_expr type_map_expr_value = {
-            .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-            .value_map_elim = {
-                .id = (*ctx.running_id)++,
+        struct dy_core_expr type_map_expr_expr = {
+            .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
+            .expr_map_elim = {
                 .expr = alloc_expr(ctx, subtype_expr),
-                .value_map = {
+                .expr_map = {
                     .e1 = alloc_expr(ctx, var_expr),
                     .e2 = alloc_expr(ctx, new_type_map_expr),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
@@ -505,19 +500,19 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
 
         struct dy_constraint c2;
         bool have_c2 = false;
-        bool did_transform_type_map_expr_value = false;
-        dy_ternary_t is_subtype_out = dy_is_subtype_sub(ctx, new_type_map_expr, *supertype.type_map.expr, &c2, &have_c2, type_map_expr_value, &type_map_expr_value, &did_transform_type_map_expr_value);
+        bool did_transform_type_map_expr_expr = false;
+        dy_ternary_t is_subtype_out = dy_is_subtype_sub(ctx, new_type_map_expr, *supertype.type_map.expr, &c2, &have_c2, type_map_expr_expr, &type_map_expr_expr, &did_transform_type_map_expr_expr);
         if (is_subtype_out == DY_NO) {
             return DY_NO;
         }
 
-        if (did_transform_var_expr || did_transform_type_map_expr_value) {
+        if (did_transform_var_expr || did_transform_type_map_expr_expr) {
             *new_subtype_expr = (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_TYPE_MAP,
                 .type_map = {
                     .arg_id = var.id,
                     .arg_type = var.type,
-                    .expr = alloc_expr(ctx, type_map_expr_value),
+                    .expr = alloc_expr(ctx, type_map_expr_expr),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
                     .is_implicit = false,
                 }
@@ -566,11 +561,10 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
         struct dy_core_expr new_type = substitute(ctx, type_map.arg_id, unknown, *type_map.expr);
 
         struct dy_core_expr e = {
-            .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-            .value_map_elim = {
-                .id = (*ctx.running_id)++,
+            .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
+            .expr_map_elim = {
                 .expr = alloc_expr(ctx, subtype_expr),
-                .value_map = {
+                .expr_map = {
                     .e1 = alloc_expr(ctx, unknown),
                     .e2 = alloc_expr(ctx, new_type),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
@@ -693,12 +687,11 @@ dy_ternary_t negative_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
         struct dy_core_expr transformed_arg_expr = substitute(ctx, var.id, supertype_arg_expr, var_expr);
         struct dy_core_expr new_type_map_expr = substitute(ctx, type_map.arg_id, transformed_arg_expr, *type_map.expr);
 
-        struct dy_core_expr type_map_expr_value = {
-            .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-            .value_map_elim = {
-                .id = (*ctx.running_id)++,
+        struct dy_core_expr type_map_expr_expr = {
+            .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
+            .expr_map_elim = {
                 .expr = alloc_expr(ctx, subtype_expr),
-                .value_map = {
+                .expr_map = {
                     .e1 = alloc_expr(ctx, var_expr),
                     .e2 = alloc_expr(ctx, new_type_map_expr),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
@@ -709,19 +702,19 @@ dy_ternary_t negative_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
 
         struct dy_constraint c2;
         bool have_c2 = false;
-        bool did_transform_type_map_expr_value = false;
-        dy_ternary_t is_subtype_out = dy_is_subtype_sub(ctx, new_type_map_expr, *supertype.type_map.expr, &c2, &have_c2, type_map_expr_value, &type_map_expr_value, &did_transform_type_map_expr_value);
+        bool did_transform_type_map_expr_expr = false;
+        dy_ternary_t is_subtype_out = dy_is_subtype_sub(ctx, new_type_map_expr, *supertype.type_map.expr, &c2, &have_c2, type_map_expr_expr, &type_map_expr_expr, &did_transform_type_map_expr_expr);
         if (is_subtype_out == DY_NO) {
             return DY_NO;
         }
 
-        if (did_transform_var_expr || did_transform_type_map_expr_value) {
+        if (did_transform_var_expr || did_transform_type_map_expr_expr) {
             *new_subtype_expr = (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_TYPE_MAP,
                 .type_map = {
                     .arg_id = var.id,
                     .arg_type = var.type,
-                    .expr = alloc_expr(ctx, type_map_expr_value),
+                    .expr = alloc_expr(ctx, type_map_expr_expr),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = false,
                 }

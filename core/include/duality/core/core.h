@@ -25,7 +25,7 @@ struct dy_core_unknown {
     bool is_inference_var;
 };
 
-struct dy_core_value_map {
+struct dy_core_expr_map {
     const struct dy_core_expr *e1;
     const struct dy_core_expr *e2;
     enum dy_core_polarity polarity;
@@ -40,14 +40,12 @@ struct dy_core_type_map {
     bool is_implicit;
 };
 
-struct dy_core_value_map_elim {
-    size_t id;
+struct dy_core_expr_map_elim {
     const struct dy_core_expr *expr;
-    struct dy_core_value_map value_map;
+    struct dy_core_expr_map expr_map;
 };
 
 struct dy_core_type_map_elim {
-    size_t id;
     const struct dy_core_expr *expr;
     struct dy_core_type_map type_map;
 };
@@ -71,9 +69,9 @@ struct dy_core_inference_ctx {
 };
 
 enum dy_core_expr_tag {
-    DY_CORE_EXPR_VALUE_MAP,
+    DY_CORE_EXPR_EXPR_MAP,
     DY_CORE_EXPR_TYPE_MAP,
-    DY_CORE_EXPR_VALUE_MAP_ELIM,
+    DY_CORE_EXPR_EXPR_MAP_ELIM,
     DY_CORE_EXPR_TYPE_MAP_ELIM,
     DY_CORE_EXPR_BOTH,
     DY_CORE_EXPR_ONE_OF,
@@ -87,9 +85,9 @@ enum dy_core_expr_tag {
 
 struct dy_core_expr {
     union {
-        struct dy_core_value_map value_map;
+        struct dy_core_expr_map expr_map;
         struct dy_core_type_map type_map;
-        struct dy_core_value_map_elim value_map_elim;
+        struct dy_core_expr_map_elim expr_map_elim;
         struct dy_core_type_map_elim type_map_elim;
         struct dy_core_both both;
         struct dy_core_one_of one_of;

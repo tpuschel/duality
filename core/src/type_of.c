@@ -13,16 +13,16 @@ static struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_e
 struct dy_core_expr dy_type_of(struct dy_check_ctx ctx, struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_VALUE_MAP:
-        expr.value_map.e2 = alloc_expr(ctx, dy_type_of(ctx, *expr.value_map.e2));
-        expr.value_map.polarity = DY_CORE_POLARITY_POSITIVE;
+    case DY_CORE_EXPR_EXPR_MAP:
+        expr.expr_map.e2 = alloc_expr(ctx, dy_type_of(ctx, *expr.expr_map.e2));
+        expr.expr_map.polarity = DY_CORE_POLARITY_POSITIVE;
         return expr;
     case DY_CORE_EXPR_TYPE_MAP:
         expr.type_map.expr = alloc_expr(ctx, dy_type_of(ctx, *expr.type_map.expr));
         expr.type_map.polarity = DY_CORE_POLARITY_POSITIVE;
         return expr;
-    case DY_CORE_EXPR_VALUE_MAP_ELIM:
-        return *expr.value_map_elim.value_map.e2;
+    case DY_CORE_EXPR_EXPR_MAP_ELIM:
+        return *expr.expr_map_elim.expr_map.e2;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         return *expr.type_map_elim.type_map.expr;
     case DY_CORE_EXPR_BOTH:

@@ -32,7 +32,7 @@ DY_SYNTAX_API bool dy_parse_positive_type_map(struct dy_parser_ctx *ctx, struct 
 
 DY_SYNTAX_API bool dy_parse_negative_type_map(struct dy_parser_ctx *ctx, struct dy_ast_type_map *type_map);
 
-DY_SYNTAX_API bool dy_parse_value_map_elim(struct dy_parser_ctx *ctx, struct dy_ast_value_map_elim *value_map_elim);
+DY_SYNTAX_API bool dy_parse_expr_map_elim(struct dy_parser_ctx *ctx, struct dy_ast_expr_map_elim *expr_map_elim);
 
 DY_SYNTAX_API bool dy_parse_type_map_elim(struct dy_parser_ctx *ctx, struct dy_ast_type_map_elim *type_map_elim);
 

@@ -21,18 +21,18 @@ static int asprintf(char **ret, const char *format, ...);
 void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_VALUE_MAP:
+    case DY_CORE_EXPR_EXPR_MAP:
         add_string(string, DY_STR_LIT("("));
-        if (expr.value_map.is_implicit) {
+        if (expr.expr_map.is_implicit) {
             add_string(string, DY_STR_LIT("@"));
         }
-        dy_core_expr_to_string(*expr.value_map.e1, string);
-        if (expr.value_map.polarity == DY_CORE_POLARITY_POSITIVE) {
+        dy_core_expr_to_string(*expr.expr_map.e1, string);
+        if (expr.expr_map.polarity == DY_CORE_POLARITY_POSITIVE) {
             add_string(string, DY_STR_LIT(" -> "));
         } else {
             add_string(string, DY_STR_LIT(" ~> "));
         }
-        dy_core_expr_to_string(*expr.value_map.e2, string);
+        dy_core_expr_to_string(*expr.expr_map.e2, string);
         add_string(string, DY_STR_LIT(")"));
         return;
     case DY_CORE_EXPR_TYPE_MAP: {
@@ -79,20 +79,15 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         add_string(string, DY_STR_LIT(")"));
         return;
     }
-    case DY_CORE_EXPR_VALUE_MAP_ELIM: {
-        /*char *c;
-        dy_assert(asprintf(&c, "$%zu", expr.value_map_elim.id) != -1);
-        add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
-        free(c);*/
-
-        dy_core_expr_to_string(*expr.value_map_elim.expr, string);
+    case DY_CORE_EXPR_EXPR_MAP_ELIM: {
+        dy_core_expr_to_string(*expr.expr_map_elim.expr, string);
         add_string(string, DY_STR_LIT(" ! "));
-        if (expr.value_map_elim.value_map.is_implicit) {
+        if (expr.expr_map_elim.expr_map.is_implicit) {
             add_string(string, DY_STR_LIT("@"));
         }
-        dy_core_expr_to_string(*expr.value_map_elim.value_map.e1, string);
+        dy_core_expr_to_string(*expr.expr_map_elim.expr_map.e1, string);
         add_string(string, DY_STR_LIT(" ~> "));
-        dy_core_expr_to_string(*expr.value_map_elim.value_map.e2, string);
+        dy_core_expr_to_string(*expr.expr_map_elim.expr_map.e2, string);
         return;
     }
     case DY_CORE_EXPR_TYPE_MAP_ELIM: {

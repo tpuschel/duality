@@ -31,8 +31,8 @@ static void print_constraint(struct dy_constraint c);
 bool dy_check_expr(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_expr *new_expr, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_VALUE_MAP:
-        if (!dy_check_value_map(ctx, expr.value_map, &expr.value_map, constraint, did_generate_constraint)) {
+    case DY_CORE_EXPR_EXPR_MAP:
+        if (!dy_check_expr_map(ctx, expr.expr_map, &expr.expr_map, constraint, did_generate_constraint)) {
             return false;
         }
 
@@ -47,8 +47,8 @@ bool dy_check_expr(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_
         *new_expr = expr;
 
         return true;
-    case DY_CORE_EXPR_VALUE_MAP_ELIM:
-        if (!dy_check_value_map_elim(ctx, expr.value_map_elim, &expr.value_map_elim, constraint, did_generate_constraint)) {
+    case DY_CORE_EXPR_EXPR_MAP_ELIM:
+        if (!dy_check_expr_map_elim(ctx, expr.expr_map_elim, &expr.expr_map_elim, constraint, did_generate_constraint)) {
             return false;
         }
 
@@ -95,19 +95,19 @@ bool dy_check_expr(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_
     DY_IMPOSSIBLE_ENUM();
 }
 
-bool dy_check_value_map(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_value_map *new_value_map, struct dy_constraint *constraint, bool *did_generate_constraint)
+bool dy_check_expr_map(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr_map *new_expr_map, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_core_expr e1;
     struct dy_constraint c1;
     bool have_c1 = false;
-    bool first_succeeded = dy_check_expr(ctx, *value_map.e1, &e1, &c1, &have_c1);
-    value_map.e1 = alloc_expr(ctx, e1);
+    bool first_succeeded = dy_check_expr(ctx, *expr_map.e1, &e1, &c1, &have_c1);
+    expr_map.e1 = alloc_expr(ctx, e1);
 
     struct dy_core_expr e2;
     struct dy_constraint c2;
     bool have_c2 = false;
-    bool second_succeeded = dy_check_expr(ctx, *value_map.e2, &e2, &c2, &have_c2);
-    value_map.e2 = alloc_expr(ctx, e2);
+    bool second_succeeded = dy_check_expr(ctx, *expr_map.e2, &e2, &c2, &have_c2);
+    expr_map.e2 = alloc_expr(ctx, e2);
 
     if (!first_succeeded || !second_succeeded) {
         return false;
@@ -131,7 +131,7 @@ bool dy_check_value_map(struct dy_check_ctx ctx, struct dy_core_value_map value_
         *did_generate_constraint = true;
     }
 
-    *new_value_map = value_map;
+    *new_expr_map = expr_map;
 
     return true;
 }
@@ -196,32 +196,32 @@ bool dy_check_type_map(struct dy_check_ctx ctx, struct dy_core_type_map type_map
     return true;
 }
 
-bool dy_check_value_map_elim(struct dy_check_ctx ctx, struct dy_core_value_map_elim elim, struct dy_core_value_map_elim *new_elim, struct dy_constraint *constraint, bool *did_generate_constraint)
+bool dy_check_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_map_elim elim, struct dy_core_expr_map_elim *new_elim, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_core_expr expr;
     struct dy_constraint c1;
     bool have_c1 = false;
     bool expr_succeeded = dy_check_expr(ctx, *elim.expr, &expr, &c1, &have_c1);
 
-    struct dy_core_value_map value_map;
+    struct dy_core_expr_map expr_map;
     struct dy_constraint c2;
     bool have_c2 = false;
-    bool value_map_succeeded = dy_check_value_map(ctx, elim.value_map, &value_map, &c2, &have_c2);
+    bool expr_map_succeeded = dy_check_expr_map(ctx, elim.expr_map, &expr_map, &c2, &have_c2);
 
-    if (!expr_succeeded || !value_map_succeeded) {
+    if (!expr_succeeded || !expr_map_succeeded) {
         return false;
     }
 
-    struct dy_core_expr value_map_expr = {
-        .tag = DY_CORE_EXPR_VALUE_MAP,
-        .value_map = value_map
+    struct dy_core_expr expr_map_expr = {
+        .tag = DY_CORE_EXPR_EXPR_MAP,
+        .expr_map = expr_map
     };
 
     struct dy_constraint c3;
     bool have_c3 = false;
-    dy_ternary_t subtype_res = dy_is_subtype(ctx, dy_type_of(ctx, expr), value_map_expr, &c3, &have_c3, expr, &expr);
+    dy_ternary_t subtype_res = dy_is_subtype(ctx, dy_type_of(ctx, expr), expr_map_expr, &c3, &have_c3, expr, &expr);
 
-    if (!expr_succeeded || !value_map_succeeded || subtype_res == DY_NO) {
+    if (!expr_succeeded || !expr_map_succeeded || subtype_res == DY_NO) {
         return false;
     }
 
@@ -286,10 +286,9 @@ bool dy_check_value_map_elim(struct dy_check_ctx ctx, struct dy_core_value_map_e
         *did_generate_constraint = true;
     }
 
-    *new_elim = (struct dy_core_value_map_elim){
-        .id = elim.id,
+    *new_elim = (struct dy_core_expr_map_elim){
         .expr = alloc_expr(ctx, expr),
-        .value_map = value_map
+        .expr_map = expr_map
     };
 
     return true;
@@ -382,7 +381,6 @@ bool dy_check_type_map_elim(struct dy_check_ctx ctx, struct dy_core_type_map_eli
     }
 
     *new_elim = (struct dy_core_type_map_elim){
-        .id = elim.id,
         .expr = alloc_expr(ctx, expr),
         .type_map = type_map
     };
@@ -567,8 +565,8 @@ bool dy_check_inference_ctx(struct dy_check_ctx ctx, struct dy_core_inference_ct
 bool is_bound(size_t id, struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_VALUE_MAP:
-        return is_bound(id, *expr.value_map.e1) || is_bound(id, *expr.value_map.e2);
+    case DY_CORE_EXPR_EXPR_MAP:
+        return is_bound(id, *expr.expr_map.e1) || is_bound(id, *expr.expr_map.e2);
     case DY_CORE_EXPR_TYPE_MAP:
         if (is_bound(id, *expr.type_map.arg_type)) {
             return true;
@@ -579,8 +577,8 @@ bool is_bound(size_t id, struct dy_core_expr expr)
         }
 
         return is_bound(id, *expr.type_map.expr);
-    case DY_CORE_EXPR_VALUE_MAP_ELIM:
-        return is_bound(id, *expr.value_map_elim.expr) || is_bound(id, *expr.value_map_elim.value_map.e1) || is_bound(id, *expr.value_map_elim.value_map.e2);
+    case DY_CORE_EXPR_EXPR_MAP_ELIM:
+        return is_bound(id, *expr.expr_map_elim.expr) || is_bound(id, *expr.expr_map_elim.expr_map.e1) || is_bound(id, *expr.expr_map_elim.expr_map.e2);
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         if (is_bound(id, *expr.type_map_elim.expr) || is_bound(id, *expr.type_map_elim.type_map.arg_type)) {
             return true;

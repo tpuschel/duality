@@ -43,13 +43,13 @@ DY_SYNTAX_API bool dy_ast_choice_to_core(struct dy_ast_to_core_ctx *ctx, struct 
 
 DY_SYNTAX_API bool dy_ast_try_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_list try_block, struct dy_core_expr *expr, dy_array_t *sub_maps);
 
-DY_SYNTAX_API bool dy_ast_positive_value_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_value_map value_map, struct dy_core_expr *expr, dy_array_t *sub_maps);
+DY_SYNTAX_API bool dy_ast_positive_expr_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map expr_map, struct dy_core_expr *expr, dy_array_t *sub_maps);
 
-DY_SYNTAX_API bool dy_ast_negative_value_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_value_map value_map, struct dy_core_expr *expr, dy_array_t *sub_maps);
+DY_SYNTAX_API bool dy_ast_negative_expr_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map expr_map, struct dy_core_expr *expr, dy_array_t *sub_maps);
 
 DY_SYNTAX_API bool dy_ast_do_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block do_block, struct dy_core_expr *expr, dy_array_t *sub_maps);
 
-DY_SYNTAX_API bool dy_ast_value_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_value_map_elim elim, struct dy_core_expr *expr, dy_array_t *sub_maps);
+DY_SYNTAX_API bool dy_ast_expr_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map_elim elim, struct dy_core_expr *expr, dy_array_t *sub_maps);
 
 DY_SYNTAX_API bool dy_ast_type_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map_elim elim, struct dy_core_expr *expr, dy_array_t *sub_maps);
 

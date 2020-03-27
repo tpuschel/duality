@@ -10,7 +10,7 @@
 
 static struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_expr expr);
 
-static struct dy_core_value_map substitute_value_map(struct dy_check_ctx ctx, size_t id, struct dy_core_expr sub, struct dy_core_value_map value_map);
+static struct dy_core_expr_map substitute_expr_map(struct dy_check_ctx ctx, size_t id, struct dy_core_expr sub, struct dy_core_expr_map expr_map);
 
 static struct dy_core_type_map substitute_type_map(struct dy_check_ctx ctx, size_t id, struct dy_core_expr sub, struct dy_core_type_map type_map);
 
@@ -25,8 +25,8 @@ struct dy_core_expr substitute(struct dy_check_ctx ctx, size_t id, struct dy_cor
         // fallthrough
     case DY_CORE_EXPR_STRING:
         return expr;
-    case DY_CORE_EXPR_VALUE_MAP:
-        expr.value_map = substitute_value_map(ctx, id, sub, expr.value_map);
+    case DY_CORE_EXPR_EXPR_MAP:
+        expr.expr_map = substitute_expr_map(ctx, id, sub, expr.expr_map);
         return expr;
     case DY_CORE_EXPR_TYPE_MAP:
         expr.type_map = substitute_type_map(ctx, id, sub, expr.type_map);
@@ -46,9 +46,9 @@ struct dy_core_expr substitute(struct dy_check_ctx ctx, size_t id, struct dy_cor
         expr.one_of.first = alloc_expr(ctx, substitute(ctx, id, sub, *expr.one_of.first));
         expr.one_of.second = alloc_expr(ctx, substitute(ctx, id, sub, *expr.one_of.second));
         return expr;
-    case DY_CORE_EXPR_VALUE_MAP_ELIM:
-        expr.value_map_elim.expr = alloc_expr(ctx, substitute(ctx, id, sub, *expr.value_map_elim.expr));
-        expr.value_map_elim.value_map = substitute_value_map(ctx, id, sub, expr.value_map_elim.value_map);
+    case DY_CORE_EXPR_EXPR_MAP_ELIM:
+        expr.expr_map_elim.expr = alloc_expr(ctx, substitute(ctx, id, sub, *expr.expr_map_elim.expr));
+        expr.expr_map_elim.expr_map = substitute_expr_map(ctx, id, sub, expr.expr_map_elim.expr_map);
         return expr;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         expr.type_map_elim.expr = alloc_expr(ctx, substitute(ctx, id, sub, *expr.type_map_elim.expr));
@@ -63,11 +63,11 @@ struct dy_core_expr substitute(struct dy_check_ctx ctx, size_t id, struct dy_cor
     DY_IMPOSSIBLE_ENUM();
 }
 
-static struct dy_core_value_map substitute_value_map(struct dy_check_ctx ctx, size_t id, struct dy_core_expr sub, struct dy_core_value_map value_map)
+static struct dy_core_expr_map substitute_expr_map(struct dy_check_ctx ctx, size_t id, struct dy_core_expr sub, struct dy_core_expr_map expr_map)
 {
-    value_map.e1 = alloc_expr(ctx, substitute(ctx, id, sub, *value_map.e1));
-    value_map.e2 = alloc_expr(ctx, substitute(ctx, id, sub, *value_map.e2));
-    return value_map;
+    expr_map.e1 = alloc_expr(ctx, substitute(ctx, id, sub, *expr_map.e1));
+    expr_map.e2 = alloc_expr(ctx, substitute(ctx, id, sub, *expr_map.e2));
+    return expr_map;
 }
 
 static struct dy_core_type_map substitute_type_map(struct dy_check_ctx ctx, size_t id, struct dy_core_expr sub, struct dy_core_type_map type_map)

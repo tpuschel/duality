@@ -59,23 +59,23 @@ static bool parse_bare_list(struct dy_parser_ctx *ctx, struct dy_ast_list *list)
 
 static bool parse_elimination(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr);
 
-static bool parse_positive_value_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr);
+static bool parse_positive_expr_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr);
 
-static bool parse_negative_value_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr);
+static bool parse_negative_expr_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr);
 
-static bool parse_implicit_positive_value_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr);
+static bool parse_implicit_positive_expr_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr);
 
-static bool parse_implicit_negative_value_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr);
+static bool parse_implicit_negative_expr_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr);
 
 static bool parse_juxtaposition_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr);
 
-static bool parse_positive_value_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr);
+static bool parse_positive_expr_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr);
 
-static bool parse_negative_value_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr);
+static bool parse_negative_expr_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr);
 
-static bool parse_implicit_positive_value_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr);
+static bool parse_implicit_positive_expr_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr);
 
-static bool parse_implicit_negative_value_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr);
+static bool parse_implicit_negative_expr_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr);
 
 static bool skip_line_comment(struct dy_parser_ctx *ctx);
 
@@ -416,19 +416,19 @@ bool parse_expr_further1(struct dy_parser_ctx *ctx, struct dy_ast_expr left, str
         return true;
     }
 
-    if (parse_positive_value_map(ctx, left, expr)) {
+    if (parse_positive_expr_map(ctx, left, expr)) {
         return true;
     }
 
-    if (parse_negative_value_map(ctx, left, expr)) {
+    if (parse_negative_expr_map(ctx, left, expr)) {
         return true;
     }
 
-    if (parse_implicit_positive_value_map(ctx, left, expr)) {
+    if (parse_implicit_positive_expr_map(ctx, left, expr)) {
         return true;
     }
 
-    if (parse_implicit_negative_value_map(ctx, left, expr)) {
+    if (parse_implicit_negative_expr_map(ctx, left, expr)) {
         return true;
     }
 
@@ -454,7 +454,7 @@ bool parse_juxtaposition(struct dy_parser_ctx *ctx, struct dy_ast_expr left, str
     return true;
 }
 
-bool parse_positive_value_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr)
+bool parse_positive_expr_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr)
 {
     size_t start_index = ctx->stream.current_index;
 
@@ -473,7 +473,7 @@ bool parse_positive_value_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left
     return true;
 }
 
-bool parse_negative_value_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr)
+bool parse_negative_expr_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr)
 {
     size_t start_index = ctx->stream.current_index;
 
@@ -492,7 +492,7 @@ bool parse_negative_value_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left
     return true;
 }
 
-bool parse_implicit_positive_value_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr)
+bool parse_implicit_positive_expr_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr)
 {
     size_t start_index = ctx->stream.current_index;
 
@@ -511,7 +511,7 @@ bool parse_implicit_positive_value_map(struct dy_parser_ctx *ctx, struct dy_ast_
     return true;
 }
 
-bool parse_implicit_negative_value_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr)
+bool parse_implicit_negative_expr_map(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struct dy_ast_expr *expr)
 {
     size_t start_index = ctx->stream.current_index;
 
@@ -547,16 +547,16 @@ bool parse_elimination(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struc
         return false;
     }
 
-    if (map.tag == DY_AST_EXPR_NEGATIVE_VALUE_MAP) {
+    if (map.tag == DY_AST_EXPR_NEGATIVE_EXPR_MAP) {
         *expr = (struct dy_ast_expr){
             .text_range = {
                 .start = left.text_range.start,
                 .end = ctx->stream.current_index,
             },
-            .tag = DY_AST_EXPR_VALUE_MAP_ELIM,
-            .value_map_elim = {
+            .tag = DY_AST_EXPR_EXPR_MAP_ELIM,
+            .expr_map_elim = {
                 .expr = alloc_expr(ctx, left),
-                .value_map = map.negative_value_map,
+                .expr_map = map.negative_expr_map,
             }
         };
 
@@ -606,19 +606,19 @@ bool parse_expr_further2(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enu
 
 bool parse_expr_further3(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr)
 {
-    if (parse_positive_value_map_further(ctx, left, op, right, expr)) {
+    if (parse_positive_expr_map_further(ctx, left, op, right, expr)) {
         return true;
     }
 
-    if (parse_negative_value_map_further(ctx, left, op, right, expr)) {
+    if (parse_negative_expr_map_further(ctx, left, op, right, expr)) {
         return true;
     }
 
-    if (parse_implicit_positive_value_map_further(ctx, left, op, right, expr)) {
+    if (parse_implicit_positive_expr_map_further(ctx, left, op, right, expr)) {
         return true;
     }
 
-    if (parse_implicit_negative_value_map_further(ctx, left, op, right, expr)) {
+    if (parse_implicit_negative_expr_map_further(ctx, left, op, right, expr)) {
         return true;
     }
 
@@ -644,7 +644,7 @@ bool parse_juxtaposition_further(struct dy_parser_ctx *ctx, struct dy_ast_expr l
     return true;
 }
 
-bool parse_positive_value_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr)
+bool parse_positive_expr_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr)
 {
     size_t start_index = ctx->stream.current_index;
 
@@ -661,7 +661,7 @@ bool parse_positive_value_map_further(struct dy_parser_ctx *ctx, struct dy_ast_e
     return true;
 }
 
-bool parse_negative_value_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr)
+bool parse_negative_expr_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr)
 {
     size_t start_index = ctx->stream.current_index;
 
@@ -678,7 +678,7 @@ bool parse_negative_value_map_further(struct dy_parser_ctx *ctx, struct dy_ast_e
     return true;
 }
 
-bool parse_implicit_positive_value_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr)
+bool parse_implicit_positive_expr_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr)
 {
     size_t start_index = ctx->stream.current_index;
 
@@ -695,7 +695,7 @@ bool parse_implicit_positive_value_map_further(struct dy_parser_ctx *ctx, struct
     return true;
 }
 
-bool parse_implicit_negative_value_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr)
+bool parse_implicit_negative_expr_map_further(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right, struct dy_ast_expr *expr)
 {
     size_t start_index = ctx->stream.current_index;
 
@@ -1233,8 +1233,8 @@ struct dy_ast_expr combine_infix(struct dy_parser_ctx *ctx, struct dy_ast_expr l
                 .start = left.text_range.start,
                 .end = right.text_range.end,
             },
-            .tag = DY_AST_EXPR_POSITIVE_VALUE_MAP,
-            .positive_value_map = {
+            .tag = DY_AST_EXPR_POSITIVE_EXPR_MAP,
+            .positive_expr_map = {
                 .e1 = alloc_expr(ctx, left),
                 .e2 = alloc_expr(ctx, right),
                 .is_implicit = false,
@@ -1246,8 +1246,8 @@ struct dy_ast_expr combine_infix(struct dy_parser_ctx *ctx, struct dy_ast_expr l
                 .start = left.text_range.start,
                 .end = right.text_range.end,
             },
-            .tag = DY_AST_EXPR_NEGATIVE_VALUE_MAP,
-            .negative_value_map = {
+            .tag = DY_AST_EXPR_NEGATIVE_EXPR_MAP,
+            .negative_expr_map = {
                 .e1 = alloc_expr(ctx, left),
                 .e2 = alloc_expr(ctx, right),
                 .is_implicit = false,
@@ -1259,8 +1259,8 @@ struct dy_ast_expr combine_infix(struct dy_parser_ctx *ctx, struct dy_ast_expr l
                 .start = left.text_range.start,
                 .end = right.text_range.end,
             },
-            .tag = DY_AST_EXPR_POSITIVE_VALUE_MAP,
-            .positive_value_map = {
+            .tag = DY_AST_EXPR_POSITIVE_EXPR_MAP,
+            .positive_expr_map = {
                 .e1 = alloc_expr(ctx, left),
                 .e2 = alloc_expr(ctx, right),
                 .is_implicit = true,
@@ -1272,8 +1272,8 @@ struct dy_ast_expr combine_infix(struct dy_parser_ctx *ctx, struct dy_ast_expr l
                 .start = left.text_range.start,
                 .end = right.text_range.end,
             },
-            .tag = DY_AST_EXPR_NEGATIVE_VALUE_MAP,
-            .negative_value_map = {
+            .tag = DY_AST_EXPR_NEGATIVE_EXPR_MAP,
+            .negative_expr_map = {
                 .e1 = alloc_expr(ctx, left),
                 .e2 = alloc_expr(ctx, right),
                 .is_implicit = true,

@@ -31,11 +31,11 @@ struct dy_constraint;
 
 DY_CORE_API bool dy_check_expr(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_expr *new_expr, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-DY_CORE_API bool dy_check_value_map(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_value_map *new_value_map, struct dy_constraint *constraint, bool *did_generate_constraint);
+DY_CORE_API bool dy_check_expr_map(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr_map *new_expr_map, struct dy_constraint *constraint, bool *did_generate_constraint);
 
 DY_CORE_API bool dy_check_type_map(struct dy_check_ctx ctx, struct dy_core_type_map type_map, struct dy_core_type_map *new_type_map, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-DY_CORE_API bool dy_check_value_map_elim(struct dy_check_ctx ctx, struct dy_core_value_map_elim elim, struct dy_core_value_map_elim *new_elim, struct dy_constraint *constraint, bool *did_generate_constraint);
+DY_CORE_API bool dy_check_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_map_elim elim, struct dy_core_expr_map_elim *new_elim, struct dy_constraint *constraint, bool *did_generate_constraint);
 
 DY_CORE_API bool dy_check_type_map_elim(struct dy_check_ctx ctx, struct dy_core_type_map_elim elim, struct dy_core_type_map_elim *new_elim, struct dy_constraint *constraint, bool *did_generate_constraint);
 

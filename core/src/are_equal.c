@@ -15,9 +15,9 @@ static dy_ternary_t is_equal_to_both_negative(struct dy_check_ctx ctx, struct dy
 
 static dy_ternary_t both_is_equal_to_both(struct dy_check_ctx ctx, struct dy_core_both p1, struct dy_core_both p2);
 
-static dy_ternary_t value_map_is_equal(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr expr);
+static dy_ternary_t expr_map_is_equal(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr expr);
 
-static dy_ternary_t value_map_is_equal_to_value_map(struct dy_check_ctx ctx, struct dy_core_value_map value_map1, struct dy_core_value_map value_map2);
+static dy_ternary_t expr_map_is_equal_to_expr_map(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map1, struct dy_core_expr_map expr_map2);
 
 static dy_ternary_t type_map_is_equal(struct dy_check_ctx ctx, struct dy_core_type_map type_map, struct dy_core_expr expr);
 
@@ -25,7 +25,7 @@ static dy_ternary_t type_map_is_equal_to_type_map(struct dy_check_ctx ctx, struc
 
 static dy_ternary_t unknown_is_equal(struct dy_check_ctx ctx, struct dy_core_unknown unknown, struct dy_core_expr expr);
 
-static dy_ternary_t value_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_value_map_elim elim, struct dy_core_expr expr);
+static dy_ternary_t expr_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_expr_map_elim elim, struct dy_core_expr expr);
 
 static dy_ternary_t type_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_type_map_elim elim, struct dy_core_expr expr);
 
@@ -53,8 +53,8 @@ dy_ternary_t dy_are_equal(struct dy_check_ctx ctx, struct dy_core_expr e1, struc
         return unknown_is_equal(ctx, e2.unknown, e1);
     }
 
-    if (e2.tag == DY_CORE_EXPR_VALUE_MAP_ELIM) {
-        return value_map_elim_is_equal(ctx, e2.value_map_elim, e1);
+    if (e2.tag == DY_CORE_EXPR_EXPR_MAP_ELIM) {
+        return expr_map_elim_is_equal(ctx, e2.expr_map_elim, e1);
     }
 
     if (e2.tag == DY_CORE_EXPR_TYPE_MAP_ELIM) {
@@ -66,12 +66,12 @@ dy_ternary_t dy_are_equal(struct dy_check_ctx ctx, struct dy_core_expr e1, struc
     }
 
     switch (e1.tag) {
-    case DY_CORE_EXPR_VALUE_MAP:
-        return value_map_is_equal(ctx, e1.value_map, e2);
+    case DY_CORE_EXPR_EXPR_MAP:
+        return expr_map_is_equal(ctx, e1.expr_map, e2);
     case DY_CORE_EXPR_TYPE_MAP:
         return type_map_is_equal(ctx, e1.type_map, e2);
-    case DY_CORE_EXPR_VALUE_MAP_ELIM:
-        return value_map_elim_is_equal(ctx, e1.value_map_elim, e2);
+    case DY_CORE_EXPR_EXPR_MAP_ELIM:
+        return expr_map_elim_is_equal(ctx, e1.expr_map_elim, e2);
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         return type_map_elim_is_equal(ctx, e1.type_map_elim, e2);
     case DY_CORE_EXPR_UNKNOWN:
@@ -178,27 +178,27 @@ dy_ternary_t both_is_equal_to_both(struct dy_check_ctx ctx, struct dy_core_both 
     return DY_YES;
 }
 
-dy_ternary_t value_map_is_equal(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr expr)
+dy_ternary_t expr_map_is_equal(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr expr)
 {
-    if (expr.tag != DY_CORE_EXPR_VALUE_MAP) {
+    if (expr.tag != DY_CORE_EXPR_EXPR_MAP) {
         return DY_NO;
     }
 
-    return value_map_is_equal_to_value_map(ctx, value_map, expr.value_map);
+    return expr_map_is_equal_to_expr_map(ctx, expr_map, expr.expr_map);
 }
 
-dy_ternary_t value_map_is_equal_to_value_map(struct dy_check_ctx ctx, struct dy_core_value_map value_map1, struct dy_core_value_map value_map2)
+dy_ternary_t expr_map_is_equal_to_expr_map(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map1, struct dy_core_expr_map expr_map2)
 {
-    if (value_map1.polarity != value_map2.polarity || value_map1.is_implicit != value_map2.is_implicit) {
+    if (expr_map1.polarity != expr_map2.polarity || expr_map1.is_implicit != expr_map2.is_implicit) {
         return DY_NO;
     }
 
-    dy_ternary_t first_res = dy_are_equal(ctx, *value_map1.e1, *value_map2.e1);
+    dy_ternary_t first_res = dy_are_equal(ctx, *expr_map1.e1, *expr_map2.e1);
     if (first_res == DY_NO) {
         return DY_NO;
     }
 
-    dy_ternary_t second_res = dy_are_equal(ctx, *value_map1.e2, *value_map2.e2);
+    dy_ternary_t second_res = dy_are_equal(ctx, *expr_map1.e2, *expr_map2.e2);
     if (second_res == DY_NO) {
         return DY_NO;
     }
@@ -262,6 +262,8 @@ dy_ternary_t one_of_is_equal(struct dy_check_ctx ctx, struct dy_core_one_of one_
 
 dy_ternary_t unknown_is_equal(struct dy_check_ctx ctx, struct dy_core_unknown unknown, struct dy_core_expr expr)
 {
+    (void)ctx;
+
     if (expr.tag != DY_CORE_EXPR_UNKNOWN) {
         return DY_MAYBE;
     }
@@ -273,18 +275,18 @@ dy_ternary_t unknown_is_equal(struct dy_check_ctx ctx, struct dy_core_unknown un
     }
 }
 
-dy_ternary_t value_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_value_map_elim elim, struct dy_core_expr expr)
+dy_ternary_t expr_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_expr_map_elim elim, struct dy_core_expr expr)
 {
-    if (expr.tag != DY_CORE_EXPR_VALUE_MAP_ELIM) {
+    if (expr.tag != DY_CORE_EXPR_EXPR_MAP_ELIM) {
         return DY_MAYBE;
     }
 
-    dy_ternary_t first_res = dy_are_equal(ctx, *elim.expr, *expr.value_map_elim.expr);
+    dy_ternary_t first_res = dy_are_equal(ctx, *elim.expr, *expr.expr_map_elim.expr);
     if (first_res == DY_NO) {
         return DY_NO;
     }
 
-    dy_ternary_t second_res = value_map_is_equal_to_value_map(ctx, elim.value_map, expr.value_map_elim.value_map);
+    dy_ternary_t second_res = expr_map_is_equal_to_expr_map(ctx, elim.expr_map, expr.expr_map_elim.expr_map);
     if (second_res == DY_NO) {
         return DY_NO;
     }

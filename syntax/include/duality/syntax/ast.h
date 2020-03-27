@@ -20,7 +20,7 @@ struct dy_ast_arg {
     bool has_type;
 };
 
-struct dy_ast_value_map {
+struct dy_ast_expr_map {
     const struct dy_ast_expr *e1;
     const struct dy_ast_expr *e2;
     bool is_implicit;
@@ -72,9 +72,9 @@ struct dy_ast_list {
     size_t num_exprs;
 };
 
-struct dy_ast_value_map_elim {
+struct dy_ast_expr_map_elim {
     const struct dy_ast_expr *expr;
-    struct dy_ast_value_map value_map;
+    struct dy_ast_expr_map expr_map;
 };
 
 struct dy_ast_type_map_elim {
@@ -92,11 +92,11 @@ enum dy_ast_expr_tag {
     DY_AST_EXPR_LIST,
     DY_AST_EXPR_CHOICE,
     DY_AST_EXPR_TRY_BLOCK,
-    DY_AST_EXPR_POSITIVE_VALUE_MAP,
-    DY_AST_EXPR_NEGATIVE_VALUE_MAP,
+    DY_AST_EXPR_POSITIVE_EXPR_MAP,
+    DY_AST_EXPR_NEGATIVE_EXPR_MAP,
     DY_AST_EXPR_POSITIVE_TYPE_MAP,
     DY_AST_EXPR_NEGATIVE_TYPE_MAP,
-    DY_AST_EXPR_VALUE_MAP_ELIM,
+    DY_AST_EXPR_EXPR_MAP_ELIM,
     DY_AST_EXPR_TYPE_MAP_ELIM,
     DY_AST_EXPR_DO_BLOCK,
     DY_AST_EXPR_ALL,
@@ -112,11 +112,11 @@ struct dy_ast_expr {
     union {
         dy_string_t string;
         dy_string_t variable;
-        struct dy_ast_value_map positive_value_map;
-        struct dy_ast_value_map negative_value_map;
+        struct dy_ast_expr_map positive_expr_map;
+        struct dy_ast_expr_map negative_expr_map;
         struct dy_ast_type_map positive_type_map;
         struct dy_ast_type_map negative_type_map;
-        struct dy_ast_value_map_elim value_map_elim;
+        struct dy_ast_expr_map_elim expr_map_elim;
         struct dy_ast_type_map_elim type_map_elim;
         struct dy_ast_do_block do_block;
         struct dy_ast_list list;

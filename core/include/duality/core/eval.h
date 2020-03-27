@@ -11,11 +11,11 @@
 
 DY_CORE_API dy_ternary_t dy_eval_expr(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_expr *new_expr);
 
-DY_CORE_API dy_ternary_t dy_eval_value_map(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr *new_expr);
+DY_CORE_API dy_ternary_t dy_eval_expr_map(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr *new_expr);
 
 DY_CORE_API dy_ternary_t dy_eval_type_map(struct dy_check_ctx ctx, struct dy_core_type_map type_map, struct dy_core_expr *new_expr);
 
-DY_CORE_API dy_ternary_t dy_eval_value_map_elim(struct dy_check_ctx ctx, struct dy_core_value_map_elim elim, struct dy_core_expr *new_expr);
+DY_CORE_API dy_ternary_t dy_eval_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_map_elim elim, struct dy_core_expr *new_expr);
 
 DY_CORE_API dy_ternary_t dy_eval_type_map_elim(struct dy_check_ctx ctx, struct dy_core_type_map_elim elim, struct dy_core_expr *new_expr);
 

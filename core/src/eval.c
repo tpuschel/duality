@@ -20,12 +20,12 @@ static struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_e
 dy_ternary_t dy_eval_expr(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_expr *new_expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_VALUE_MAP:
-        return dy_eval_value_map(ctx, expr.value_map, new_expr);
+    case DY_CORE_EXPR_EXPR_MAP:
+        return dy_eval_expr_map(ctx, expr.expr_map, new_expr);
     case DY_CORE_EXPR_TYPE_MAP:
         return dy_eval_type_map(ctx, expr.type_map, new_expr);
-    case DY_CORE_EXPR_VALUE_MAP_ELIM:
-        return dy_eval_value_map_elim(ctx, expr.value_map_elim, new_expr);
+    case DY_CORE_EXPR_EXPR_MAP_ELIM:
+        return dy_eval_expr_map_elim(ctx, expr.expr_map_elim, new_expr);
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         return dy_eval_type_map_elim(ctx, expr.type_map_elim, new_expr);
     case DY_CORE_EXPR_BOTH:
@@ -52,21 +52,21 @@ dy_ternary_t dy_eval_expr(struct dy_check_ctx ctx, struct dy_core_expr expr, str
     DY_IMPOSSIBLE_ENUM();
 }
 
-dy_ternary_t dy_eval_value_map(struct dy_check_ctx ctx, struct dy_core_value_map value_map, struct dy_core_expr *new_expr)
+dy_ternary_t dy_eval_expr_map(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr *new_expr)
 {
     struct dy_core_expr new_e1;
-    dy_ternary_t result = dy_eval_expr(ctx, *value_map.e1, &new_e1);
+    dy_ternary_t result = dy_eval_expr(ctx, *expr_map.e1, &new_e1);
     if (result == DY_NO) {
         return DY_NO;
     }
 
     *new_expr = (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_VALUE_MAP,
-        .value_map = {
+        .tag = DY_CORE_EXPR_EXPR_MAP,
+        .expr_map = {
             .e1 = alloc_expr(ctx, new_e1),
-            .e2 = value_map.e2,
-            .polarity = value_map.polarity,
-            .is_implicit = value_map.is_implicit,
+            .e2 = expr_map.e2,
+            .polarity = expr_map.polarity,
+            .is_implicit = expr_map.is_implicit,
         }
     };
 
@@ -95,16 +95,16 @@ dy_ternary_t dy_eval_type_map(struct dy_check_ctx ctx, struct dy_core_type_map t
     return result;
 }
 
-dy_ternary_t dy_eval_value_map_elim(struct dy_check_ctx ctx, struct dy_core_value_map_elim elim, struct dy_core_expr *new_expr)
+dy_ternary_t dy_eval_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_map_elim elim, struct dy_core_expr *new_expr)
 {
     struct dy_core_expr left;
     dy_ternary_t left_result = dy_eval_expr(ctx, *elim.expr, &left);
 
     struct dy_core_expr right;
-    dy_ternary_t right_result = dy_eval_expr(ctx, *elim.value_map.e1, &right);
+    dy_ternary_t right_result = dy_eval_expr(ctx, *elim.expr_map.e1, &right);
 
     struct dy_core_expr type;
-    dy_ternary_t type_result = dy_eval_expr(ctx, *elim.value_map.e2, &type);
+    dy_ternary_t type_result = dy_eval_expr(ctx, *elim.expr_map.e2, &type);
 
     if (left_result == DY_NO || right_result == DY_NO || type_result == DY_NO) {
         return DY_NO;
@@ -112,15 +112,14 @@ dy_ternary_t dy_eval_value_map_elim(struct dy_check_ctx ctx, struct dy_core_valu
 
     if (left_result == DY_MAYBE || right_result == DY_MAYBE || type_result == DY_MAYBE) {
         *new_expr = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-            .value_map_elim = {
-                .id = elim.id,
+            .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
+            .expr_map_elim = {
                 .expr = alloc_expr(ctx, left),
-                .value_map = {
+                .expr_map = {
                     .e1 = alloc_expr(ctx, right),
                     .e2 = alloc_expr(ctx, type),
-                    .polarity = elim.value_map.polarity,
-                    .is_implicit = elim.value_map.is_implicit,
+                    .polarity = elim.expr_map.polarity,
+                    .is_implicit = elim.expr_map.is_implicit,
                 },
             }
         };
@@ -128,19 +127,19 @@ dy_ternary_t dy_eval_value_map_elim(struct dy_check_ctx ctx, struct dy_core_valu
         return DY_MAYBE;
     }
 
-    struct dy_core_expr value_map = {
-        .tag = DY_CORE_EXPR_VALUE_MAP,
-        .value_map = {
+    struct dy_core_expr expr_map = {
+        .tag = DY_CORE_EXPR_EXPR_MAP,
+        .expr_map = {
             .e1 = alloc_expr(ctx, right),
             .e2 = alloc_expr(ctx, type),
-            .polarity = elim.value_map.polarity,
-            .is_implicit = elim.value_map.is_implicit,
+            .polarity = elim.expr_map.polarity,
+            .is_implicit = elim.expr_map.is_implicit,
         }
     };
 
     struct dy_constraint constraint;
     bool have_constraint = false;
-    dy_ternary_t result = dy_is_subtype_no_transformation(ctx, dy_type_of(ctx, left), value_map, &constraint, &have_constraint);
+    dy_ternary_t result = dy_is_subtype_no_transformation(ctx, dy_type_of(ctx, left), expr_map, &constraint, &have_constraint);
     if (result == DY_NO) {
         return DY_NO;
     }
@@ -152,11 +151,10 @@ dy_ternary_t dy_eval_value_map_elim(struct dy_check_ctx ctx, struct dy_core_valu
 
     if (result == DY_MAYBE) {
         *new_expr = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-            .value_map_elim = {
-                .id = elim.id,
+            .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
+            .expr_map_elim = {
                 .expr = alloc_expr(ctx, left),
-                .value_map = value_map.value_map,
+                .expr_map = expr_map.expr_map,
             }
         };
 
@@ -177,8 +175,8 @@ dy_ternary_t dy_eval_value_map_elim(struct dy_check_ctx ctx, struct dy_core_valu
         return DY_YES;
     }
 
-    if (left.tag == DY_CORE_EXPR_VALUE_MAP) {
-        return dy_eval_expr(ctx, *left.value_map.e2, new_expr);
+    if (left.tag == DY_CORE_EXPR_EXPR_MAP) {
+        return dy_eval_expr(ctx, *left.expr_map.e2, new_expr);
     }
 
     if (left.tag == DY_CORE_EXPR_TYPE_MAP) {
@@ -199,33 +197,31 @@ dy_ternary_t dy_eval_value_map_elim(struct dy_check_ctx ctx, struct dy_core_valu
     if (left.tag == DY_CORE_EXPR_BOTH) {
         struct dy_constraint constraint;
         bool have_constraint = false;
-        dy_ternary_t result = dy_is_subtype_no_transformation(ctx, dy_type_of(ctx, *left.both.e1), value_map, &constraint, &have_constraint);
+        dy_ternary_t result = dy_is_subtype_no_transformation(ctx, dy_type_of(ctx, *left.both.e1), expr_map, &constraint, &have_constraint);
         if (have_constraint) {
             fprintf(stderr, "Constraint on eval??\n");
             return DY_NO;
         }
         if (result == DY_YES) {
-            struct dy_core_value_map_elim new_elim = {
-                .id = (*ctx.running_id)++,
+            struct dy_core_expr_map_elim new_elim = {
                 .expr = left.both.e1,
-                .value_map = value_map.value_map,
+                .expr_map = expr_map.expr_map,
             };
 
-            return dy_eval_value_map_elim(ctx, new_elim, new_expr);
+            return dy_eval_expr_map_elim(ctx, new_elim, new_expr);
         }
 
-        struct dy_core_value_map_elim new_elim = {
-            .id = (*ctx.running_id)++,
+        struct dy_core_expr_map_elim new_elim = {
             .expr = left.both.e2,
-            .value_map = value_map.value_map,
+            .expr_map = expr_map.expr_map,
         };
 
-        return dy_eval_value_map_elim(ctx, new_elim, new_expr);
+        return dy_eval_expr_map_elim(ctx, new_elim, new_expr);
     }
 
     *new_expr = (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_VALUE_MAP_ELIM,
-        .value_map_elim = elim
+        .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
+        .expr_map_elim = elim
     };
 
     return DY_MAYBE;
