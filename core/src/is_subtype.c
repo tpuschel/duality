@@ -85,7 +85,7 @@ dy_ternary_t dy_is_subtype_sub(struct dy_check_ctx ctx, struct dy_core_expr subt
 
         *did_generate_constraint = true;
 
-        return DY_YES;
+        return DY_MAYBE;
     }
 
     if (supertype.tag == DY_CORE_EXPR_UNKNOWN && supertype.unknown.is_inference_var) {
@@ -103,7 +103,7 @@ dy_ternary_t dy_is_subtype_sub(struct dy_check_ctx ctx, struct dy_core_expr subt
 
         *did_generate_constraint = true;
 
-        return DY_YES;
+        return DY_MAYBE;
     }
 
     if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
