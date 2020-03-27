@@ -28,6 +28,8 @@ static void remove_id(dy_array_t *ids, size_t id);
 static void print_core_expr(struct dy_core_expr expr, struct dy_allocator allocator);
 static void print_constraint(struct dy_constraint c);
 
+static bool is_mentioned_in_constraints(struct dy_check_ctx ctx, size_t id, struct dy_constraint constraint);
+
 bool dy_check_expr(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_expr *new_expr, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     switch (expr.tag) {
@@ -165,6 +167,14 @@ bool dy_check_type_map(struct dy_check_ctx ctx, struct dy_core_type_map type_map
 
     if (!arg_succeeded || !expr_succeeded) {
         return false;
+    }
+
+    if (have_c2) {
+        // Check to see if we're bound in one of the constraints.
+        // If that's the case, error out for now.
+        if (is_mentioned_in_constraints(ctx, type_map.arg_id, c2)) {
+            return false;
+        }
     }
 
     if (have_c1 && have_c2) {
@@ -813,6 +823,25 @@ void remove_id(dy_array_t *ids, size_t id_to_remove)
             dy_array_remove(ids, i);
             return;
         }
+    }
+}
+
+bool is_mentioned_in_constraints(struct dy_check_ctx ctx, size_t id, struct dy_constraint constraint)
+{
+    switch (constraint.tag) {
+    case DY_CONSTRAINT_SINGLE:
+        if (constraint.single.range.have_subtype && is_bound(id, constraint.single.range.subtype)) {
+            return true;
+        }
+
+        if (constraint.single.range.have_supertype && is_bound(id, constraint.single.range.supertype)) {
+            return true;
+        }
+
+        return false;
+    case DY_CONSTRAINT_MULTIPLE:
+        return is_mentioned_in_constraints(ctx, id, *constraint.multiple.c1)
+               || is_mentioned_in_constraints(ctx, id, *constraint.multiple.c2);
     }
 }
 
