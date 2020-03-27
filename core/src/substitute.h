@@ -7,8 +7,8 @@
 #ifndef DY_SUBSTITUTE_H
 #define DY_SUBSTITUTE_H
 
-#include <duality/core/eval.h>
+#include <duality/core/core.h>
 
-struct dy_core_expr substitute(struct dy_check_ctx ctx, size_t id, struct dy_core_expr sub, struct dy_core_expr expr);
+struct dy_core_expr substitute(size_t id, struct dy_core_expr sub, struct dy_core_expr expr);
 
 #endif // DY_SUBSTITUTE_H

@@ -234,7 +234,7 @@ dy_ternary_t type_map_is_equal_to_type_map(struct dy_check_ctx ctx, struct dy_co
         }
     };
 
-    return dy_are_equal(ctx, *type_map1.expr, substitute(ctx, type_map2.arg_id, id_expr, *type_map2.expr));
+    return dy_are_equal(ctx, *type_map1.expr, substitute(type_map2.arg_id, id_expr, *type_map2.expr));
 }
 
 dy_ternary_t one_of_is_equal(struct dy_check_ctx ctx, struct dy_core_one_of one_of, struct dy_core_expr expr)

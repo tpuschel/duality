@@ -8,13 +8,12 @@
 #define DY_ARRAY_H
 
 #include <duality/support/api.h>
-#include <duality/support/allocator.h>
+
+#include <stddef.h>
 
 typedef struct dy_array dy_array_t;
 
-DY_SUPPORT_API dy_array_t *dy_array_create(struct dy_allocator allocator, size_t elem_size, size_t capacity);
-
-DY_SUPPORT_API dy_array_t *dy_array_create_with_seperate_allocators(struct dy_allocator instance_allocator, struct dy_allocator space_allocator, size_t elem_size, size_t capacity);
+DY_SUPPORT_API dy_array_t *dy_array_create(size_t elem_size, size_t capacity);
 
 DY_SUPPORT_API size_t dy_array_add(dy_array_t *array, const void *value);
 
@@ -47,10 +46,6 @@ DY_SUPPORT_API void dy_array_add_to_size(dy_array_t *array, size_t added_size);
 DY_SUPPORT_API void dy_array_set_size(dy_array_t *array, size_t size);
 
 DY_SUPPORT_API size_t dy_array_pop(dy_array_t *array, void *value);
-
-DY_SUPPORT_API struct dy_allocator dy_array_instance_allocator(dy_array_t *array);
-
-DY_SUPPORT_API struct dy_allocator dy_array_space_allocator(dy_array_t *array);
 
 DY_SUPPORT_API void dy_array_destroy_instance(dy_array_t *array);
 

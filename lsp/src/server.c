@@ -36,18 +36,18 @@ int dy_lsp_run_server(FILE *in, FILE *out)
     };
 
     struct send_env send_env = {
-        .buffer = dy_array_create(dy_allocator_stdlib(), sizeof(char), 1024),
+        .buffer = dy_array_create(sizeof(char), 1024),
         .file = out
     };
 
     struct dy_stream stream = {
         .get_chars = stream_callback,
         .env = &recv_env,
-        .buffer = dy_array_create(dy_allocator_stdlib(), sizeof(char), 1024),
+        .buffer = dy_array_create(sizeof(char), 1024),
         .current_index = 0
     };
 
-    dy_lsp_ctx_t *ctx = dy_lsp_create(dy_allocator_stdlib(), send_callback, &send_env);
+    dy_lsp_ctx_t *ctx = dy_lsp_create(send_callback, &send_env);
 
     for (;;) {
         if (!dy_lsp_process_message(ctx, &stream)) {
@@ -161,7 +161,7 @@ void stream_callback(dy_array_t *buffer, void *env)
 
 void write_size_t(FILE *file, size_t x)
 {
-    dy_array_t *buffer = dy_array_create(dy_allocator_stdlib(), sizeof(char), 4);
+    dy_array_t *buffer = dy_array_create(sizeof(char), 4);
 
     for (;;) {
         char digit = (x % 10) + '0';

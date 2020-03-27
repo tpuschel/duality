@@ -7,8 +7,9 @@
 #include <duality/syntax/ast_to_core.h>
 
 #include <duality/support/assert.h>
+#include <duality/support/allocator.h>
 
-static struct dy_core_expr *alloc_expr(struct dy_ast_to_core_ctx *ctx, struct dy_core_expr expr);
+static struct dy_core_expr *alloc_expr(struct dy_core_expr expr);
 
 static bool ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map type_map, enum dy_core_polarity polarity, struct dy_core_expr *expr, dy_array_t *sub_maps);
 
@@ -119,9 +120,9 @@ bool dy_ast_variable_to_core(struct dy_ast_to_core_ctx *ctx, dy_string_t variabl
 bool ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map type_map, enum dy_core_polarity polarity, struct dy_core_expr *expr, dy_array_t *sub_maps)
 {
     if (type_map.arg.has_type) {
-        dy_array_t *sub_maps1 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+        dy_array_t *sub_maps1 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
 
-        struct dy_core_expr *type = ctx->allocator.alloc(sizeof *type, ctx->allocator.env);
+        struct dy_core_expr *type = dy_malloc(sizeof *type);
         bool arg_type_conversion_succeeded = dy_ast_expr_to_core(ctx, *type_map.arg.type, type, sub_maps1);
 
         struct dy_text_range_core_map map1 = {
@@ -148,7 +149,7 @@ bool ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map
         }
 
         struct dy_core_expr e;
-        dy_array_t *sub_maps2 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+        dy_array_t *sub_maps2 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
         bool expr_conversion_succeeded = dy_ast_expr_to_core(ctx, *type_map.expr, &e, sub_maps2);
 
         struct dy_text_range_core_map map2 = {
@@ -170,7 +171,7 @@ bool ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map
             .type_map = {
                 .arg_id = id,
                 .arg_type = type,
-                .expr = alloc_expr(ctx, e),
+                .expr = alloc_expr(e),
                 .polarity = polarity,
                 .is_implicit = type_map.is_implicit,
             }
@@ -180,7 +181,7 @@ bool ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map
     } else {
         struct dy_core_unknown unknown = create_inference_var(ctx);
 
-        struct dy_core_expr *type = ctx->allocator.alloc(sizeof *type, ctx->allocator.env);
+        struct dy_core_expr *type = dy_malloc(sizeof *type);
         *type = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_UNKNOWN,
             .unknown = unknown
@@ -202,7 +203,7 @@ bool ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map
         }
 
         struct dy_core_expr e;
-        dy_array_t *sub_maps2 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+        dy_array_t *sub_maps2 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
         bool expr_conversion_succeeded = dy_ast_expr_to_core(ctx, *type_map.expr, &e, sub_maps2);
 
         struct dy_text_range_core_map map2 = {
@@ -224,7 +225,7 @@ bool ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map
             .type_map = {
                 .arg_id = id,
                 .arg_type = type,
-                .expr = alloc_expr(ctx, e),
+                .expr = alloc_expr(e),
                 .polarity = polarity,
                 .is_implicit = type_map.is_implicit,
             }
@@ -235,7 +236,7 @@ bool ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map
             .inference_ctx = {
                 .id = unknown.id,
                 .type = unknown.type,
-                .expr = alloc_expr(ctx, result_type_map),
+                .expr = alloc_expr(result_type_map),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -259,7 +260,7 @@ bool ast_list_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_list list, e
     dy_assert(list.num_exprs != 0);
 
     struct dy_core_expr e1;
-    dy_array_t *sub_maps1 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    dy_array_t *sub_maps1 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
     bool b1 = dy_ast_expr_to_core(ctx, list.exprs[0], &e1, sub_maps1);
 
     struct dy_text_range_core_map map1 = {
@@ -295,8 +296,8 @@ bool ast_list_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_list list, e
     *expr = (struct dy_core_expr){
         .tag = DY_CORE_EXPR_BOTH,
         .both = {
-            .e1 = alloc_expr(ctx, e1),
-            .e2 = alloc_expr(ctx, e2),
+            .e1 = alloc_expr(e1),
+            .e2 = alloc_expr(e2),
             .polarity = polarity,
         }
     };
@@ -319,7 +320,7 @@ bool dy_ast_try_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_list
     dy_assert(try_block.num_exprs != 0);
 
     struct dy_core_expr e1;
-    dy_array_t *sub_maps1 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    dy_array_t *sub_maps1 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
     bool b1 = dy_ast_expr_to_core(ctx, try_block.exprs[0], &e1, sub_maps1);
 
     struct dy_text_range_core_map map1 = {
@@ -354,8 +355,8 @@ bool dy_ast_try_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_list
     *expr = (struct dy_core_expr){
         .tag = DY_CORE_EXPR_ONE_OF,
         .one_of = {
-            .first = alloc_expr(ctx, e1),
-            .second = alloc_expr(ctx, e2),
+            .first = alloc_expr(e1),
+            .second = alloc_expr(e2),
         }
     };
 
@@ -365,7 +366,7 @@ bool dy_ast_try_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_list
 bool ast_expr_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map expr_map, enum dy_core_polarity polarity, struct dy_core_expr *expr, dy_array_t *sub_maps)
 {
     struct dy_core_expr e1;
-    dy_array_t *sub_maps1 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    dy_array_t *sub_maps1 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
     bool b1 = dy_ast_expr_to_core(ctx, *expr_map.e1, &e1, sub_maps1);
 
     struct dy_text_range_core_map map1 = {
@@ -375,7 +376,7 @@ bool ast_expr_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map
     };
 
     struct dy_core_expr e2;
-    dy_array_t *sub_maps2 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    dy_array_t *sub_maps2 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
     bool b2 = dy_ast_expr_to_core(ctx, *expr_map.e2, &e2, sub_maps2);
 
     struct dy_text_range_core_map map2 = {
@@ -394,8 +395,8 @@ bool ast_expr_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map
     *expr = (struct dy_core_expr){
         .tag = DY_CORE_EXPR_EXPR_MAP,
         .expr_map = {
-            .e1 = alloc_expr(ctx, e1),
-            .e2 = alloc_expr(ctx, e2),
+            .e1 = alloc_expr(e1),
+            .e2 = alloc_expr(e2),
             .polarity = polarity,
             .is_implicit = expr_map.is_implicit,
         }
@@ -418,7 +419,7 @@ bool dy_ast_do_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_bl
 {
     switch (do_block.tag) {
     case DY_AST_DO_BLOCK_END_EXPR: {
-        dy_array_t *sub_maps1 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+        dy_array_t *sub_maps1 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
 
         if (dy_ast_expr_to_core(ctx, *do_block.end_expr, expr, sub_maps1)) {
             struct dy_text_range_core_map map1 = {
@@ -448,7 +449,7 @@ bool dy_ast_do_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_bl
 bool do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_equality equality, struct dy_core_expr *expr, dy_array_t *sub_maps)
 {
     struct dy_core_expr e1;
-    dy_array_t *sub_maps1 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    dy_array_t *sub_maps1 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
     bool e1_conversion_succeeded = dy_ast_expr_to_core(ctx, *equality.e1, &e1, sub_maps1);
 
     struct dy_text_range_core_map map1 = {
@@ -458,7 +459,7 @@ bool do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_
     };
 
     struct dy_core_expr e2;
-    dy_array_t *sub_maps2 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    dy_array_t *sub_maps2 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
     bool e2_conversion_succeeded = dy_ast_expr_to_core(ctx, *equality.e2, &e2, sub_maps2);
 
     struct dy_text_range_core_map map2 = {
@@ -480,8 +481,8 @@ bool do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_
     struct dy_core_expr positive_expr_map = {
         .tag = DY_CORE_EXPR_EXPR_MAP,
         .expr_map = {
-            .e1 = alloc_expr(ctx, e1),
-            .e2 = alloc_expr(ctx, rest),
+            .e1 = alloc_expr(e1),
+            .e2 = alloc_expr(rest),
             .polarity = DY_CORE_POLARITY_POSITIVE,
             .is_implicit = false,
         }
@@ -491,7 +492,7 @@ bool do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_
         .tag = DY_CORE_EXPR_UNKNOWN,
         .unknown = {
             .id = (*ctx->running_id)++,
-            .type = alloc_expr(ctx, (struct dy_core_expr){ .tag = DY_CORE_EXPR_END, .end_polarity = DY_CORE_POLARITY_POSITIVE }),
+            .type = alloc_expr((struct dy_core_expr){ .tag = DY_CORE_EXPR_END, .end_polarity = DY_CORE_POLARITY_POSITIVE }),
             .is_inference_var = true,
         }
     };
@@ -499,10 +500,10 @@ bool do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_
     struct dy_core_expr elim = {
         .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
         .expr_map_elim = {
-            .expr = alloc_expr(ctx, positive_expr_map),
+            .expr = alloc_expr(positive_expr_map),
             .expr_map = {
-                .e1 = alloc_expr(ctx, e2),
-                .e2 = alloc_expr(ctx, result_type),
+                .e1 = alloc_expr(e2),
+                .e2 = alloc_expr(result_type),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = false,
             },
@@ -514,7 +515,7 @@ bool do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_
         .inference_ctx = {
             .id = result_type.unknown.id,
             .type = result_type.unknown.type,
-            .expr = alloc_expr(ctx, elim),
+            .expr = alloc_expr(elim),
             .polarity = DY_CORE_POLARITY_NEGATIVE,
         }
     };
@@ -525,7 +526,7 @@ bool do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_
 bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_let let, struct dy_core_expr *expr, dy_array_t *sub_maps)
 {
     struct dy_core_expr e;
-    dy_array_t *sub_maps1 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    dy_array_t *sub_maps1 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
     bool expr_conversion_succeeded = dy_ast_expr_to_core(ctx, *let.expr, &e, sub_maps1);
 
     struct dy_text_range_core_map map1 = {
@@ -538,7 +539,7 @@ bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block
 
     struct dy_core_unknown unknown = create_inference_var(ctx);
 
-    struct dy_core_expr *arg_type = ctx->allocator.alloc(sizeof *arg_type, ctx->allocator.env);
+    struct dy_core_expr *arg_type = dy_malloc(sizeof *arg_type);
     *arg_type = (struct dy_core_expr){
         .tag = DY_CORE_EXPR_UNKNOWN,
         .unknown = unknown
@@ -568,7 +569,7 @@ bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block
         .type_map = {
             .arg_id = id,
             .arg_type = arg_type,
-            .expr = alloc_expr(ctx, rest),
+            .expr = alloc_expr(rest),
             .polarity = DY_CORE_POLARITY_POSITIVE,
             .is_implicit = false,
         }
@@ -579,7 +580,7 @@ bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block
         .inference_ctx = {
             .id = unknown.id,
             .type = unknown.type,
-            .expr = alloc_expr(ctx, positive_type_map),
+            .expr = alloc_expr(positive_type_map),
             .polarity = DY_CORE_POLARITY_POSITIVE,
         }
     };
@@ -588,7 +589,7 @@ bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block
         .tag = DY_CORE_EXPR_UNKNOWN,
         .unknown = {
             .id = (*ctx->running_id)++,
-            .type = alloc_expr(ctx, (struct dy_core_expr){ .tag = DY_CORE_EXPR_END, .end_polarity = DY_CORE_POLARITY_POSITIVE }),
+            .type = alloc_expr((struct dy_core_expr){ .tag = DY_CORE_EXPR_END, .end_polarity = DY_CORE_POLARITY_POSITIVE }),
             .is_inference_var = true,
         }
     };
@@ -596,10 +597,10 @@ bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block
     struct dy_core_expr elim = {
         .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
         .expr_map_elim = {
-            .expr = alloc_expr(ctx, result_inference_ctx),
+            .expr = alloc_expr(result_inference_ctx),
             .expr_map = {
-                .e1 = alloc_expr(ctx, e),
-                .e2 = alloc_expr(ctx, result_type),
+                .e1 = alloc_expr(e),
+                .e2 = alloc_expr(result_type),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = false,
             },
@@ -611,7 +612,7 @@ bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block
         .inference_ctx = {
             .id = result_type.unknown.id,
             .type = result_type.unknown.type,
-            .expr = alloc_expr(ctx, elim),
+            .expr = alloc_expr(elim),
             .polarity = DY_CORE_POLARITY_NEGATIVE,
         }
     };
@@ -622,7 +623,7 @@ bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block
 bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_ignored_expr ignored_expr, struct dy_core_expr *expr, dy_array_t *sub_maps)
 {
     struct dy_core_expr e;
-    dy_array_t *sub_maps1 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    dy_array_t *sub_maps1 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
     bool expr_conversion_succeeded = dy_ast_expr_to_core(ctx, *ignored_expr.expr, &e, sub_maps1);
 
     struct dy_text_range_core_map map1 = {
@@ -653,8 +654,8 @@ bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast
         .tag = DY_CORE_EXPR_TYPE_MAP,
         .type_map = {
             .arg_id = id,
-            .arg_type = alloc_expr(ctx, unknown_expr),
-            .expr = alloc_expr(ctx, rest),
+            .arg_type = alloc_expr(unknown_expr),
+            .expr = alloc_expr(rest),
             .polarity = DY_CORE_POLARITY_POSITIVE,
             .is_implicit = false,
         }
@@ -665,7 +666,7 @@ bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast
         .inference_ctx = {
             .id = unknown.id,
             .type = unknown.type,
-            .expr = alloc_expr(ctx, positive_type_map),
+            .expr = alloc_expr(positive_type_map),
             .polarity = DY_CORE_POLARITY_POSITIVE,
         }
     };
@@ -674,7 +675,7 @@ bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast
         .tag = DY_CORE_EXPR_UNKNOWN,
         .unknown = {
             .id = (*ctx->running_id)++,
-            .type = alloc_expr(ctx, (struct dy_core_expr){ .tag = DY_CORE_EXPR_END, .end_polarity = DY_CORE_POLARITY_POSITIVE }),
+            .type = alloc_expr((struct dy_core_expr){ .tag = DY_CORE_EXPR_END, .end_polarity = DY_CORE_POLARITY_POSITIVE }),
             .is_inference_var = true,
         }
     };
@@ -682,10 +683,10 @@ bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast
     struct dy_core_expr elim = {
         .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
         .expr_map_elim = {
-            .expr = alloc_expr(ctx, result_inference_ctx),
+            .expr = alloc_expr(result_inference_ctx),
             .expr_map = {
-                .e1 = alloc_expr(ctx, e),
-                .e2 = alloc_expr(ctx, result_type),
+                .e1 = alloc_expr(e),
+                .e2 = alloc_expr(result_type),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = false,
             },
@@ -697,7 +698,7 @@ bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast
         .inference_ctx = {
             .id = result_type.unknown.id,
             .type = result_type.unknown.type,
-            .expr = alloc_expr(ctx, elim),
+            .expr = alloc_expr(elim),
             .polarity = DY_CORE_POLARITY_NEGATIVE,
         }
     };
@@ -708,7 +709,7 @@ bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast
 bool dy_ast_expr_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map_elim elim, struct dy_core_expr *expr, dy_array_t *sub_maps)
 {
     struct dy_core_expr e1;
-    dy_array_t *sub_maps1 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    dy_array_t *sub_maps1 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
     bool b1 = dy_ast_expr_to_core(ctx, *elim.expr, &e1, sub_maps1);
 
     struct dy_text_range_core_map map1 = {
@@ -731,7 +732,7 @@ bool dy_ast_expr_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
     *expr = (struct dy_core_expr){
         .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
         .expr_map_elim = {
-            .expr = alloc_expr(ctx, e1),
+            .expr = alloc_expr(e1),
             .expr_map = e2.expr_map,
         }
     };
@@ -742,7 +743,7 @@ bool dy_ast_expr_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
 bool dy_ast_type_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map_elim elim, struct dy_core_expr *expr, dy_array_t *sub_maps)
 {
     struct dy_core_expr e1;
-    dy_array_t *sub_maps1 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    dy_array_t *sub_maps1 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
     bool b1 = dy_ast_expr_to_core(ctx, *elim.expr, &e1, sub_maps1);
 
     struct dy_text_range_core_map map1 = {
@@ -765,7 +766,7 @@ bool dy_ast_type_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
     *expr = (struct dy_core_expr){
         .tag = DY_CORE_EXPR_TYPE_MAP_ELIM,
         .type_map_elim = {
-            .expr = alloc_expr(ctx, e1),
+            .expr = alloc_expr(e1),
             .type_map = e2.type_map,
         }
     };
@@ -776,7 +777,7 @@ bool dy_ast_type_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
 bool dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_juxtaposition juxtaposition, struct dy_core_expr *expr, dy_array_t *sub_maps)
 {
     struct dy_core_expr left;
-    dy_array_t *sub_maps1 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    dy_array_t *sub_maps1 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
     bool b1 = dy_ast_expr_to_core(ctx, *juxtaposition.left, &left, sub_maps1);
 
     struct dy_text_range_core_map map1 = {
@@ -786,7 +787,7 @@ bool dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
     };
 
     struct dy_core_expr right;
-    dy_array_t *sub_maps2 = dy_array_create(dy_allocator_stdlib(), sizeof(struct dy_text_range_core_map), 2);
+    dy_array_t *sub_maps2 = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
     bool b2 = dy_ast_expr_to_core(ctx, *juxtaposition.right, &right, sub_maps2);
 
     struct dy_text_range_core_map map2 = {
@@ -812,10 +813,10 @@ bool dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
     struct dy_core_expr elim = {
         .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
         .expr_map_elim = {
-            .expr = alloc_expr(ctx, left),
+            .expr = alloc_expr(left),
             .expr_map = {
-                .e1 = alloc_expr(ctx, right),
-                .e2 = alloc_expr(ctx, unknown_expr),
+                .e1 = alloc_expr(right),
+                .e2 = alloc_expr(unknown_expr),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = false,
             },
@@ -827,7 +828,7 @@ bool dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
         .inference_ctx = {
             .id = unknown.id,
             .type = unknown.type,
-            .expr = alloc_expr(ctx, elim),
+            .expr = alloc_expr(elim),
             .polarity = DY_CORE_POLARITY_NEGATIVE,
         }
     };
@@ -835,9 +836,9 @@ bool dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
     return true;
 }
 
-struct dy_core_expr *alloc_expr(struct dy_ast_to_core_ctx *ctx, struct dy_core_expr expr)
+struct dy_core_expr *alloc_expr(struct dy_core_expr expr)
 {
-    return dy_alloc(&expr, sizeof expr, ctx->allocator);
+    return dy_alloc_and_copy(&expr, sizeof expr);
 }
 
 struct dy_core_unknown create_inference_var(struct dy_ast_to_core_ctx *ctx)
@@ -849,7 +850,7 @@ struct dy_core_unknown create_inference_var(struct dy_ast_to_core_ctx *ctx)
 
     return (struct dy_core_unknown){
         .id = (*ctx->running_id)++,
-        .type = alloc_expr(ctx, type_all),
+        .type = alloc_expr(type_all),
         .is_inference_var = true
     };
 }

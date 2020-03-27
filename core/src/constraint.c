@@ -8,13 +8,14 @@
 #include <duality/core/is_subtype.h>
 
 #include <duality/support/assert.h>
+#include <duality/support/allocator.h>
 
-static struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_expr expr);
+static struct dy_core_expr *alloc_expr(struct dy_core_expr expr);
 
-static struct dy_constraint_range constraint_conjunction(struct dy_check_ctx ctx, struct dy_constraint_range range1, struct dy_constraint_range range2);
-static struct dy_constraint_range constraint_disjunction(struct dy_check_ctx ctx, struct dy_constraint_range range1, struct dy_constraint_range range2);
+static struct dy_constraint_range constraint_conjunction(struct dy_constraint_range range1, struct dy_constraint_range range2);
+static struct dy_constraint_range constraint_disjunction(struct dy_constraint_range range1, struct dy_constraint_range range2);
 
-struct dy_constraint_range dy_constraint_collect(struct dy_check_ctx ctx, struct dy_constraint constraint, size_t id)
+struct dy_constraint_range dy_constraint_collect(struct dy_constraint constraint, size_t id)
 {
     switch (constraint.tag) {
     case DY_CONSTRAINT_SINGLE:
@@ -27,15 +28,15 @@ struct dy_constraint_range dy_constraint_collect(struct dy_check_ctx ctx, struct
 
         return constraint.single.range;
     case DY_CONSTRAINT_MULTIPLE: {
-        struct dy_constraint_range range1 = dy_constraint_collect(ctx, *constraint.multiple.c1, id);
+        struct dy_constraint_range range1 = dy_constraint_collect(*constraint.multiple.c1, id);
 
-        struct dy_constraint_range range2 = dy_constraint_collect(ctx, *constraint.multiple.c2, id);
+        struct dy_constraint_range range2 = dy_constraint_collect(*constraint.multiple.c2, id);
 
         switch (constraint.multiple.polarity) {
         case DY_CORE_POLARITY_POSITIVE:
-            return constraint_conjunction(ctx, range1, range2);
+            return constraint_conjunction(range1, range2);
         case DY_CORE_POLARITY_NEGATIVE:
-            return constraint_disjunction(ctx, range1, range2);
+            return constraint_disjunction(range1, range2);
         }
 
         DY_IMPOSSIBLE_ENUM();
@@ -43,7 +44,7 @@ struct dy_constraint_range dy_constraint_collect(struct dy_check_ctx ctx, struct
     }
 }
 
-struct dy_constraint_range constraint_conjunction(struct dy_check_ctx ctx, struct dy_constraint_range range1, struct dy_constraint_range range2)
+struct dy_constraint_range constraint_conjunction(struct dy_constraint_range range1, struct dy_constraint_range range2)
 {
     struct dy_core_expr supertype;
     bool have_supertype = false;
@@ -51,8 +52,8 @@ struct dy_constraint_range constraint_conjunction(struct dy_check_ctx ctx, struc
         supertype = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .e1 = alloc_expr(ctx, range1.supertype),
-                .e2 = alloc_expr(ctx, range2.supertype),
+                .e1 = alloc_expr(range1.supertype),
+                .e2 = alloc_expr(range2.supertype),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -72,8 +73,8 @@ struct dy_constraint_range constraint_conjunction(struct dy_check_ctx ctx, struc
         subtype = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .e1 = alloc_expr(ctx, range1.subtype),
-                .e2 = alloc_expr(ctx, range2.subtype),
+                .e1 = alloc_expr(range1.subtype),
+                .e2 = alloc_expr(range2.subtype),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
@@ -95,7 +96,7 @@ struct dy_constraint_range constraint_conjunction(struct dy_check_ctx ctx, struc
     };
 }
 
-struct dy_constraint_range constraint_disjunction(struct dy_check_ctx ctx, struct dy_constraint_range range1, struct dy_constraint_range range2)
+struct dy_constraint_range constraint_disjunction(struct dy_constraint_range range1, struct dy_constraint_range range2)
 {
     struct dy_core_expr supertype;
     bool have_supertype = false;
@@ -103,8 +104,8 @@ struct dy_constraint_range constraint_disjunction(struct dy_check_ctx ctx, struc
         supertype = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .e1 = alloc_expr(ctx, range1.supertype),
-                .e2 = alloc_expr(ctx, range2.supertype),
+                .e1 = alloc_expr(range1.supertype),
+                .e2 = alloc_expr(range2.supertype),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
@@ -118,8 +119,8 @@ struct dy_constraint_range constraint_disjunction(struct dy_check_ctx ctx, struc
         subtype = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .e1 = alloc_expr(ctx, range1.subtype),
-                .e2 = alloc_expr(ctx, range2.subtype),
+                .e1 = alloc_expr(range1.subtype),
+                .e2 = alloc_expr(range2.subtype),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -135,7 +136,7 @@ struct dy_constraint_range constraint_disjunction(struct dy_check_ctx ctx, struc
     };
 }
 
-struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_expr expr)
+struct dy_core_expr *alloc_expr(struct dy_core_expr expr)
 {
-    return dy_alloc(&expr, sizeof expr, ctx.allocator);
+    return dy_alloc_and_copy(&expr, sizeof expr);
 }

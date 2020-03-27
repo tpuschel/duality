@@ -11,6 +11,7 @@
 #include <duality/core/constraint.h>
 
 #include <duality/support/assert.h>
+#include <duality/support/allocator.h>
 
 #include "substitute.h"
 
@@ -35,8 +36,8 @@ static dy_ternary_t is_subtype_of_negative_both(struct dy_check_ctx ctx, struct 
 
 static dy_ternary_t both_is_subtype_of_both(struct dy_check_ctx ctx, struct dy_core_both p1, struct dy_core_both p2, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
-static struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_expr expr);
-static struct dy_constraint *alloc_constraint(struct dy_check_ctx ctx, struct dy_constraint constraint);
+static struct dy_core_expr *alloc_expr(struct dy_core_expr expr);
+static struct dy_constraint *alloc_constraint(struct dy_constraint constraint);
 
 dy_ternary_t dy_is_subtype(struct dy_check_ctx ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr)
 {
@@ -193,7 +194,7 @@ dy_ternary_t positive_expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
         struct dy_core_expr subtype_expr_emap_e2 = {
             .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
             .expr_map_elim = {
-                .expr = alloc_expr(ctx, subtype_expr),
+                .expr = alloc_expr(subtype_expr),
                 .expr_map = {
                     .e1 = expr_map.e1,
                     .e2 = expr_map.e2,
@@ -215,7 +216,7 @@ dy_ternary_t positive_expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
                 .tag = DY_CORE_EXPR_EXPR_MAP,
                 .expr_map = {
                     .e1 = expr_map.e1,
-                    .e2 = alloc_expr(ctx, transformed_subtype_expr_emap_e2),
+                    .e2 = alloc_expr(transformed_subtype_expr_emap_e2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
                     .is_implicit = false,
                 }
@@ -244,7 +245,7 @@ dy_ternary_t positive_expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
         struct dy_core_expr emap_e2 = {
             .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
             .expr_map_elim = {
-                .expr = alloc_expr(ctx, subtype_expr),
+                .expr = alloc_expr(subtype_expr),
                 .expr_map = {
                     .e1 = expr_map.e1,
                     .e2 = expr_map.e2,
@@ -266,8 +267,8 @@ dy_ternary_t positive_expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
             *new_subtype_expr = (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_EXPR_MAP,
                 .expr_map = {
-                    .e1 = alloc_expr(ctx, emap_e1),
-                    .e2 = alloc_expr(ctx, emap_e2),
+                    .e1 = alloc_expr(emap_e1),
+                    .e2 = alloc_expr(emap_e2),
                     .polarity = expr_map.polarity,
                     .is_implicit = expr_map.is_implicit,
                 }
@@ -280,8 +281,8 @@ dy_ternary_t positive_expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
             *constraint = (struct dy_constraint){
                 .tag = DY_CONSTRAINT_MULTIPLE,
                 .multiple = {
-                    .c1 = alloc_constraint(ctx, c1),
-                    .c2 = alloc_constraint(ctx, c2),
+                    .c1 = alloc_constraint(c1),
+                    .c2 = alloc_constraint(c2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
                 }
             };
@@ -315,7 +316,7 @@ dy_ternary_t negative_expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
         struct dy_core_expr emap_e2 = {
             .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
             .expr_map_elim = {
-                .expr = alloc_expr(ctx, subtype_expr),
+                .expr = alloc_expr(subtype_expr),
                 .expr_map = {
                     .e1 = expr_map.e1,
                     .e2 = expr_map.e2,
@@ -336,7 +337,7 @@ dy_ternary_t negative_expr_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
                 .tag = DY_CORE_EXPR_EXPR_MAP,
                 .expr_map = {
                     .e1 = expr_map.e1,
-                    .e2 = alloc_expr(ctx, emap_e2),
+                    .e2 = alloc_expr(emap_e2),
                     .polarity = expr_map.polarity,
                     .is_implicit = expr_map.is_implicit,
                 }
@@ -372,7 +373,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
     if (supertype.tag == DY_CORE_EXPR_EXPR_MAP && supertype.expr_map.polarity == DY_CORE_POLARITY_NEGATIVE && type_map.is_implicit == supertype.expr_map.is_implicit) {
         struct dy_core_unknown var = {
             .id = (*ctx.running_id)++,
-            .type = alloc_expr(ctx, dy_type_of(ctx, *supertype.expr_map.e1)),
+            .type = alloc_expr(dy_type_of(ctx, *supertype.expr_map.e1)),
             .is_inference_var = false
         };
 
@@ -389,16 +390,16 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
             return DY_NO;
         }
 
-        struct dy_core_expr emap_e1 = substitute(ctx, var.id, *supertype.expr_map.e1, var_expr);
-        struct dy_core_expr new_type_map_expr = substitute(ctx, type_map.arg_id, emap_e1, *type_map.expr);
+        struct dy_core_expr emap_e1 = substitute(var.id, *supertype.expr_map.e1, var_expr);
+        struct dy_core_expr new_type_map_expr = substitute(type_map.arg_id, emap_e1, *type_map.expr);
 
         struct dy_core_expr emap_e2 = {
             .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
             .expr_map_elim = {
-                .expr = alloc_expr(ctx, subtype_expr),
+                .expr = alloc_expr(subtype_expr),
                 .expr_map = {
-                    .e1 = alloc_expr(ctx, var_expr),
-                    .e2 = alloc_expr(ctx, new_type_map_expr),
+                    .e1 = alloc_expr(var_expr),
+                    .e2 = alloc_expr(new_type_map_expr),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = false,
                 },
@@ -419,7 +420,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
                 .type_map = {
                     .arg_id = var.id,
                     .arg_type = var.type,
-                    .expr = alloc_expr(ctx, emap_e2),
+                    .expr = alloc_expr(emap_e2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
                     .is_implicit = false,
                 }
@@ -432,8 +433,8 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
             *constraint = (struct dy_constraint){
                 .tag = DY_CONSTRAINT_MULTIPLE,
                 .multiple = {
-                    .c1 = alloc_constraint(ctx, c1),
-                    .c2 = alloc_constraint(ctx, c2),
+                    .c1 = alloc_constraint(c1),
+                    .c2 = alloc_constraint(c2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
                 }
             };
@@ -482,16 +483,16 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
             }
         };
 
-        struct dy_core_expr transformed_arg_expr = substitute(ctx, var.id, supertype_arg_expr, var_expr);
-        struct dy_core_expr new_type_map_expr = substitute(ctx, type_map.arg_id, transformed_arg_expr, *type_map.expr);
+        struct dy_core_expr transformed_arg_expr = substitute(var.id, supertype_arg_expr, var_expr);
+        struct dy_core_expr new_type_map_expr = substitute(type_map.arg_id, transformed_arg_expr, *type_map.expr);
 
         struct dy_core_expr type_map_expr_expr = {
             .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
             .expr_map_elim = {
-                .expr = alloc_expr(ctx, subtype_expr),
+                .expr = alloc_expr(subtype_expr),
                 .expr_map = {
-                    .e1 = alloc_expr(ctx, var_expr),
-                    .e2 = alloc_expr(ctx, new_type_map_expr),
+                    .e1 = alloc_expr(var_expr),
+                    .e2 = alloc_expr(new_type_map_expr),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = false,
                 },
@@ -512,7 +513,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
                 .type_map = {
                     .arg_id = var.id,
                     .arg_type = var.type,
-                    .expr = alloc_expr(ctx, type_map_expr_expr),
+                    .expr = alloc_expr(type_map_expr_expr),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
                     .is_implicit = false,
                 }
@@ -525,8 +526,8 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
             *constraint = (struct dy_constraint){
                 .tag = DY_CONSTRAINT_MULTIPLE,
                 .multiple = {
-                    .c1 = alloc_constraint(ctx, c1),
-                    .c2 = alloc_constraint(ctx, c2),
+                    .c1 = alloc_constraint(c1),
+                    .c2 = alloc_constraint(c2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
                 }
             };
@@ -561,10 +562,10 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
         struct dy_core_expr e = {
             .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
             .expr_map_elim = {
-                .expr = alloc_expr(ctx, subtype_expr),
+                .expr = alloc_expr(subtype_expr),
                 .expr_map = {
-                    .e1 = alloc_expr(ctx, unknown),
-                    .e2 = alloc_expr(ctx, substitute(ctx, type_map.arg_id, unknown, *type_map.expr)),
+                    .e1 = alloc_expr(unknown),
+                    .e2 = alloc_expr(substitute(type_map.arg_id, unknown, *type_map.expr)),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = true,
                 },
@@ -588,13 +589,13 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
                 .end_polarity = DY_CORE_POLARITY_POSITIVE
             };
 
-            *new_subtype_expr = substitute(ctx, id, all, did_transform_e ? new_e : e);
+            *new_subtype_expr = substitute(id, all, did_transform_e ? new_e : e);
             *did_transform_subtype_expr = true;
 
             return result;
         }
 
-        dy_array_t *ids = dy_array_create(ctx.allocator, sizeof(size_t), 4);
+        dy_array_t *ids = dy_array_create(sizeof(size_t), 4);
         dy_binding_contraints(ctx, id, c, have_c, ids);
 
         if (dy_array_size(ids) != 0) {
@@ -619,21 +620,21 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
 
         dy_array_destroy(ids);
 
-        struct dy_constraint_range solution = dy_constraint_collect(ctx, c, id);
+        struct dy_constraint_range solution = dy_constraint_collect(c, id);
 
         // We ignore the new_e above when re-subtype-checking.
         // Don't know for sure if that's kosher, but there are situations where
         // re-subtype_checking on the new_e doesn't work.
 
         if (solution.have_supertype) {
-            e = substitute(ctx, id, solution.supertype, e);
+            e = substitute(id, solution.supertype, e);
         } else {
             struct dy_core_expr all = {
                 .tag = DY_CORE_EXPR_END,
                 .end_polarity = DY_CORE_POLARITY_POSITIVE
             };
 
-            e = substitute(ctx, id, all, e);
+            e = substitute(id, all, e);
         }
 
         have_c = false;
@@ -687,16 +688,16 @@ dy_ternary_t negative_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
             }
         };
 
-        struct dy_core_expr transformed_arg_expr = substitute(ctx, var.id, supertype_arg_expr, var_expr);
-        struct dy_core_expr new_type_map_expr = substitute(ctx, type_map.arg_id, transformed_arg_expr, *type_map.expr);
+        struct dy_core_expr transformed_arg_expr = substitute(var.id, supertype_arg_expr, var_expr);
+        struct dy_core_expr new_type_map_expr = substitute(type_map.arg_id, transformed_arg_expr, *type_map.expr);
 
         struct dy_core_expr type_map_expr_expr = {
             .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
             .expr_map_elim = {
-                .expr = alloc_expr(ctx, subtype_expr),
+                .expr = alloc_expr(subtype_expr),
                 .expr_map = {
-                    .e1 = alloc_expr(ctx, var_expr),
-                    .e2 = alloc_expr(ctx, new_type_map_expr),
+                    .e1 = alloc_expr(var_expr),
+                    .e2 = alloc_expr(new_type_map_expr),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = false,
                 },
@@ -717,7 +718,7 @@ dy_ternary_t negative_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
                 .type_map = {
                     .arg_id = var.id,
                     .arg_type = var.type,
-                    .expr = alloc_expr(ctx, type_map_expr_expr),
+                    .expr = alloc_expr(type_map_expr_expr),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = false,
                 }
@@ -730,8 +731,8 @@ dy_ternary_t negative_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
             *constraint = (struct dy_constraint){
                 .tag = DY_CONSTRAINT_MULTIPLE,
                 .multiple = {
-                    .c1 = alloc_constraint(ctx, c1),
-                    .c2 = alloc_constraint(ctx, c2),
+                    .c1 = alloc_constraint(c1),
+                    .c2 = alloc_constraint(c2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
                 }
             };
@@ -796,8 +797,8 @@ dy_ternary_t positive_both_is_subtype(struct dy_check_ctx ctx, struct dy_core_bo
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
@@ -808,8 +809,8 @@ dy_ternary_t positive_both_is_subtype(struct dy_check_ctx ctx, struct dy_core_bo
         *new_subtype_expr = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .e1 = alloc_expr(ctx, e1),
-                .e2 = alloc_expr(ctx, e2),
+                .e1 = alloc_expr(e1),
+                .e2 = alloc_expr(e2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -862,8 +863,8 @@ dy_ternary_t negative_both_is_subtype(struct dy_check_ctx ctx, struct dy_core_bo
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
@@ -874,8 +875,8 @@ dy_ternary_t negative_both_is_subtype(struct dy_check_ctx ctx, struct dy_core_bo
         *new_subtype_expr = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_ONE_OF,
             .one_of = {
-                .first = alloc_expr(ctx, e1),
-                .second = alloc_expr(ctx, e2),
+                .first = alloc_expr(e1),
+                .second = alloc_expr(e2),
             }
         };
 
@@ -917,8 +918,8 @@ dy_ternary_t is_subtype_of_positive_both(struct dy_check_ctx ctx, struct dy_core
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -935,8 +936,8 @@ dy_ternary_t is_subtype_of_positive_both(struct dy_check_ctx ctx, struct dy_core
         *new_subtype_expr = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .e1 = alloc_expr(ctx, e1),
-                .e2 = alloc_expr(ctx, e2),
+                .e1 = alloc_expr(e1),
+                .e2 = alloc_expr(e2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -993,8 +994,8 @@ dy_ternary_t is_subtype_of_negative_both(struct dy_check_ctx ctx, struct dy_core
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
@@ -1005,8 +1006,8 @@ dy_ternary_t is_subtype_of_negative_both(struct dy_check_ctx ctx, struct dy_core
         *new_subtype_expr = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .e1 = alloc_expr(ctx, e1),
-                .e2 = alloc_expr(ctx, e2),
+                .e1 = alloc_expr(e1),
+                .e2 = alloc_expr(e2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -1045,8 +1046,8 @@ dy_ternary_t both_is_subtype_of_both(struct dy_check_ctx ctx, struct dy_core_bot
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -1063,8 +1064,8 @@ dy_ternary_t both_is_subtype_of_both(struct dy_check_ctx ctx, struct dy_core_bot
         *new_subtype_expr = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .e1 = alloc_expr(ctx, e1),
-                .e2 = alloc_expr(ctx, e2),
+                .e1 = alloc_expr(e1),
+                .e2 = alloc_expr(e2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -1079,12 +1080,12 @@ dy_ternary_t both_is_subtype_of_both(struct dy_check_ctx ctx, struct dy_core_bot
     return DY_YES;
 }
 
-struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_expr expr)
+struct dy_core_expr *alloc_expr(struct dy_core_expr expr)
 {
-    return dy_alloc(&expr, sizeof expr, ctx.allocator);
+    return dy_alloc_and_copy(&expr, sizeof expr);
 }
 
-struct dy_constraint *alloc_constraint(struct dy_check_ctx ctx, struct dy_constraint constraint)
+struct dy_constraint *alloc_constraint(struct dy_constraint constraint)
 {
-    return dy_alloc(&constraint, sizeof constraint, ctx.allocator);
+    return dy_alloc_and_copy(&constraint, sizeof constraint);
 }

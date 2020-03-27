@@ -7,7 +7,7 @@
 #ifndef DY_CONSTRAINT_H
 #define DY_CONSTRAINT_H
 
-#include <duality/core/check.h>
+#include <duality/core/core.h>
 
 struct dy_constraint_range {
     struct dy_core_expr subtype;
@@ -41,6 +41,6 @@ struct dy_constraint {
     enum dy_constraint_tag tag;
 };
 
-DY_CORE_API struct dy_constraint_range dy_constraint_collect(struct dy_check_ctx ctx, struct dy_constraint constraint, size_t id);
+DY_CORE_API struct dy_constraint_range dy_constraint_collect(struct dy_constraint constraint, size_t id);
 
 #endif // DY_CONSTRAINT_H

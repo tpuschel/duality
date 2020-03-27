@@ -6,43 +6,34 @@
 
 #include <duality/support/allocator.h>
 
+#include <duality/support/assert.h>
+
 #include <stdlib.h>
+#include <string.h>
 
-static void *malloc_(size_t size, void *env);
-static void *realloc_(void *ptr, size_t size, void *env);
-static void free_(void *ptr, size_t size, void *env);
 
-struct dy_allocator dy_allocator_stdlib()
+void *dy_malloc(size_t size)
 {
-    struct dy_allocator allocator = {
-        .alloc = malloc_,
-        .realloc = realloc_,
-        .free = free_,
-        .env = NULL
-    };
-
-    return allocator;
+    void *p = malloc(size);
+    dy_assert(p);
+    return p;
 }
 
-
-void *malloc_(size_t size, void *env)
+void *dy_realloc(void *ptr, size_t size)
 {
-    (void)env;
-
-    return malloc(size);
+    void *p = realloc(ptr, size);
+    dy_assert(p);
+    return p;
 }
 
-void *realloc_(void *ptr, size_t size, void *env)
+void dy_free(void *ptr)
 {
-    (void)env;
-
-    return realloc(ptr, size);
-}
-
-void free_(void *ptr, size_t size, void *env)
-{
-    (void)env;
-    (void)size;
-
     free(ptr);
+}
+
+void *dy_alloc_and_copy(const void *ptr, size_t size)
+{
+    void *p = dy_malloc(size);
+    memcpy(p, ptr, size);
+    return p;
 }

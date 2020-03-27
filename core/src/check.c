@@ -8,24 +8,24 @@
 
 #include <duality/core/is_subtype.h>
 #include <duality/core/type_of.h>
-#include <duality/core/constraint.h>
 
 #include <duality/support/array.h>
 #include <duality/support/assert.h>
+#include <duality/support/allocator.h>
 
 #include "substitute.h"
 
 #include <stdio.h>
 
-static struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_expr expr);
-static struct dy_constraint *alloc_constraint(struct dy_check_ctx ctx, struct dy_constraint constraint);
+static struct dy_core_expr *alloc_expr(struct dy_core_expr expr);
+static struct dy_constraint *alloc_constraint(struct dy_constraint constraint);
 
 static bool is_bound(size_t id, struct dy_core_expr expr);
 
 static bool resolve_implicit(struct dy_check_ctx ctx, size_t id, struct dy_core_expr type, enum dy_core_polarity polarity, struct dy_constraint constraint, bool have_constraint, struct dy_constraint *new_constraint, bool *have_new_constraint, struct dy_core_expr expr, struct dy_core_expr *new_expr);
 static void remove_id(dy_array_t *ids, size_t id);
 
-static void print_core_expr(struct dy_core_expr expr, struct dy_allocator allocator);
+static void print_core_expr(struct dy_core_expr expr);
 static void print_constraint(struct dy_constraint c);
 
 static bool is_mentioned_in_constraints(struct dy_check_ctx ctx, size_t id, struct dy_constraint constraint);
@@ -103,13 +103,13 @@ bool dy_check_expr_map(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map
     struct dy_constraint c1;
     bool have_c1 = false;
     bool first_succeeded = dy_check_expr(ctx, *expr_map.e1, &e1, &c1, &have_c1);
-    expr_map.e1 = alloc_expr(ctx, e1);
+    expr_map.e1 = alloc_expr(e1);
 
     struct dy_core_expr e2;
     struct dy_constraint c2;
     bool have_c2 = false;
     bool second_succeeded = dy_check_expr(ctx, *expr_map.e2, &e2, &c2, &have_c2);
-    expr_map.e2 = alloc_expr(ctx, e2);
+    expr_map.e2 = alloc_expr(e2);
 
     if (!first_succeeded || !second_succeeded) {
         return false;
@@ -119,8 +119,8 @@ bool dy_check_expr_map(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -151,12 +151,12 @@ bool dy_check_type_map(struct dy_check_ctx ctx, struct dy_core_type_map type_map
             .tag = DY_CORE_EXPR_UNKNOWN,
             .unknown = {
                 .id = type_map.arg_id,
-                .type = alloc_expr(ctx, type),
+                .type = alloc_expr(type),
                 .is_inference_var = false,
             },
         };
 
-        expr = substitute(ctx, type_map.arg_id, new_unknown, *type_map.expr);
+        expr = substitute(type_map.arg_id, new_unknown, *type_map.expr);
     } else {
         expr = *type_map.expr;
     }
@@ -181,8 +181,8 @@ bool dy_check_type_map(struct dy_check_ctx ctx, struct dy_core_type_map type_map
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -197,8 +197,8 @@ bool dy_check_type_map(struct dy_check_ctx ctx, struct dy_core_type_map type_map
 
     *new_type_map = (struct dy_core_type_map){
         .arg_id = type_map.arg_id,
-        .arg_type = alloc_expr(ctx, type),
-        .expr = alloc_expr(ctx, expr),
+        .arg_type = alloc_expr(type),
+        .expr = alloc_expr(expr),
         .polarity = type_map.polarity,
         .is_implicit = type_map.is_implicit
     };
@@ -239,8 +239,8 @@ bool dy_check_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_map_eli
         struct dy_constraint c = {
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -248,8 +248,8 @@ bool dy_check_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_map_eli
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c),
-                .c2 = alloc_constraint(ctx, c3),
+                .c1 = alloc_constraint(c),
+                .c2 = alloc_constraint(c3),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -259,8 +259,8 @@ bool dy_check_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_map_eli
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -269,8 +269,8 @@ bool dy_check_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_map_eli
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c2),
-                .c2 = alloc_constraint(ctx, c3),
+                .c1 = alloc_constraint(c2),
+                .c2 = alloc_constraint(c3),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -279,8 +279,8 @@ bool dy_check_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_map_eli
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c3),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c3),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -297,7 +297,7 @@ bool dy_check_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_map_eli
     }
 
     *new_elim = (struct dy_core_expr_map_elim){
-        .expr = alloc_expr(ctx, expr),
+        .expr = alloc_expr(expr),
         .expr_map = expr_map
     };
 
@@ -333,8 +333,8 @@ bool dy_check_type_map_elim(struct dy_check_ctx ctx, struct dy_core_type_map_eli
         struct dy_constraint c = {
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -342,8 +342,8 @@ bool dy_check_type_map_elim(struct dy_check_ctx ctx, struct dy_core_type_map_eli
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c),
-                .c2 = alloc_constraint(ctx, c3),
+                .c1 = alloc_constraint(c),
+                .c2 = alloc_constraint(c3),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -353,8 +353,8 @@ bool dy_check_type_map_elim(struct dy_check_ctx ctx, struct dy_core_type_map_eli
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -363,8 +363,8 @@ bool dy_check_type_map_elim(struct dy_check_ctx ctx, struct dy_core_type_map_eli
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c2),
-                .c2 = alloc_constraint(ctx, c3),
+                .c1 = alloc_constraint(c2),
+                .c2 = alloc_constraint(c3),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -373,8 +373,8 @@ bool dy_check_type_map_elim(struct dy_check_ctx ctx, struct dy_core_type_map_eli
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c3),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c3),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -391,7 +391,7 @@ bool dy_check_type_map_elim(struct dy_check_ctx ctx, struct dy_core_type_map_eli
     }
 
     *new_elim = (struct dy_core_type_map_elim){
-        .expr = alloc_expr(ctx, expr),
+        .expr = alloc_expr(expr),
         .type_map = type_map
     };
 
@@ -404,13 +404,13 @@ bool dy_check_both(struct dy_check_ctx ctx, struct dy_core_both both, struct dy_
     struct dy_constraint c1;
     bool have_c1 = false;
     bool first_succeeded = dy_check_expr(ctx, *both.e1, &e1, &c1, &have_c1);
-    both.e1 = alloc_expr(ctx, e1);
+    both.e1 = alloc_expr(e1);
 
     struct dy_core_expr e2;
     struct dy_constraint c2;
     bool have_c2 = false;
     bool second_succeeded = dy_check_expr(ctx, *both.e2, &e2, &c2, &have_c2);
-    both.e2 = alloc_expr(ctx, e2);
+    both.e2 = alloc_expr(e2);
 
     if (!first_succeeded || !second_succeeded) {
         return false;
@@ -420,8 +420,8 @@ bool dy_check_both(struct dy_check_ctx ctx, struct dy_core_both both, struct dy_
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -460,8 +460,8 @@ bool dy_check_one_of(struct dy_check_ctx ctx, struct dy_core_one_of one_of, stru
             *constraint = (struct dy_constraint){
                 .tag = DY_CONSTRAINT_MULTIPLE,
                 .multiple = {
-                    .c1 = alloc_constraint(ctx, c1),
-                    .c2 = alloc_constraint(ctx, c2),
+                    .c1 = alloc_constraint(c1),
+                    .c2 = alloc_constraint(c2),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                 }
             };
@@ -471,8 +471,8 @@ bool dy_check_one_of(struct dy_check_ctx ctx, struct dy_core_one_of one_of, stru
         *new_expr = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_ONE_OF,
             .one_of = {
-                .first = alloc_expr(ctx, first),
-                .second = alloc_expr(ctx, second),
+                .first = alloc_expr(first),
+                .second = alloc_expr(second),
             }
         };
 
@@ -509,12 +509,12 @@ bool dy_check_inference_ctx(struct dy_check_ctx ctx, struct dy_core_inference_ct
             .tag = DY_CORE_EXPR_UNKNOWN,
             .unknown = {
                 .id = inference_ctx.id,
-                .type = alloc_expr(ctx, type),
+                .type = alloc_expr(type),
                 .is_inference_var = true,
             },
         };
 
-        expr = substitute(ctx, inference_ctx.id, new_unknown, *inference_ctx.expr);
+        expr = substitute(inference_ctx.id, new_unknown, *inference_ctx.expr);
     } else {
         expr = *inference_ctx.expr;
     }
@@ -527,7 +527,7 @@ bool dy_check_inference_ctx(struct dy_check_ctx ctx, struct dy_core_inference_ct
         return false;
     }
 
-    dy_array_t *ids = dy_array_create(ctx.allocator, sizeof(size_t), 4);
+    dy_array_t *ids = dy_array_create(sizeof(size_t), 4);
     dy_binding_contraints(ctx, inference_ctx.id, c2, have_c2, ids);
 
     if (dy_array_size(ids) == 0) {
@@ -553,8 +553,8 @@ bool dy_check_inference_ctx(struct dy_check_ctx ctx, struct dy_core_inference_ct
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_MULTIPLE,
             .multiple = {
-                .c1 = alloc_constraint(ctx, c1),
-                .c2 = alloc_constraint(ctx, c2),
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -690,33 +690,33 @@ void dy_binding_contraints(struct dy_check_ctx ctx, size_t id, struct dy_constra
 bool resolve_implicit(struct dy_check_ctx ctx, size_t id, struct dy_core_expr type, enum dy_core_polarity polarity, struct dy_constraint constraint, bool have_constraint, struct dy_constraint *new_constraint, bool *have_new_constraint, struct dy_core_expr expr, struct dy_core_expr *new_expr)
 {
     if (have_constraint) {
-        struct dy_constraint_range solution = dy_constraint_collect(ctx, constraint, id);
+        struct dy_constraint_range solution = dy_constraint_collect(constraint, id);
 
         switch (polarity) {
         case DY_CORE_POLARITY_POSITIVE:
             if (solution.have_supertype) {
                 dy_assert(!is_bound(id, solution.supertype));
 
-                expr = substitute(ctx, id, solution.supertype, expr);
+                expr = substitute(id, solution.supertype, expr);
             } else {
                 struct dy_core_expr new_unknown = {
                     .tag = DY_CORE_EXPR_UNKNOWN,
                     .unknown = {
                         .id = id,
-                        .type = alloc_expr(ctx, type),
+                        .type = alloc_expr(type),
                         .is_inference_var = false,
                     }
                 };
 
-                expr = substitute(ctx, id, new_unknown, expr);
+                expr = substitute(id, new_unknown, expr);
 
                 expr = (struct dy_core_expr){
                     .tag = DY_CORE_EXPR_TYPE_MAP,
                     .type_map = {
                         .arg_id = id,
-                        .arg_type = alloc_expr(ctx, type),
+                        .arg_type = alloc_expr(type),
                         .polarity = DY_CORE_POLARITY_POSITIVE,
-                        .expr = alloc_expr(ctx, expr),
+                        .expr = alloc_expr(expr),
                         .is_implicit = true,
                     }
                 };
@@ -726,26 +726,26 @@ bool resolve_implicit(struct dy_check_ctx ctx, size_t id, struct dy_core_expr ty
             if (solution.have_subtype) {
                 dy_assert(!is_bound(id, solution.subtype));
 
-                expr = substitute(ctx, id, solution.subtype, expr);
+                expr = substitute(id, solution.subtype, expr);
             } else {
                 struct dy_core_expr new_unknown = {
                     .tag = DY_CORE_EXPR_UNKNOWN,
                     .unknown = {
                         .id = id,
-                        .type = alloc_expr(ctx, type),
+                        .type = alloc_expr(type),
                         .is_inference_var = false,
                     }
                 };
 
-                expr = substitute(ctx, id, new_unknown, expr);
+                expr = substitute(id, new_unknown, expr);
 
                 expr = (struct dy_core_expr){
                     .tag = DY_CORE_EXPR_TYPE_MAP,
                     .type_map = {
                         .arg_id = id,
-                        .arg_type = alloc_expr(ctx, type),
+                        .arg_type = alloc_expr(type),
                         .polarity = DY_CORE_POLARITY_POSITIVE,
-                        .expr = alloc_expr(ctx, expr),
+                        .expr = alloc_expr(expr),
                         .is_implicit = true,
                     }
                 };
@@ -762,20 +762,20 @@ bool resolve_implicit(struct dy_check_ctx ctx, size_t id, struct dy_core_expr ty
             .tag = DY_CORE_EXPR_UNKNOWN,
             .unknown = {
                 .id = id,
-                .type = alloc_expr(ctx, type),
+                .type = alloc_expr(type),
                 .is_inference_var = false,
             }
         };
 
-        expr = substitute(ctx, id, new_unknown, expr);
+        expr = substitute(id, new_unknown, expr);
 
         expr = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_TYPE_MAP,
             .type_map = {
                 .arg_id = id,
-                .arg_type = alloc_expr(ctx, type),
+                .arg_type = alloc_expr(type),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
-                .expr = alloc_expr(ctx, expr),
+                .expr = alloc_expr(expr),
                 .is_implicit = true,
             }
         };
@@ -845,19 +845,19 @@ bool is_mentioned_in_constraints(struct dy_check_ctx ctx, size_t id, struct dy_c
     }
 }
 
-struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_expr expr)
+struct dy_core_expr *alloc_expr(struct dy_core_expr expr)
 {
-    return dy_alloc(&expr, sizeof expr, ctx.allocator);
+    return dy_alloc_and_copy(&expr, sizeof expr);
 }
 
-struct dy_constraint *alloc_constraint(struct dy_check_ctx ctx, struct dy_constraint constraint)
+struct dy_constraint *alloc_constraint(struct dy_constraint constraint)
 {
-    return dy_alloc(&constraint, sizeof constraint, ctx.allocator);
+    return dy_alloc_and_copy(&constraint, sizeof constraint);
 }
 
-void print_core_expr(struct dy_core_expr expr, struct dy_allocator allocator)
+void print_core_expr(struct dy_core_expr expr)
 {
-    dy_array_t *s = dy_array_create(allocator, 1, 64);
+    dy_array_t *s = dy_array_create(1, 64);
     dy_core_expr_to_string(expr, s);
 
     for (size_t i = 0; i < dy_array_size(s); ++i) {
@@ -874,13 +874,13 @@ void print_constraint(struct dy_constraint c)
     switch (c.tag) {
     case DY_CONSTRAINT_SINGLE:
         if (c.single.range.have_subtype) {
-            print_core_expr(c.single.range.subtype, dy_allocator_stdlib());
+            print_core_expr(c.single.range.subtype);
             fprintf(stderr, " <: ");
         }
         fprintf(stderr, "%zu", c.single.id);
         if (c.single.range.have_supertype) {
             fprintf(stderr, " <: ");
-            print_core_expr(c.single.range.supertype, dy_allocator_stdlib());
+            print_core_expr(c.single.range.supertype);
         }
         break;
     case DY_CONSTRAINT_MULTIPLE:

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
@@ -8,24 +8,15 @@
 #define DY_ALLOCATOR_H
 
 #include <stddef.h>
-#include <string.h>
 
 #include <duality/support/api.h>
 
-struct dy_allocator {
-    void *(*alloc)(size_t size, void *env);
-    void *(*realloc)(void *ptr, size_t size, void *env);
-    void (*free)(void *ptr, size_t size, void *env);
-    void *env;
-};
+DY_SUPPORT_API void *dy_malloc(size_t size);
 
-DY_SUPPORT_API struct dy_allocator dy_allocator_stdlib(void);
+DY_SUPPORT_API void *dy_realloc(void *ptr, size_t size);
 
-static inline void *dy_alloc(const void *ptr, size_t size, struct dy_allocator allocator)
-{
-    void *p = allocator.alloc(size, allocator.env);
-    memcpy(p, ptr, size);
-    return p;
-}
+DY_SUPPORT_API void dy_free(void *ptr);
+
+DY_SUPPORT_API void *dy_alloc_and_copy(const void *ptr, size_t size);
 
 #endif // DY_ALLOCATOR_H

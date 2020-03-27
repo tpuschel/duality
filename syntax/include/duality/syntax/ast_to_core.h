@@ -8,9 +8,12 @@
 #define DY_AST_TO_CORE_H
 
 #include <duality/syntax/ast.h>
-#include <duality/core/core.h>
-#include <duality/support/array.h>
 #include <duality/syntax/parser.h>
+
+#include <duality/core/core.h>
+
+#include <duality/support/array.h>
+
 
 struct dy_ast_to_core_bound_var {
     dy_string_t name;
@@ -20,7 +23,6 @@ struct dy_ast_to_core_bound_var {
 
 struct dy_ast_to_core_ctx {
     size_t *running_id;
-    struct dy_allocator allocator;
     dy_array_t *bound_vars;
     dy_array_t *unbound_vars;
 };

@@ -8,6 +8,7 @@
 
 #include <duality/support/assert.h>
 #include <duality/support/overflow.h>
+#include <duality/support/allocator.h>
 
 #include <string.h>
 
@@ -16,33 +17,24 @@ struct dy_array {
     size_t elem_size;
     size_t num_elems;
     size_t capacity;
-    struct dy_allocator instance_allocator;
-    struct dy_allocator space_allocator;
 };
 
 static void *pos(const dy_array_t *array, size_t i);
 static void *last(const dy_array_t *array);
 
-dy_array_t *dy_array_create(struct dy_allocator allocator, size_t elem_size, size_t capacity)
-{
-    return dy_array_create_with_seperate_allocators(allocator, allocator, elem_size, capacity);
-}
-
-dy_array_t *dy_array_create_with_seperate_allocators(struct dy_allocator instance_allocator, struct dy_allocator space_allocator, size_t elem_size, size_t capacity)
+dy_array_t *dy_array_create(size_t elem_size, size_t capacity)
 {
     size_t capacity_in_bytes;
     dy_assert(!dy_size_t_mul_overflow(elem_size, capacity, &capacity_in_bytes));
 
     dy_array_t array = {
-        .buffer = space_allocator.alloc(capacity_in_bytes, space_allocator.env),
+        .buffer = dy_malloc(capacity_in_bytes),
         .elem_size = elem_size,
         .num_elems = 0,
-        .capacity = capacity,
-        .instance_allocator = instance_allocator,
-        .space_allocator = space_allocator,
+        .capacity = capacity
     };
 
-    return dy_alloc(&array, sizeof array, instance_allocator);
+    return dy_alloc_and_copy(&array, sizeof array);
 }
 
 size_t dy_array_add(dy_array_t *array, const void *value)
@@ -79,7 +71,7 @@ void dy_array_insert_keep_order(dy_array_t *array, size_t index, const void *val
         size_t capacity_in_bytes;
         dy_assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
 
-        array->buffer = array->space_allocator.realloc(array->buffer, capacity_in_bytes, array->space_allocator.env);
+        array->buffer = dy_realloc(array->buffer, capacity_in_bytes);
     }
 
     memmove(pos(array, index + 1), pos(array, index), array->elem_size * (array->num_elems - index));
@@ -117,7 +109,7 @@ void dy_array_set_excess_capacity(dy_array_t *array, size_t excess_capacity)
     size_t capacity_in_bytes;
     dy_assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
 
-    array->buffer = array->space_allocator.realloc(array->buffer, capacity_in_bytes, array->space_allocator.env);
+    array->buffer = dy_realloc(array->buffer, capacity_in_bytes);
 }
 
 void dy_array_add_to_size(dy_array_t *array, size_t added_size)
@@ -150,16 +142,6 @@ void dy_array_set_size(dy_array_t *array, size_t size)
     array->num_elems = size;
 }
 
-struct dy_allocator dy_array_instance_allocator(dy_array_t *array)
-{
-    return array->instance_allocator;
-}
-
-struct dy_allocator dy_array_space_allocator(dy_array_t *array)
-{
-    return array->space_allocator;
-}
-
 size_t dy_array_pop(dy_array_t *array, void *value)
 {
     memcpy(value, last(array), array->elem_size);
@@ -180,15 +162,12 @@ void *last(const dy_array_t *array)
 
 void dy_array_destroy_instance(dy_array_t *array)
 {
-    array->instance_allocator.free(array, sizeof *array, array->instance_allocator.env);
+    dy_free(array);
 }
 
 void dy_array_destroy(dy_array_t *array)
 {
-    size_t capacity_in_bytes;
-    dy_assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
-
-    array->space_allocator.free(array->buffer, capacity_in_bytes, array->space_allocator.env);
+    dy_free(array->buffer);
 
     dy_array_destroy_instance(array);
 }

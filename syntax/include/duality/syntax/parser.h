@@ -10,7 +10,6 @@
 #include <duality/syntax/api.h>
 #include <duality/syntax/ast.h>
 
-#include <duality/support/allocator.h>
 #include <duality/support/string.h>
 #include <duality/support/array.h>
 #include <duality/support/range.h>
@@ -18,7 +17,6 @@
 
 struct dy_parser_ctx {
     struct dy_stream stream;
-    struct dy_allocator allocator;
     dy_array_t *arrays;
 };
 

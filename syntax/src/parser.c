@@ -7,6 +7,7 @@
 #include <duality/syntax/parser.h>
 
 #include <duality/support/assert.h>
+#include <duality/support/allocator.h>
 
 enum infix_op {
     INFIX_OP_STRAIGHT_ARROW,
@@ -37,13 +38,13 @@ static bool parse_expr_further3(struct dy_parser_ctx *ctx, struct dy_ast_expr le
 
 static bool parse_expr_further4(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op left_op, struct dy_ast_expr right, enum infix_op right_op, struct dy_ast_expr *expr);
 
-static struct dy_ast_expr combine_infix(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right);
+static struct dy_ast_expr combine_infix(struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right);
 
 static bool parse_expr_parenthesized(struct dy_parser_ctx *ctx, struct dy_ast_expr *expr);
 
 static bool parse_arg(struct dy_parser_ctx *ctx, struct dy_ast_arg *arg);
 
-static struct dy_ast_expr *alloc_expr(struct dy_parser_ctx *ctx, struct dy_ast_expr expr);
+static struct dy_ast_expr *alloc_expr(struct dy_ast_expr expr);
 
 static void skip_whitespace_except_newline(struct dy_parser_ctx *ctx);
 
@@ -113,7 +114,7 @@ bool dy_parse_variable(struct dy_parser_ctx *ctx, dy_string_t *var)
 {
     size_t start_index = ctx->stream.current_index;
 
-    dy_array_t *var_name = dy_array_create(ctx->allocator, sizeof(char), 8);
+    dy_array_t *var_name = dy_array_create(sizeof(char), 8);
     dy_array_add(ctx->arrays, &var_name);
 
     char c;
@@ -388,7 +389,7 @@ bool dy_parse_string(struct dy_parser_ctx *ctx, dy_string_t *string)
         return false;
     }
 
-    dy_array_t *string_storage = dy_array_create(ctx->allocator, sizeof(char), 8);
+    dy_array_t *string_storage = dy_array_create(sizeof(char), 8);
     dy_array_add(ctx->arrays, &string_storage);
 
     for (;;) {
@@ -555,7 +556,7 @@ bool parse_elimination(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struc
             },
             .tag = DY_AST_EXPR_EXPR_MAP_ELIM,
             .expr_map_elim = {
-                .expr = alloc_expr(ctx, left),
+                .expr = alloc_expr(left),
                 .expr_map = map.negative_expr_map,
             }
         };
@@ -571,7 +572,7 @@ bool parse_elimination(struct dy_parser_ctx *ctx, struct dy_ast_expr left, struc
             },
             .tag = DY_AST_EXPR_TYPE_MAP_ELIM,
             .type_map_elim = {
-                .expr = alloc_expr(ctx, left),
+                .expr = alloc_expr(left),
                 .type_map = map.negative_type_map,
             }
         };
@@ -626,7 +627,7 @@ bool parse_expr_further3(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enu
         return true;
     }
 
-    *expr = combine_infix(ctx, left, op, right);
+    *expr = combine_infix(left, op, right);
     return true;
 }
 
@@ -715,7 +716,7 @@ bool parse_implicit_negative_expr_map_further(struct dy_parser_ctx *ctx, struct 
 bool parse_expr_further4(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op left_op, struct dy_ast_expr right, enum infix_op right_op, struct dy_ast_expr *expr)
 {
     if (left_op_is_first(left_op, right_op)) {
-        struct dy_ast_expr new_left = combine_infix(ctx, left, left_op, right);
+        struct dy_ast_expr new_left = combine_infix(left, left_op, right);
 
         return parse_expr_further2(ctx, new_left, right_op, expr);
     } else {
@@ -724,7 +725,7 @@ bool parse_expr_further4(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enu
             return false;
         }
 
-        *expr = combine_infix(ctx, left, left_op, new_right);
+        *expr = combine_infix(left, left_op, new_right);
 
         return true;
     }
@@ -741,7 +742,7 @@ bool parse_bare_list(struct dy_parser_ctx *ctx, struct dy_ast_list *list)
 
     skip_whitespace(ctx);
 
-    dy_array_t *exprs = dy_array_create(ctx->allocator, sizeof(struct dy_ast_expr), 4);
+    dy_array_t *exprs = dy_array_create(sizeof(struct dy_ast_expr), 4);
 
     for (;;) {
         struct dy_ast_expr expr;
@@ -936,7 +937,7 @@ bool parse_do_block_body(struct dy_parser_ctx *ctx, struct dy_ast_do_block *do_b
     if (dy_parse_expr(ctx, &end_expr)) {
         *do_block = (struct dy_ast_do_block){
             .tag = DY_AST_DO_BLOCK_END_EXPR,
-            .end_expr = alloc_expr(ctx, end_expr)
+            .end_expr = alloc_expr(end_expr)
         };
 
         return true;
@@ -986,9 +987,9 @@ bool parse_do_block_body_equality(struct dy_parser_ctx *ctx, struct dy_ast_do_bl
     }
 
     *equality = (struct dy_ast_do_block_equality){
-        .e1 = alloc_expr(ctx, e1),
-        .e2 = alloc_expr(ctx, e2),
-        .rest = dy_alloc(&rest, sizeof rest, ctx->allocator)
+        .e1 = alloc_expr(e1),
+        .e2 = alloc_expr(e2),
+        .rest = dy_alloc_and_copy(&rest, sizeof rest)
     };
 
     return true;
@@ -1043,8 +1044,8 @@ bool parse_do_block_body_let(struct dy_parser_ctx *ctx, struct dy_ast_do_block_l
 
     *let = (struct dy_ast_do_block_let){
         .arg_name = name,
-        .expr = alloc_expr(ctx, expr),
-        .rest = dy_alloc(&rest, sizeof rest, ctx->allocator)
+        .expr = alloc_expr(expr),
+        .rest = dy_alloc_and_copy(&rest, sizeof rest)
     };
 
     return true;
@@ -1076,8 +1077,8 @@ bool parse_do_block_body_ignored_expr(struct dy_parser_ctx *ctx, struct dy_ast_d
     }
 
     *ignored_expr = (struct dy_ast_do_block_ignored_expr){
-        .expr = alloc_expr(ctx, expr),
-        .rest = dy_alloc(&rest, sizeof rest, ctx->allocator)
+        .expr = alloc_expr(expr),
+        .rest = dy_alloc_and_copy(&rest, sizeof rest)
     };
 
     return true;
@@ -1154,7 +1155,7 @@ bool parse_type_map(struct dy_parser_ctx *ctx, dy_string_t arrow_literal, struct
 
     *type_map = (struct dy_ast_type_map){
         .arg = arg,
-        .expr = alloc_expr(ctx, expr)
+        .expr = alloc_expr(expr)
     };
 
     return true;
@@ -1217,14 +1218,14 @@ bool parse_arg(struct dy_parser_ctx *ctx, struct dy_ast_arg *arg)
     *arg = (struct dy_ast_arg){
         .name = name,
         .has_name = has_name,
-        .type = alloc_expr(ctx, type),
+        .type = alloc_expr(type),
         .has_type = has_type
     };
 
     return true;
 }
 
-struct dy_ast_expr combine_infix(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right)
+struct dy_ast_expr combine_infix(struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr right)
 {
     switch (op) {
     case INFIX_OP_STRAIGHT_ARROW:
@@ -1235,8 +1236,8 @@ struct dy_ast_expr combine_infix(struct dy_parser_ctx *ctx, struct dy_ast_expr l
             },
             .tag = DY_AST_EXPR_POSITIVE_EXPR_MAP,
             .positive_expr_map = {
-                .e1 = alloc_expr(ctx, left),
-                .e2 = alloc_expr(ctx, right),
+                .e1 = alloc_expr(left),
+                .e2 = alloc_expr(right),
                 .is_implicit = false,
             }
         };
@@ -1248,8 +1249,8 @@ struct dy_ast_expr combine_infix(struct dy_parser_ctx *ctx, struct dy_ast_expr l
             },
             .tag = DY_AST_EXPR_NEGATIVE_EXPR_MAP,
             .negative_expr_map = {
-                .e1 = alloc_expr(ctx, left),
-                .e2 = alloc_expr(ctx, right),
+                .e1 = alloc_expr(left),
+                .e2 = alloc_expr(right),
                 .is_implicit = false,
             }
         };
@@ -1261,8 +1262,8 @@ struct dy_ast_expr combine_infix(struct dy_parser_ctx *ctx, struct dy_ast_expr l
             },
             .tag = DY_AST_EXPR_POSITIVE_EXPR_MAP,
             .positive_expr_map = {
-                .e1 = alloc_expr(ctx, left),
-                .e2 = alloc_expr(ctx, right),
+                .e1 = alloc_expr(left),
+                .e2 = alloc_expr(right),
                 .is_implicit = true,
             }
         };
@@ -1274,8 +1275,8 @@ struct dy_ast_expr combine_infix(struct dy_parser_ctx *ctx, struct dy_ast_expr l
             },
             .tag = DY_AST_EXPR_NEGATIVE_EXPR_MAP,
             .negative_expr_map = {
-                .e1 = alloc_expr(ctx, left),
-                .e2 = alloc_expr(ctx, right),
+                .e1 = alloc_expr(left),
+                .e2 = alloc_expr(right),
                 .is_implicit = true,
             }
         };
@@ -1287,8 +1288,8 @@ struct dy_ast_expr combine_infix(struct dy_parser_ctx *ctx, struct dy_ast_expr l
             },
             .tag = DY_AST_EXPR_JUXTAPOSITION,
             .juxtaposition = {
-                .left = alloc_expr(ctx, left),
-                .right = alloc_expr(ctx, right),
+                .left = alloc_expr(left),
+                .right = alloc_expr(right),
             }
         };
     }
@@ -1385,9 +1386,9 @@ void skip_whitespace_except_newline(struct dy_parser_ctx *ctx)
     }
 }
 
-struct dy_ast_expr *alloc_expr(struct dy_parser_ctx *ctx, struct dy_ast_expr expr)
+struct dy_ast_expr *alloc_expr(struct dy_ast_expr expr)
 {
-    return dy_alloc(&expr, sizeof expr, ctx->allocator);
+    return dy_alloc_and_copy(&expr, sizeof expr);
 }
 
 bool parse_one_of(struct dy_parser_ctx *ctx, dy_string_t chars, char *c)

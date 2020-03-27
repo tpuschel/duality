@@ -10,12 +10,14 @@
 
 #include <duality/core/is_subtype.h>
 #include <duality/core/type_of.h>
-#include <duality/support/assert.h>
 #include <duality/core/constraint.h>
+
+#include <duality/support/assert.h>
+#include <duality/support/allocator.h>
 
 #include <stdio.h>
 
-static struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_expr expr);
+static struct dy_core_expr *alloc_expr(struct dy_core_expr expr);
 
 dy_ternary_t dy_eval_expr(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_expr *new_expr)
 {
@@ -63,7 +65,7 @@ dy_ternary_t dy_eval_expr_map(struct dy_check_ctx ctx, struct dy_core_expr_map e
     *new_expr = (struct dy_core_expr){
         .tag = DY_CORE_EXPR_EXPR_MAP,
         .expr_map = {
-            .e1 = alloc_expr(ctx, new_e1),
+            .e1 = alloc_expr(new_e1),
             .e2 = expr_map.e2,
             .polarity = expr_map.polarity,
             .is_implicit = expr_map.is_implicit,
@@ -85,7 +87,7 @@ dy_ternary_t dy_eval_type_map(struct dy_check_ctx ctx, struct dy_core_type_map t
         .tag = DY_CORE_EXPR_TYPE_MAP,
         .type_map = {
             .arg_id = type_map.arg_id,
-            .arg_type = alloc_expr(ctx, new_type),
+            .arg_type = alloc_expr(new_type),
             .expr = type_map.expr,
             .polarity = type_map.polarity,
             .is_implicit = type_map.is_implicit,
@@ -114,10 +116,10 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_
         *new_expr = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
             .expr_map_elim = {
-                .expr = alloc_expr(ctx, left),
+                .expr = alloc_expr(left),
                 .expr_map = {
-                    .e1 = alloc_expr(ctx, right),
-                    .e2 = alloc_expr(ctx, type),
+                    .e1 = alloc_expr(right),
+                    .e2 = alloc_expr(type),
                     .polarity = elim.expr_map.polarity,
                     .is_implicit = elim.expr_map.is_implicit,
                 },
@@ -130,8 +132,8 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_
     struct dy_core_expr expr_map = {
         .tag = DY_CORE_EXPR_EXPR_MAP,
         .expr_map = {
-            .e1 = alloc_expr(ctx, right),
-            .e2 = alloc_expr(ctx, type),
+            .e1 = alloc_expr(right),
+            .e2 = alloc_expr(type),
             .polarity = elim.expr_map.polarity,
             .is_implicit = elim.expr_map.is_implicit,
         }
@@ -153,7 +155,7 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_
         *new_expr = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
             .expr_map_elim = {
-                .expr = alloc_expr(ctx, left),
+                .expr = alloc_expr(left),
                 .expr_map = expr_map.expr_map,
             }
         };
@@ -177,7 +179,7 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_check_ctx ctx, struct dy_core_expr_
     }
 
     if (left.tag == DY_CORE_EXPR_TYPE_MAP) {
-        struct dy_core_expr e = substitute(ctx, left.type_map.arg_id, right, *left.type_map.expr);
+        struct dy_core_expr e = substitute(left.type_map.arg_id, right, *left.type_map.expr);
         struct dy_constraint constraint;
         bool have_constraint = false;
         if (!dy_check_expr(ctx, e, &e, &constraint, &have_constraint)) {
@@ -244,8 +246,8 @@ dy_ternary_t dy_eval_both(struct dy_check_ctx ctx, struct dy_core_both both, str
     *new_expr = (struct dy_core_expr){
         .tag = DY_CORE_EXPR_BOTH,
         .both = {
-            .e1 = alloc_expr(ctx, e1),
-            .e2 = alloc_expr(ctx, e2),
+            .e1 = alloc_expr(e1),
+            .e2 = alloc_expr(e2),
             .polarity = both.polarity,
         }
     };
@@ -270,7 +272,7 @@ dy_ternary_t dy_eval_one_of(struct dy_check_ctx ctx, struct dy_core_one_of one_o
         *new_expr = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_ONE_OF,
             .one_of = {
-                .first = alloc_expr(ctx, first),
+                .first = alloc_expr(first),
                 .second = one_of.second,
             }
         };
@@ -281,7 +283,7 @@ dy_ternary_t dy_eval_one_of(struct dy_check_ctx ctx, struct dy_core_one_of one_o
     return dy_eval_expr(ctx, *one_of.second, new_expr);
 }
 
-struct dy_core_expr *alloc_expr(struct dy_check_ctx ctx, struct dy_core_expr expr)
+struct dy_core_expr *alloc_expr(struct dy_core_expr expr)
 {
-    return dy_alloc(&expr, sizeof expr, ctx.allocator);
+    return dy_alloc_and_copy(&expr, sizeof expr);
 }

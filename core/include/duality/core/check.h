@@ -10,8 +10,8 @@
 #include <duality/core/api.h>
 #include <duality/core/core.h>
 #include <duality/core/ternary.h>
+#include <duality/core/constraint.h>
 
-#include <duality/support/allocator.h>
 #include <duality/support/array.h>
 
 // TODO: Remove the binding_ids stuff and just work with constraints directly.
@@ -23,11 +23,8 @@ struct dy_bound_constraint {
 
 struct dy_check_ctx {
     size_t *running_id;
-    struct dy_allocator allocator;
     dy_array_t *bound_constraints;
 };
-
-struct dy_constraint;
 
 DY_CORE_API bool dy_check_expr(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_expr *new_expr, struct dy_constraint *constraint, bool *did_generate_constraint);
 

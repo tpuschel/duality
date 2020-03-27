@@ -9,14 +9,13 @@
 
 #include <duality/lsp/api.h>
 
-#include <duality/support/allocator.h>
 #include <duality/support/json.h>
 
 typedef struct dy_lsp_ctx dy_lsp_ctx_t;
 
 typedef void (*dy_lsp_send_fn)(dy_json_t message, void *env);
 
-DY_LSP_API dy_lsp_ctx_t *dy_lsp_create(struct dy_allocator allocator, dy_lsp_send_fn send, void *env);
+DY_LSP_API dy_lsp_ctx_t *dy_lsp_create(dy_lsp_send_fn send, void *env);
 
 DY_LSP_API bool dy_lsp_handle_message(dy_lsp_ctx_t *ctx, dy_json_t message);
 
