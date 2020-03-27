@@ -60,7 +60,7 @@ struct dy_core_expr dy_type_of(struct dy_check_ctx ctx, struct dy_core_expr expr
             .type_map = {
                 .arg_id = (*ctx.running_id)++,
                 .arg_type = alloc_expr(ctx, (struct dy_core_expr){ .tag = DY_CORE_EXPR_TYPE_OF_STRINGS }),
-                .expr = alloc_expr(ctx, (struct dy_core_expr){ .tag = DY_CORE_EXPR_END, .end_polarity = DY_CORE_POLARITY_POSITIVE }),
+                .expr = alloc_expr(ctx, (struct dy_core_expr){ .tag = DY_CORE_EXPR_TYPE_OF_STRINGS }),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
                 .is_implicit = false,
             }
