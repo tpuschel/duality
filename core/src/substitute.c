@@ -73,7 +73,9 @@ static struct dy_core_value_map substitute_value_map(struct dy_check_ctx ctx, si
 static struct dy_core_type_map substitute_type_map(struct dy_check_ctx ctx, size_t id, struct dy_core_expr sub, struct dy_core_type_map type_map)
 {
     type_map.arg_type = alloc_expr(ctx, substitute(ctx, id, sub, *type_map.arg_type));
-    type_map.expr = alloc_expr(ctx, substitute(ctx, id, sub, *type_map.expr));
+    if (id != type_map.arg_id) {
+        type_map.expr = alloc_expr(ctx, substitute(ctx, id, sub, *type_map.expr));
+    }
     return type_map;
 }
 
