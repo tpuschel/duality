@@ -558,15 +558,13 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
             }
         };
 
-        struct dy_core_expr new_type = substitute(ctx, type_map.arg_id, unknown, *type_map.expr);
-
         struct dy_core_expr e = {
             .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
             .expr_map_elim = {
                 .expr = alloc_expr(ctx, subtype_expr),
                 .expr_map = {
                     .e1 = alloc_expr(ctx, unknown),
-                    .e2 = alloc_expr(ctx, new_type),
+                    .e2 = alloc_expr(ctx, substitute(ctx, type_map.arg_id, unknown, *type_map.expr)),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = true,
                 },
@@ -576,7 +574,8 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
         struct dy_constraint c;
         bool have_c = false;
         bool did_transform_e = false;
-        dy_ternary_t result = dy_is_subtype_sub(ctx, new_type, supertype, &c, &have_c, e, &e, &did_transform_e);
+        struct dy_core_expr new_e;
+        dy_ternary_t result = dy_is_subtype_sub(ctx, dy_type_of(ctx, e), supertype, &c, &have_c, e, &new_e, &did_transform_e);
         if (result == DY_NO) {
             return DY_NO;
         }
@@ -589,7 +588,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
                 .end_polarity = DY_CORE_POLARITY_POSITIVE
             };
 
-            *new_subtype_expr = substitute(ctx, id, all, e);
+            *new_subtype_expr = substitute(ctx, id, all, did_transform_e ? new_e : e);
             *did_transform_subtype_expr = true;
 
             return result;
@@ -607,7 +606,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
 
             dy_array_add(ctx.bound_constraints, &bound_constraint);
 
-            *new_subtype_expr = e;
+            *new_subtype_expr = did_transform_e ? new_e : e;
             *did_transform_subtype_expr = true;
 
             if (have_c) {
@@ -621,6 +620,10 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_check_ctx ctx, struct dy_cor
         dy_array_destroy(ids);
 
         struct dy_constraint_range solution = dy_constraint_collect(ctx, c, id);
+
+        // We ignore the new_e above when re-subtype-checking.
+        // Don't know for sure if that's kosher, but there are situations where
+        // re-subtype_checking on the new_e doesn't work.
 
         if (solution.have_supertype) {
             e = substitute(ctx, id, solution.supertype, e);
