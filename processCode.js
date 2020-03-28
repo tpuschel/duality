@@ -25,13 +25,10 @@ let unboundVarsList = unboundVars => {
 let streamCallbackPointer = addFunction((buffer, env) => { }, 'vii')
 
 let processCode = program => {
-    let allocatorPtr = _malloc(16)
-    _dy_allocator_stdlib(allocatorPtr)
-
     let cText = allocate(intArrayFromString(program, true), 'i8', ALLOC_NORMAL)
     let cTextLength = lengthBytesUTF8(program)
 
-    let textBuffer = _dy_array_create(allocatorPtr, 1, cTextLength)
+    let textBuffer = _dy_array_create(1, cTextLength)
     _memcpy(_dy_array_buffer(textBuffer), cText, cTextLength)
     _dy_array_set_size(textBuffer, cTextLength)
 
@@ -39,21 +36,15 @@ let processCode = program => {
 
 
     // First, parsing
-    let parserCtx = _malloc(36)
+    let parserCtx = _malloc(20)
 
     setValue(parserCtx, streamCallbackPointer, 'i32') // stream
     setValue(parserCtx + 4, textBuffer, 'i32') // buffer
     setValue(parserCtx + 8, zero, 'i32') // env
     setValue(parserCtx + 12, zero, 'i32') // current_index
 
-    // setting allocator
-    setValue(parserCtx + 16, getValue(allocatorPtr, 'i32'), 'i32')
-    setValue(parserCtx + 20, getValue(allocatorPtr + 4, 'i32'), 'i32')
-    setValue(parserCtx + 24, getValue(allocatorPtr + 8, 'i32'), 'i32')
-    setValue(parserCtx + 28, getValue(allocatorPtr + 12, 'i32'), 'i32')
-
-    let stringArrays = _dy_array_create(allocatorPtr, 4, 4)
-    setValue(parserCtx + 32, stringArrays, 'i32') // arrays
+    let stringArrays = _dy_array_create(4, 4)
+    setValue(parserCtx + 16, stringArrays, 'i32') // arrays
 
     // actually parse
     let resultDoBlock = _malloc(20)
@@ -64,7 +55,7 @@ let processCode = program => {
 
 
     // Second, AST -> Core translation
-    let astToCoreCtx = _malloc(28)
+    let astToCoreCtx = _malloc(12)
 
     // creating running_id with initial value 0
     let runningId = _malloc(4)
@@ -73,23 +64,17 @@ let processCode = program => {
     // setting running_id
     setValue(astToCoreCtx, runningId, 'i32')
 
-    // setting allocator
-    setValue(astToCoreCtx + 4, getValue(allocatorPtr, 'i32'), 'i32')
-    setValue(astToCoreCtx + 8, getValue(allocatorPtr + 4, 'i32'), 'i32')
-    setValue(astToCoreCtx + 12, getValue(allocatorPtr + 8, 'i32'), 'i32')
-    setValue(astToCoreCtx + 16, getValue(allocatorPtr + 12, 'i32'), 'i32')
-
     // setting bound_vars
-    let boundVars = _dy_array_create(allocatorPtr, 16, 8)
-    setValue(astToCoreCtx + 20, boundVars, 'i32')
+    let boundVars = _dy_array_create(16, 8)
+    setValue(astToCoreCtx + 4, boundVars, 'i32')
 
     // setting unbound_vars
-    let unboundVars = _dy_array_create(allocatorPtr, dyStringSize, 4)
-    setValue(astToCoreCtx + 24, unboundVars, 'i32')
+    let unboundVars = _dy_array_create(dyStringSize, 4)
+    setValue(astToCoreCtx + 8, unboundVars, 'i32')
 
-    let sourceMaps = _dy_array_create(allocatorPtr, 44, 4)
+    let sourceMaps = _dy_array_create(40, 4)
 
-    let coreExprSize = 32
+    let coreExprSize = 28
 
     let coreExprResult = _malloc(coreExprSize)
     let astToCoreDidSucceed = _dy_ast_do_block_to_core(astToCoreCtx, resultDoBlock, coreExprResult, sourceMaps)
@@ -99,19 +84,13 @@ let processCode = program => {
 
 
     // Third, checking
-    let checkingCtx = _malloc(24)
+    let checkingCtx = _malloc(8)
 
     // Setting running_id
     setValue(checkingCtx, runningId, 'i32')
 
-    // setting allocator
-    setValue(checkingCtx + 4, getValue(allocatorPtr, 'i32'), 'i32')
-    setValue(checkingCtx + 8, getValue(allocatorPtr + 4, 'i32'), 'i32')
-    setValue(checkingCtx + 12, getValue(allocatorPtr + 8, 'i32'), 'i32')
-    setValue(checkingCtx + 16, getValue(allocatorPtr + 12, 'i32'), 'i32')
-
-    let boundConstraints = _dy_array_create(allocatorPtr, 40, 8)
-    setValue(checkingCtx + 20, boundConstraints, 'i32')
+    let boundConstraints = _dy_array_create(36, 8)
+    setValue(checkingCtx + 4, boundConstraints, 'i32')
 
     let constraint = _malloc(16)
     let have_constraint = _malloc(4)
@@ -131,7 +110,7 @@ let processCode = program => {
     }
 
 
-    let coreExprStringDyArray = _dy_array_create(allocatorPtr, 1, 64)
+    let coreExprStringDyArray = _dy_array_create(1, 64)
     _dy_core_expr_to_string(newCoreExpr, coreExprStringDyArray)
 
     return 'Result: ' + UTF8ToString(_dy_array_buffer(coreExprStringDyArray), _dy_array_size(coreExprStringDyArray))
