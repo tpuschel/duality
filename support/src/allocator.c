@@ -11,10 +11,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 void *dy_malloc(size_t size)
 {
     void *p = malloc(size);
+    dy_assert(p);
+    return p;
+}
+
+void *dy_calloc(size_t count, size_t size)
+{
+    void *p = calloc(count, size);
     dy_assert(p);
     return p;
 }

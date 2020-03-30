@@ -7,13 +7,14 @@ add_library(duality-support
     "src/stream.c"
     "src/utf8_to_json.c"
     "src/json_to_utf8.c"
+    "src/obj_pool.c"
 )
 
 include(CheckIncludeFile)
 
-check_include_file(execinfo.h HAVE_EXECINFO)
-if(HAVE_EXECINFO)
-    target_compile_definitions(duality-support PRIVATE DY_HAVE_EXECINFO)
+check_include_file(unistd.h HAVE_UNISTD)
+if(HAVE_UNISTD)
+    target_compile_definitions(duality-support PRIVATE DY_HAVE_UNISTD)
 endif()
 
 set_target_properties(duality-support PROPERTIES C_VISIBILITY_PRESET hidden)

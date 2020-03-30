@@ -7,31 +7,32 @@
 #include <duality/core/are_equal.h>
 
 #include <duality/support/assert.h>
+
 #include "substitute.h"
 
-static dy_ternary_t is_equal_to_both_positive(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_both both);
+static dy_ternary_t is_equal_to_both_positive(struct dy_core_ctx ctx, struct dy_core_expr expr, struct dy_core_both both);
 
-static dy_ternary_t is_equal_to_both_negative(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_both both);
+static dy_ternary_t is_equal_to_both_negative(struct dy_core_ctx ctx, struct dy_core_expr expr, struct dy_core_both both);
 
-static dy_ternary_t both_is_equal_to_both(struct dy_check_ctx ctx, struct dy_core_both p1, struct dy_core_both p2);
+static dy_ternary_t both_is_equal_to_both(struct dy_core_ctx ctx, struct dy_core_both p1, struct dy_core_both p2);
 
-static dy_ternary_t expr_map_is_equal(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr expr);
+static dy_ternary_t expr_map_is_equal(struct dy_core_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr expr);
 
-static dy_ternary_t expr_map_is_equal_to_expr_map(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map1, struct dy_core_expr_map expr_map2);
+static dy_ternary_t expr_map_is_equal_to_expr_map(struct dy_core_ctx ctx, struct dy_core_expr_map expr_map1, struct dy_core_expr_map expr_map2);
 
-static dy_ternary_t type_map_is_equal(struct dy_check_ctx ctx, struct dy_core_type_map type_map, struct dy_core_expr expr);
+static dy_ternary_t type_map_is_equal(struct dy_core_ctx ctx, struct dy_core_type_map type_map, struct dy_core_expr expr);
 
-static dy_ternary_t type_map_is_equal_to_type_map(struct dy_check_ctx ctx, struct dy_core_type_map type_map1, struct dy_core_type_map type_map2);
+static dy_ternary_t type_map_is_equal_to_type_map(struct dy_core_ctx ctx, struct dy_core_type_map type_map1, struct dy_core_type_map type_map2);
 
-static dy_ternary_t unknown_is_equal(struct dy_check_ctx ctx, struct dy_core_unknown unknown, struct dy_core_expr expr);
+static dy_ternary_t unknown_is_equal(struct dy_core_ctx ctx, struct dy_core_unknown unknown, struct dy_core_expr expr);
 
-static dy_ternary_t expr_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_expr_map_elim elim, struct dy_core_expr expr);
+static dy_ternary_t expr_map_elim_is_equal(struct dy_core_ctx ctx, struct dy_core_expr_map_elim elim, struct dy_core_expr expr);
 
-static dy_ternary_t type_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_type_map_elim elim, struct dy_core_expr expr);
+static dy_ternary_t type_map_elim_is_equal(struct dy_core_ctx ctx, struct dy_core_type_map_elim elim, struct dy_core_expr expr);
 
-static dy_ternary_t one_of_is_equal(struct dy_check_ctx ctx, struct dy_core_one_of one_of, struct dy_core_expr expr);
+static dy_ternary_t one_of_is_equal(struct dy_core_ctx ctx, struct dy_core_one_of one_of, struct dy_core_expr expr);
 
-dy_ternary_t dy_are_equal(struct dy_check_ctx ctx, struct dy_core_expr e1, struct dy_core_expr e2)
+dy_ternary_t dy_are_equal(struct dy_core_ctx ctx, struct dy_core_expr e1, struct dy_core_expr e2)
 {
     if (e1.tag == DY_CORE_EXPR_BOTH && e1.both.polarity == DY_CORE_POLARITY_POSITIVE) {
         return is_equal_to_both_positive(ctx, e2, e1.both);
@@ -113,7 +114,7 @@ dy_ternary_t dy_are_equal(struct dy_check_ctx ctx, struct dy_core_expr e1, struc
     DY_IMPOSSIBLE_ENUM();
 }
 
-dy_ternary_t is_equal_to_both_positive(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_both both)
+dy_ternary_t is_equal_to_both_positive(struct dy_core_ctx ctx, struct dy_core_expr expr, struct dy_core_both both)
 {
     if (expr.tag == DY_CORE_EXPR_BOTH && expr.both.polarity == DY_CORE_POLARITY_POSITIVE) {
         return both_is_equal_to_both(ctx, expr.both, both);
@@ -136,7 +137,7 @@ dy_ternary_t is_equal_to_both_positive(struct dy_check_ctx ctx, struct dy_core_e
     return DY_YES;
 }
 
-dy_ternary_t is_equal_to_both_negative(struct dy_check_ctx ctx, struct dy_core_expr expr, struct dy_core_both both)
+dy_ternary_t is_equal_to_both_negative(struct dy_core_ctx ctx, struct dy_core_expr expr, struct dy_core_both both)
 {
     if (expr.tag == DY_CORE_EXPR_BOTH && expr.both.polarity == DY_CORE_POLARITY_NEGATIVE) {
         return both_is_equal_to_both(ctx, expr.both, both);
@@ -159,7 +160,7 @@ dy_ternary_t is_equal_to_both_negative(struct dy_check_ctx ctx, struct dy_core_e
     return DY_NO;
 }
 
-dy_ternary_t both_is_equal_to_both(struct dy_check_ctx ctx, struct dy_core_both p1, struct dy_core_both p2)
+dy_ternary_t both_is_equal_to_both(struct dy_core_ctx ctx, struct dy_core_both p1, struct dy_core_both p2)
 {
     dy_ternary_t first_res = dy_are_equal(ctx, *p1.e1, *p2.e1);
     if (first_res == DY_NO) {
@@ -178,7 +179,7 @@ dy_ternary_t both_is_equal_to_both(struct dy_check_ctx ctx, struct dy_core_both 
     return DY_YES;
 }
 
-dy_ternary_t expr_map_is_equal(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr expr)
+dy_ternary_t expr_map_is_equal(struct dy_core_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr expr)
 {
     if (expr.tag != DY_CORE_EXPR_EXPR_MAP) {
         return DY_NO;
@@ -187,7 +188,7 @@ dy_ternary_t expr_map_is_equal(struct dy_check_ctx ctx, struct dy_core_expr_map 
     return expr_map_is_equal_to_expr_map(ctx, expr_map, expr.expr_map);
 }
 
-dy_ternary_t expr_map_is_equal_to_expr_map(struct dy_check_ctx ctx, struct dy_core_expr_map expr_map1, struct dy_core_expr_map expr_map2)
+dy_ternary_t expr_map_is_equal_to_expr_map(struct dy_core_ctx ctx, struct dy_core_expr_map expr_map1, struct dy_core_expr_map expr_map2)
 {
     if (expr_map1.polarity != expr_map2.polarity || expr_map1.is_implicit != expr_map2.is_implicit) {
         return DY_NO;
@@ -210,7 +211,7 @@ dy_ternary_t expr_map_is_equal_to_expr_map(struct dy_check_ctx ctx, struct dy_co
     return DY_YES;
 }
 
-dy_ternary_t type_map_is_equal(struct dy_check_ctx ctx, struct dy_core_type_map type_map, struct dy_core_expr expr)
+dy_ternary_t type_map_is_equal(struct dy_core_ctx ctx, struct dy_core_type_map type_map, struct dy_core_expr expr)
 {
     if (expr.tag != DY_CORE_EXPR_TYPE_MAP) {
         return DY_NO;
@@ -219,7 +220,7 @@ dy_ternary_t type_map_is_equal(struct dy_check_ctx ctx, struct dy_core_type_map 
     return type_map_is_equal_to_type_map(ctx, type_map, expr.type_map);
 }
 
-dy_ternary_t type_map_is_equal_to_type_map(struct dy_check_ctx ctx, struct dy_core_type_map type_map1, struct dy_core_type_map type_map2)
+dy_ternary_t type_map_is_equal_to_type_map(struct dy_core_ctx ctx, struct dy_core_type_map type_map1, struct dy_core_type_map type_map2)
 {
     if (type_map1.polarity != type_map2.polarity || type_map1.is_implicit != type_map2.is_implicit) {
         return DY_NO;
@@ -234,10 +235,16 @@ dy_ternary_t type_map_is_equal_to_type_map(struct dy_check_ctx ctx, struct dy_co
         }
     };
 
-    return dy_are_equal(ctx, *type_map1.expr, substitute(type_map2.arg_id, id_expr, *type_map2.expr));
+    struct dy_core_expr e = substitute(ctx, type_map2.arg_id, id_expr, *type_map2.expr);
+
+    dy_ternary_t result = dy_are_equal(ctx, *type_map1.expr, e);
+
+    dy_core_expr_release(ctx.expr_pool, e);
+
+    return result;
 }
 
-dy_ternary_t one_of_is_equal(struct dy_check_ctx ctx, struct dy_core_one_of one_of, struct dy_core_expr expr)
+dy_ternary_t one_of_is_equal(struct dy_core_ctx ctx, struct dy_core_one_of one_of, struct dy_core_expr expr)
 {
     if (expr.tag != DY_CORE_EXPR_ONE_OF) {
         return DY_MAYBE;
@@ -260,7 +267,7 @@ dy_ternary_t one_of_is_equal(struct dy_check_ctx ctx, struct dy_core_one_of one_
     return DY_YES;
 }
 
-dy_ternary_t unknown_is_equal(struct dy_check_ctx ctx, struct dy_core_unknown unknown, struct dy_core_expr expr)
+dy_ternary_t unknown_is_equal(struct dy_core_ctx ctx, struct dy_core_unknown unknown, struct dy_core_expr expr)
 {
     (void)ctx;
 
@@ -275,7 +282,7 @@ dy_ternary_t unknown_is_equal(struct dy_check_ctx ctx, struct dy_core_unknown un
     }
 }
 
-dy_ternary_t expr_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_expr_map_elim elim, struct dy_core_expr expr)
+dy_ternary_t expr_map_elim_is_equal(struct dy_core_ctx ctx, struct dy_core_expr_map_elim elim, struct dy_core_expr expr)
 {
     if (expr.tag != DY_CORE_EXPR_EXPR_MAP_ELIM) {
         return DY_MAYBE;
@@ -298,7 +305,7 @@ dy_ternary_t expr_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_expr
     return DY_YES;
 }
 
-dy_ternary_t type_map_elim_is_equal(struct dy_check_ctx ctx, struct dy_core_type_map_elim elim, struct dy_core_expr expr)
+dy_ternary_t type_map_elim_is_equal(struct dy_core_ctx ctx, struct dy_core_type_map_elim elim, struct dy_core_expr expr)
 {
     if (expr.tag != DY_CORE_EXPR_TYPE_MAP_ELIM) {
         return DY_MAYBE;

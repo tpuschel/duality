@@ -72,43 +72,51 @@ int main(int argc, const char *argv[])
 
     dy_array_destroy(parser_ctx.stream.buffer);
 
+    dy_obj_pool_t *core_expr_pool = dy_obj_pool_create(sizeof(struct dy_core_expr), _Alignof(struct dy_core_expr));
+
+    dy_obj_pool_set_is_parent_cb(core_expr_pool, dy_core_expr_is_parent);
+
     size_t running_id = 0;
     dy_array_t *unbound_vars = dy_array_create(sizeof(dy_string_t), 2);
 
     struct dy_ast_to_core_ctx ast_to_core_ctx = {
         .running_id = &running_id,
         .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), 64),
-        .unbound_vars = unbound_vars
+        .unbound_vars = unbound_vars,
+        .core_expr_pool = core_expr_pool
     };
 
     struct dy_core_expr program;
-    dy_array_t *sub_maps = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
-    if (!dy_ast_do_block_to_core(&ast_to_core_ctx, program_ast, &program, sub_maps)) {
+    if (!dy_ast_do_block_to_core(&ast_to_core_ctx, program_ast, &program)) {
         print_unbound_vars_error(unbound_vars);
         return -1;
     }
+
     /*
     printf("Core:\n");
-    print_core_expr(program, dy_allocator_stdlib());
+    print_core_expr(program);
     printf("\n");
-*/
-    struct dy_check_ctx check_ctx = {
+    */
+
+    struct dy_core_ctx core_ctx = {
         .running_id = &running_id,
-        .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), 64)
+        .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), 64),
+        .expr_pool = core_expr_pool
     };
 
     struct dy_core_expr checked_program;
     struct dy_constraint constraint;
     bool have_constraint = false;
-    if (!dy_check_expr(check_ctx, program, &checked_program, &constraint, &have_constraint)) {
+    if (!dy_check_expr(core_ctx, program, &checked_program, &constraint, &have_constraint)) {
         fprintf(stderr, "Program failed check.\n");
         return -1;
     }
+
     /*
     printf("Checked Core:\n");
-    print_core_expr(checked_program, dy_allocator_stdlib());
+    print_core_expr(checked_program);
     printf("\n");
-*/
+    */
 
     if (have_constraint) {
         fprintf(stderr, "Constraint on top level??.\n");
@@ -118,7 +126,7 @@ int main(int argc, const char *argv[])
     }
 
     struct dy_core_expr result;
-    dy_ternary_t is_valid = dy_eval_expr(check_ctx, checked_program, &result);
+    dy_ternary_t is_valid = dy_eval_expr(core_ctx, checked_program, &result);
     if (is_valid == DY_NO) {
         fprintf(stderr, "Program execution failed.\n");
         return -1;

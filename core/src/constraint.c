@@ -5,17 +5,18 @@
  */
 
 #include <duality/core/constraint.h>
+
 #include <duality/core/is_subtype.h>
 
 #include <duality/support/assert.h>
-#include <duality/support/allocator.h>
 
-static struct dy_core_expr *alloc_expr(struct dy_core_expr expr);
+static struct dy_constraint_range retain_range(struct dy_core_ctx ctx, struct dy_constraint_range range);
+static void release_range(struct dy_core_ctx ctx, struct dy_constraint_range range);
 
-static struct dy_constraint_range constraint_conjunction(struct dy_constraint_range range1, struct dy_constraint_range range2);
-static struct dy_constraint_range constraint_disjunction(struct dy_constraint_range range1, struct dy_constraint_range range2);
+static struct dy_constraint_range constraint_conjunction(struct dy_core_ctx ctx, struct dy_constraint_range range1, struct dy_constraint_range range2);
+static struct dy_constraint_range constraint_disjunction(struct dy_core_ctx ctx, struct dy_constraint_range range1, struct dy_constraint_range range2);
 
-struct dy_constraint_range dy_constraint_collect(struct dy_constraint constraint, size_t id)
+struct dy_constraint_range dy_constraint_collect(struct dy_core_ctx ctx, struct dy_constraint constraint, size_t id)
 {
     switch (constraint.tag) {
     case DY_CONSTRAINT_SINGLE:
@@ -26,25 +27,31 @@ struct dy_constraint_range dy_constraint_collect(struct dy_constraint constraint
             };
         }
 
-        return constraint.single.range;
+        return retain_range(ctx, constraint.single.range);
     case DY_CONSTRAINT_MULTIPLE: {
-        struct dy_constraint_range range1 = dy_constraint_collect(*constraint.multiple.c1, id);
+        struct dy_constraint_range range1 = dy_constraint_collect(ctx, *constraint.multiple.c1, id);
+        struct dy_constraint_range range2 = dy_constraint_collect(ctx, *constraint.multiple.c2, id);
 
-        struct dy_constraint_range range2 = dy_constraint_collect(*constraint.multiple.c2, id);
+        struct dy_constraint_range r;
 
         switch (constraint.multiple.polarity) {
         case DY_CORE_POLARITY_POSITIVE:
-            return constraint_conjunction(range1, range2);
+            r = constraint_conjunction(ctx, range1, range2);
+            break;
         case DY_CORE_POLARITY_NEGATIVE:
-            return constraint_disjunction(range1, range2);
+            r = constraint_disjunction(ctx, range1, range2);
+            break;
         }
 
-        DY_IMPOSSIBLE_ENUM();
+        release_range(ctx, range1);
+        release_range(ctx, range2);
+
+        return r;
     }
     }
 }
 
-struct dy_constraint_range constraint_conjunction(struct dy_constraint_range range1, struct dy_constraint_range range2)
+struct dy_constraint_range constraint_conjunction(struct dy_core_ctx ctx, struct dy_constraint_range range1, struct dy_constraint_range range2)
 {
     struct dy_core_expr supertype;
     bool have_supertype = false;
@@ -52,18 +59,18 @@ struct dy_constraint_range constraint_conjunction(struct dy_constraint_range ran
         supertype = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .e1 = alloc_expr(range1.supertype),
-                .e2 = alloc_expr(range2.supertype),
+                .e1 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range1.supertype)),
+                .e2 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range2.supertype)),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
 
         have_supertype = true;
     } else if (range1.have_supertype) {
-        supertype = range1.supertype;
+        supertype = dy_core_expr_retain(ctx.expr_pool, range1.supertype);
         have_supertype = true;
     } else if (range2.have_supertype) {
-        supertype = range2.supertype;
+        supertype = dy_core_expr_retain(ctx.expr_pool, range2.supertype);
         have_supertype = true;
     }
 
@@ -73,18 +80,18 @@ struct dy_constraint_range constraint_conjunction(struct dy_constraint_range ran
         subtype = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .e1 = alloc_expr(range1.subtype),
-                .e2 = alloc_expr(range2.subtype),
+                .e1 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range1.subtype)),
+                .e2 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range2.subtype)),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
 
         have_subtype = true;
     } else if (range1.have_subtype) {
-        subtype = range1.subtype;
+        subtype = dy_core_expr_retain(ctx.expr_pool, range1.subtype);
         have_subtype = true;
     } else if (range2.have_subtype) {
-        subtype = range2.subtype;
+        subtype = dy_core_expr_retain(ctx.expr_pool, range2.subtype);
         have_subtype = true;
     }
 
@@ -96,7 +103,7 @@ struct dy_constraint_range constraint_conjunction(struct dy_constraint_range ran
     };
 }
 
-struct dy_constraint_range constraint_disjunction(struct dy_constraint_range range1, struct dy_constraint_range range2)
+struct dy_constraint_range constraint_disjunction(struct dy_core_ctx ctx, struct dy_constraint_range range1, struct dy_constraint_range range2)
 {
     struct dy_core_expr supertype;
     bool have_supertype = false;
@@ -104,8 +111,8 @@ struct dy_constraint_range constraint_disjunction(struct dy_constraint_range ran
         supertype = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .e1 = alloc_expr(range1.supertype),
-                .e2 = alloc_expr(range2.supertype),
+                .e1 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range1.supertype)),
+                .e2 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range2.supertype)),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
@@ -119,8 +126,8 @@ struct dy_constraint_range constraint_disjunction(struct dy_constraint_range ran
         subtype = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
-                .e1 = alloc_expr(range1.subtype),
-                .e2 = alloc_expr(range2.subtype),
+                .e1 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range1.subtype)),
+                .e2 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range2.subtype)),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
@@ -136,7 +143,26 @@ struct dy_constraint_range constraint_disjunction(struct dy_constraint_range ran
     };
 }
 
-struct dy_core_expr *alloc_expr(struct dy_core_expr expr)
+struct dy_constraint_range retain_range(struct dy_core_ctx ctx, struct dy_constraint_range range)
 {
-    return dy_alloc_and_copy(&expr, sizeof expr);
+    if (range.have_subtype) {
+        dy_core_expr_retain(ctx.expr_pool, range.subtype);
+    }
+
+    if (range.have_supertype) {
+        dy_core_expr_retain(ctx.expr_pool, range.supertype);
+    }
+
+    return range;
+}
+
+void release_range(struct dy_core_ctx ctx, struct dy_constraint_range range)
+{
+    if (range.have_subtype) {
+        dy_core_expr_release(ctx.expr_pool, range.subtype);
+    }
+
+    if (range.have_supertype) {
+        dy_core_expr_release(ctx.expr_pool, range.supertype);
+    }
 }

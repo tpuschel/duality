@@ -7,6 +7,7 @@
 #include <duality/lsp/lsp.h>
 
 #include <duality/support/array.h>
+#include <duality/support/obj_pool.h>
 #include <duality/support/allocator.h>
 
 #include <duality/syntax/ast_to_core.h>
@@ -19,14 +20,17 @@ struct document {
     dy_string_t text;
     size_t running_id;
     struct dy_ast_do_block ast;
-    bool ast_is_valid;
-    struct dy_text_range_core_map core;
+    bool ast_is_present;
+    struct dy_core_expr core;
+    bool core_is_present;
     bool core_is_valid;
 };
 
 struct dy_lsp_ctx {
     dy_lsp_send_fn send;
     void *env;
+
+    dy_obj_pool_t *core_expr_pool;
 
     bool is_initialized;
     bool received_shutdown_request;
@@ -45,11 +49,10 @@ static dy_json_t response_error(long code, dy_string_t message);
 static dy_json_t success_response(dy_json_t id, dy_json_t result);
 static dy_json_t hover_result(dy_string_t contents);
 
-static void process_document(struct document *doc);
+static void process_document(struct dy_lsp_ctx *ctx, struct document *doc);
 static struct dy_stream stream_from_string(dy_string_t s);
 static void null_stream(dy_array_t *buffer, void *env);
 static bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, size_t *byte_offset);
-static bool type_of_expr_at_byte_offset(size_t *running_id, struct dy_text_range_core_map map, size_t byte_offset, struct dy_core_expr *type);
 
 static bool json_force_object(dy_json_t json, struct dy_json_object *object);
 static bool json_force_string(dy_json_t json, dy_string_t *value);
@@ -63,6 +66,7 @@ dy_lsp_ctx_t *dy_lsp_create(dy_lsp_send_fn send, void *env)
     *ctx = (struct dy_lsp_ctx){
         .send = send,
         .env = env,
+        .core_expr_pool = dy_obj_pool_create(sizeof(struct dy_core_expr), _Alignof(struct dy_core_expr)),
         .is_initialized = false,
         .received_shutdown_request = false,
         .exit_code = 1, // Error by default.
@@ -414,10 +418,12 @@ void dy_lsp_did_open(dy_lsp_ctx_t *ctx, dy_string_t uri, dy_string_t text)
     struct document doc = {
         .uri = uri,
         .text = text,
-        .running_id = 0
+        .running_id = 0,
+        .ast_is_present = false,
+        .core_is_present = false
     };
 
-    process_document(&doc);
+    process_document(ctx, &doc);
 
     dy_array_add(ctx->documents, &doc);
 }
@@ -464,7 +470,7 @@ void dy_lsp_did_change(dy_lsp_ctx_t *ctx, dy_string_t uri, struct dy_json_array 
 
             doc->text = text_string;
 
-            process_document(doc);
+            process_document(ctx, doc);
         }
 
         break;
@@ -481,30 +487,10 @@ bool dy_lsp_hover(dy_lsp_ctx_t *ctx, dy_string_t uri, long line_number, long utf
         }
 
         if (doc->core_is_valid) {
-            size_t byte_offset;
-            if (!compute_byte_offset(doc->text, line_number, utf16_char_offset, &byte_offset)) {
-                *error = invalid_request(DY_STR_LIT("Could'nt compute byte offset."));
-                return false;
-            }
-
-            struct dy_core_expr type;
-            if (!type_of_expr_at_byte_offset(&doc->running_id, doc->core, byte_offset, &type)) {
-                *error = invalid_request(DY_STR_LIT("'position' is not a string."));
-                return false;
-            }
-
-            dy_array_t *type_string_storage = dy_array_create(sizeof(char), 64);
-            dy_core_expr_to_string(type, type_string_storage);
-
-            dy_string_t type_string = {
-                .ptr = dy_array_buffer(type_string_storage),
-                .size = dy_array_size(type_string_storage)
-            };
-
-            *result = hover_result(type_string);
+            *result = hover_result(DY_STR_LIT("Code is valid."));
             return true;
         } else {
-            *result = dy_json_null();
+            *result = hover_result(DY_STR_LIT("Code is invalid."));
             return true;
         }
     }
@@ -741,8 +727,16 @@ dy_json_t hover_result(dy_string_t contents)
     };
 }
 
-void process_document(struct document *doc)
+void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
 {
+    if (doc->core_is_present) {
+        dy_core_expr_release(ctx->core_expr_pool, doc->core);
+    }
+
+    doc->ast_is_present = false;
+    doc->core_is_present = false;
+    doc->core_is_valid = false;
+
     struct dy_parser_ctx parser_ctx = {
         .stream = stream_from_string(doc->text),
         .arrays = dy_array_create(sizeof(dy_array_t *), 32)
@@ -750,42 +744,52 @@ void process_document(struct document *doc)
 
     struct dy_ast_do_block ast;
     bool parsing_succeeded = dy_parse_file(&parser_ctx, &ast);
+
     dy_array_destroy(parser_ctx.stream.buffer);
+
     if (!parsing_succeeded) {
-        doc->ast_is_valid = false;
-        doc->core_is_valid = false;
         return;
     }
+
+    doc->ast = ast;
+    doc->ast_is_present = true;
 
     dy_array_t *unbound_vars = dy_array_create(sizeof(dy_string_t), 2);
     size_t running_id = 0;
     struct dy_ast_to_core_ctx ast_to_core_ctx = {
         .running_id = &running_id,
         .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), 64),
-        .unbound_vars = unbound_vars
+        .unbound_vars = unbound_vars,
+        .core_expr_pool = ctx->core_expr_pool
     };
 
     struct dy_core_expr core;
-    dy_array_t *sub_maps = dy_array_create(sizeof(struct dy_text_range_core_map), 2);
-    if (!dy_ast_do_block_to_core(&ast_to_core_ctx, ast, &core, sub_maps)) {
-        doc->ast_is_valid = true;
-        doc->ast = ast;
-        doc->core_is_valid = false;
-
+    if (!dy_ast_do_block_to_core(&ast_to_core_ctx, ast, &core)) {
         return;
     }
 
-    doc->ast_is_valid = true;
-    doc->ast = ast;
-    doc->core_is_valid = true;
-    doc->core = (struct dy_text_range_core_map){
-        .text_range = {
-            .start = 0,
-            .end = doc->text.size,
-        },
-        .expr = core,
-        .sub_maps = sub_maps,
+    doc->core = core;
+    doc->core_is_present = true;
+
+    struct dy_core_ctx core_ctx = {
+        .running_id = &running_id,
+        .expr_pool = ctx->core_expr_pool,
+        .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), 1)
     };
+
+    struct dy_core_expr new_core;
+    struct dy_constraint c;
+    bool have_c = false;
+    bool is_valid = dy_check_expr(core_ctx, core, &new_core, &c, &have_c);
+
+    dy_core_expr_release(ctx->core_expr_pool, core);
+
+    if (!is_valid) {
+        return;
+    }
+
+    doc->core_is_valid = true;
+    doc->core = new_core;
 
     return;
 }
@@ -849,30 +853,6 @@ bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, 
     }
 
     *byte_offset = cnt;
-
-    return true;
-}
-
-bool type_of_expr_at_byte_offset(size_t *running_id, struct dy_text_range_core_map map, size_t byte_offset, struct dy_core_expr *type)
-{
-    if (map.text_range.start > byte_offset || map.text_range.end < byte_offset) {
-        return false;
-    }
-
-    for (size_t i = 0, size = dy_array_size(map.sub_maps); i < size; ++i) {
-        struct dy_text_range_core_map sub_map;
-        dy_array_get(map.sub_maps, i, &sub_map);
-
-        if (type_of_expr_at_byte_offset(running_id, sub_map, byte_offset, type)) {
-            return true;
-        }
-    }
-
-    struct dy_check_ctx check_ctx = {
-        .running_id = running_id
-    };
-
-    *type = dy_type_of(check_ctx, map.expr);
 
     return true;
 }

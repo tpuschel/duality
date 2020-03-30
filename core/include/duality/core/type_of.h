@@ -7,8 +7,8 @@
 #ifndef DY_TYPE_OF_H
 #define DY_TYPE_OF_H
 
-#include <duality/core/check.h>
+#include <duality/core/ctx.h>
 
-DY_CORE_API struct dy_core_expr dy_type_of(struct dy_check_ctx ctx, struct dy_core_expr expr);
+DY_CORE_API struct dy_core_expr dy_type_of(struct dy_core_ctx ctx, struct dy_core_expr expr);
 
 #endif // DY_TYPE_OF_H

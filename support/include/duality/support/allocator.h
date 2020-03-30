@@ -13,6 +13,8 @@
 
 DY_SUPPORT_API void *dy_malloc(size_t size);
 
+DY_SUPPORT_API void *dy_calloc(size_t count, size_t size);
+
 DY_SUPPORT_API void *dy_realloc(void *ptr, size_t size);
 
 DY_SUPPORT_API void dy_free(void *ptr);

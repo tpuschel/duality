@@ -8,7 +8,6 @@
 #define DY_AST_H
 
 #include <duality/support/string.h>
-
 #include <duality/support/range.h>
 
 struct dy_ast_expr;

@@ -9,6 +9,7 @@
 
 #include <duality/support/string.h>
 #include <duality/support/array.h>
+#include <duality/support/obj_pool.h>
 
 #include <duality/core/api.h>
 
@@ -101,5 +102,17 @@ struct dy_core_expr {
 };
 
 DY_CORE_API void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string);
+
+DY_CORE_API struct dy_core_expr *dy_core_expr_new(dy_obj_pool_t *pool, struct dy_core_expr expr);
+
+DY_CORE_API struct dy_core_expr dy_core_expr_retain(dy_obj_pool_t *pool, struct dy_core_expr expr);
+
+DY_CORE_API struct dy_core_expr *dy_core_expr_retain_ptr(dy_obj_pool_t *pool, const struct dy_core_expr *expr);
+
+DY_CORE_API void dy_core_expr_release(dy_obj_pool_t *pool, struct dy_core_expr expr);
+
+DY_CORE_API void dy_core_expr_release_ptr(dy_obj_pool_t *pool, const struct dy_core_expr *expr);
+
+DY_CORE_API int dy_core_expr_is_parent(const void *parent, const void *child);
 
 #endif // DY_CORE_H

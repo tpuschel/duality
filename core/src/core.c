@@ -19,6 +19,234 @@ static void add_string(dy_array_t *string, dy_string_t s);
 static int asprintf(char **ret, const char *format, ...);
 #endif
 
+struct dy_core_expr *dy_core_expr_new(dy_obj_pool_t *pool, struct dy_core_expr expr)
+{
+    return dy_obj_pool_new(pool, &expr);
+}
+
+struct dy_core_expr *dy_core_expr_retain_ptr(dy_obj_pool_t *pool, const struct dy_core_expr *expr)
+{
+    return dy_obj_pool_retain(pool, expr);
+}
+
+struct dy_core_expr dy_core_expr_retain(dy_obj_pool_t *pool, struct dy_core_expr expr)
+{
+    switch (expr.tag) {
+    case DY_CORE_EXPR_EXPR_MAP:
+        dy_core_expr_retain_ptr(pool, expr.expr_map.e1);
+        dy_core_expr_retain_ptr(pool, expr.expr_map.e2);
+
+        return expr;
+    case DY_CORE_EXPR_TYPE_MAP:
+        dy_core_expr_retain_ptr(pool, expr.type_map.arg_type);
+        dy_core_expr_retain_ptr(pool, expr.type_map.expr);
+
+        return expr;
+    case DY_CORE_EXPR_EXPR_MAP_ELIM:
+        dy_core_expr_retain_ptr(pool, expr.expr_map_elim.expr);
+        dy_core_expr_retain_ptr(pool, expr.expr_map_elim.expr_map.e1);
+        dy_core_expr_retain_ptr(pool, expr.expr_map_elim.expr_map.e2);
+
+        return expr;
+    case DY_CORE_EXPR_TYPE_MAP_ELIM:
+        dy_core_expr_retain_ptr(pool, expr.type_map_elim.expr);
+        dy_core_expr_retain_ptr(pool, expr.type_map_elim.type_map.arg_type);
+        dy_core_expr_retain_ptr(pool, expr.type_map_elim.type_map.expr);
+
+        return expr;
+    case DY_CORE_EXPR_BOTH:
+        dy_core_expr_retain_ptr(pool, expr.both.e1);
+        dy_core_expr_retain_ptr(pool, expr.both.e2);
+
+        return expr;
+    case DY_CORE_EXPR_ONE_OF:
+        dy_core_expr_retain_ptr(pool, expr.one_of.first);
+        dy_core_expr_retain_ptr(pool, expr.one_of.second);
+
+        return expr;
+    case DY_CORE_EXPR_UNKNOWN:
+        dy_core_expr_retain_ptr(pool, expr.unknown.type);
+
+        return expr;
+    case DY_CORE_EXPR_INFERENCE_CTX:
+        dy_core_expr_retain_ptr(pool, expr.inference_ctx.type);
+        dy_core_expr_retain_ptr(pool, expr.inference_ctx.expr);
+
+        return expr;
+    case DY_CORE_EXPR_END:
+        // fallthrough
+    case DY_CORE_EXPR_STRING:
+        // fallthrough
+    case DY_CORE_EXPR_TYPE_OF_STRINGS:
+        // fallthroughs
+    case DY_CORE_EXPR_PRINT:
+        return expr;
+    }
+}
+
+void dy_core_expr_release_ptr(dy_obj_pool_t *pool, const struct dy_core_expr *expr)
+{
+    struct dy_core_expr shallow_copy = *expr;
+    if (dy_obj_pool_release(pool, expr) == 0) {
+        dy_core_expr_release(pool, shallow_copy);
+    }
+}
+
+void dy_core_expr_release(dy_obj_pool_t *pool, struct dy_core_expr expr)
+{
+    switch (expr.tag) {
+    case DY_CORE_EXPR_EXPR_MAP:
+        dy_core_expr_release_ptr(pool, expr.expr_map.e1);
+        dy_core_expr_release_ptr(pool, expr.expr_map.e2);
+
+        return;
+    case DY_CORE_EXPR_TYPE_MAP:
+        dy_core_expr_release_ptr(pool, expr.type_map.arg_type);
+        dy_core_expr_release_ptr(pool, expr.type_map.expr);
+
+        return;
+    case DY_CORE_EXPR_EXPR_MAP_ELIM:
+        dy_core_expr_release_ptr(pool, expr.expr_map_elim.expr);
+        dy_core_expr_release_ptr(pool, expr.expr_map_elim.expr_map.e1);
+        dy_core_expr_release_ptr(pool, expr.expr_map_elim.expr_map.e2);
+
+        return;
+    case DY_CORE_EXPR_TYPE_MAP_ELIM:
+        dy_core_expr_release_ptr(pool, expr.type_map_elim.expr);
+        dy_core_expr_release_ptr(pool, expr.type_map_elim.type_map.arg_type);
+        dy_core_expr_release_ptr(pool, expr.type_map_elim.type_map.expr);
+
+        return;
+    case DY_CORE_EXPR_BOTH:
+        dy_core_expr_release_ptr(pool, expr.both.e1);
+        dy_core_expr_release_ptr(pool, expr.both.e2);
+
+        return;
+    case DY_CORE_EXPR_ONE_OF:
+        dy_core_expr_release_ptr(pool, expr.one_of.first);
+        dy_core_expr_release_ptr(pool, expr.one_of.second);
+
+        return;
+    case DY_CORE_EXPR_UNKNOWN:
+        dy_core_expr_release_ptr(pool, expr.unknown.type);
+
+        return;
+    case DY_CORE_EXPR_INFERENCE_CTX:
+        dy_core_expr_release_ptr(pool, expr.inference_ctx.type);
+        dy_core_expr_release_ptr(pool, expr.inference_ctx.expr);
+
+        return;
+    case DY_CORE_EXPR_END:
+        // fallthrough
+    case DY_CORE_EXPR_STRING:
+        // fallthrough
+    case DY_CORE_EXPR_TYPE_OF_STRINGS:
+        // fallthroughs
+    case DY_CORE_EXPR_PRINT:
+        return;
+    }
+}
+
+int dy_core_expr_is_parent(const void *parent, const void *child)
+{
+    struct dy_core_expr expr = *(const struct dy_core_expr *)parent;
+
+    switch (expr.tag) {
+    case DY_CORE_EXPR_EXPR_MAP:
+        if (expr.expr_map.e1 == child) {
+            return true;
+        }
+
+        if (expr.expr_map.e2 == child) {
+            return true;
+        }
+
+        return false;
+    case DY_CORE_EXPR_TYPE_MAP:
+        if (expr.type_map.arg_type == child) {
+            return true;
+        }
+
+        if (expr.type_map.expr == child) {
+            return true;
+        }
+
+        return false;
+    case DY_CORE_EXPR_EXPR_MAP_ELIM:
+        if (expr.expr_map_elim.expr == child) {
+            return true;
+        }
+
+        if (expr.expr_map_elim.expr_map.e1 == child) {
+            return true;
+        }
+
+        if (expr.expr_map_elim.expr_map.e2 == child) {
+            return true;
+        }
+
+        return false;
+    case DY_CORE_EXPR_TYPE_MAP_ELIM:
+        if (expr.type_map_elim.expr == child) {
+            return true;
+        }
+
+        if (expr.type_map_elim.type_map.arg_type == child) {
+            return true;
+        }
+
+        if (expr.type_map_elim.type_map.expr == child) {
+            return true;
+        }
+
+        return false;
+    case DY_CORE_EXPR_BOTH:
+        if (expr.both.e1 == child) {
+            return true;
+        }
+
+        if (expr.both.e2 == child) {
+            return true;
+        }
+
+        return false;
+    case DY_CORE_EXPR_ONE_OF:
+        if (expr.one_of.first == child) {
+            return true;
+        }
+
+        if (expr.one_of.second == child) {
+            return true;
+        }
+
+        return false;
+    case DY_CORE_EXPR_UNKNOWN:
+        if (expr.unknown.type == child) {
+            return true;
+        }
+
+        return false;
+    case DY_CORE_EXPR_INFERENCE_CTX:
+        if (expr.inference_ctx.type == child) {
+            return true;
+        }
+
+        if (expr.inference_ctx.expr == child) {
+            return true;
+        }
+
+        return false;
+    case DY_CORE_EXPR_END:
+        // fallthrough
+    case DY_CORE_EXPR_STRING:
+        // fallthrough
+    case DY_CORE_EXPR_TYPE_OF_STRINGS:
+        // fallthroughs
+    case DY_CORE_EXPR_PRINT:
+        return false;
+    }
+}
+
 void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
 {
     switch (expr.tag) {
