@@ -11,7 +11,6 @@
 #include <duality/support/assert.h>
 
 #include <string.h>
-#include <stdalign.h>
 #include <limits.h>
 
 #include <stdio.h>
@@ -45,10 +44,10 @@ static void print_parents(dy_obj_pool_t *pool, const void *child);
 dy_obj_pool_t *dy_obj_pool_create(size_t obj_size, size_t obj_align)
 {
     size_t padding;
-    if (obj_align >= alignof(struct slot)) {
+    if (obj_align >= _Alignof(struct slot)) {
         padding = compute_padding(sizeof(struct slot), obj_align);
     } else {
-        padding = compute_padding(obj_size, alignof(struct slot));
+        padding = compute_padding(obj_size, _Alignof(struct slot));
     }
 
     struct dy_obj_pool pool = {
