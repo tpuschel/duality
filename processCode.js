@@ -24,13 +24,24 @@ let unboundVarsList = unboundVars => {
 
 let streamCallbackPointer = addFunction((buffer, env) => { }, 'vii')
 
+let coreExprPool
+
+let textBuffer
+
 let processCode = program => {
     let cText = allocate(intArrayFromString(program, true), 'i8', ALLOC_NORMAL)
     let cTextLength = lengthBytesUTF8(program)
 
-    let textBuffer = _dy_array_create(1, cTextLength)
+    if (!textBuffer) {
+        textBuffer = _dy_array_create(1, cTextLength)
+    }
+
+    _dy_array_set_size(textBuffer, 0)
+    _dy_array_set_excess_capacity(textBuffer, cTextLength)
     _memcpy(_dy_array_buffer(textBuffer), cText, cTextLength)
     _dy_array_set_size(textBuffer, cTextLength)
+
+    _free(cText)
 
     let zero = 0
 
@@ -55,7 +66,7 @@ let processCode = program => {
 
 
     // Second, AST -> Core translation
-    let astToCoreCtx = _malloc(12)
+    let astToCoreCtx = _malloc(16)
 
     // creating running_id with initial value 0
     let runningId = _malloc(4)
@@ -64,46 +75,60 @@ let processCode = program => {
     // setting running_id
     setValue(astToCoreCtx, runningId, 'i32')
 
+    let coreExprSize = 28
+
     // setting bound_vars
-    let boundVars = _dy_array_create(16, 8)
+    let boundVars = _dy_array_create(coreExprSize + 12, 8)
     setValue(astToCoreCtx + 4, boundVars, 'i32')
 
     // setting unbound_vars
     let unboundVars = _dy_array_create(dyStringSize, 4)
     setValue(astToCoreCtx + 8, unboundVars, 'i32')
 
-    let sourceMaps = _dy_array_create(40, 4)
+    let coreExprAlign = 4
 
-    let coreExprSize = 28
+    if (!coreExprPool) {
+        coreExprPool = _dy_obj_pool_create(coreExprSize, coreExprAlign)
+    }
+
+    setValue(astToCoreCtx + 12, coreExprPool, 'i32')
 
     let coreExprResult = _malloc(coreExprSize)
-    let astToCoreDidSucceed = _dy_ast_do_block_to_core(astToCoreCtx, resultDoBlock, coreExprResult, sourceMaps)
+    let astToCoreDidSucceed = _dy_ast_do_block_to_core(astToCoreCtx, resultDoBlock, coreExprResult)
     if (!astToCoreDidSucceed) {
         return 'Unbound variables: ' + unboundVarsList(unboundVars).reduce((accum, val) => accum + ', ' + val) + '.'
     }
 
 
     // Third, checking
-    let checkingCtx = _malloc(8)
+    let checkingCtx = _malloc(12)
 
     // Setting running_id
     setValue(checkingCtx, runningId, 'i32')
 
+    setValue(checkingCtx + 4, coreExprPool, 'i32')
+
     let boundConstraints = _dy_array_create(36, 8)
-    setValue(checkingCtx + 4, boundConstraints, 'i32')
+    setValue(checkingCtx + 8, boundConstraints, 'i32')
 
     let constraint = _malloc(16)
     let have_constraint = _malloc(4)
+    let checkedCoreExpr = _malloc(coreExprSize)
+    let checkDidSucceed = _dy_check_expr(checkingCtx, coreExprResult, checkedCoreExpr, constraint, have_constraint)
 
-    let checkDidSucceed = _dy_check_expr(checkingCtx, coreExprResult, coreExprResult, constraint, have_constraint)
+    _dy_core_expr_release(coreExprPool, coreExprResult)
+
     if (!checkDidSucceed) {
         return 'Failed check.'
     }
 
 
     // Lastly, evaluating
-    let newCoreExpr = _malloc(coreExprSize)
-    let evalDidSucceed = _dy_eval_expr(checkingCtx, coreExprResult, newCoreExpr)
+    let evaledCoreExpr = _malloc(coreExprSize)
+    let evalDidSucceed = _dy_eval_expr(checkingCtx, checkedCoreExpr, evaledCoreExpr)
+
+    _dy_core_expr_release(coreExprPool, checkedCoreExpr)
+
     if (evalDidSucceed == 1) {
         // Fail
         return 'Evaluation failed.'
@@ -111,7 +136,11 @@ let processCode = program => {
 
 
     let coreExprStringDyArray = _dy_array_create(1, 64)
-    _dy_core_expr_to_string(newCoreExpr, coreExprStringDyArray)
+    _dy_core_expr_to_string(evaledCoreExpr, coreExprStringDyArray)
 
-    return 'Result: ' + UTF8ToString(_dy_array_buffer(coreExprStringDyArray), _dy_array_size(coreExprStringDyArray))
+    let resultString = 'Result: ' + UTF8ToString(_dy_array_buffer(coreExprStringDyArray), _dy_array_size(coreExprStringDyArray))
+
+    _dy_core_expr_release(coreExprPool, evaledCoreExpr)
+
+    return resultString
 }
