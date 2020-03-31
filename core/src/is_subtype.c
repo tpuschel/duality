@@ -570,7 +570,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
      */
     if (supertype.tag == DY_CORE_EXPR_TYPE_MAP && supertype.type_map.polarity == DY_CORE_POLARITY_POSITIVE && type_map.is_implicit == supertype.type_map.is_implicit) {
         struct dy_core_unknown var = {
-            .id = supertype.type_map.arg_id,
+            .id = supertype.type_map.arg_id, // *Should* be safe to reuse this.
             .type = supertype.type_map.arg_type,
             .is_inference_var = false
         };
@@ -667,7 +667,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
     }
 
     if (type_map.is_implicit) {
-        size_t id = (*ctx.running_id)++;
+        size_t id = type_map.arg_id; // *Should* be safe to reuse this.
 
         struct dy_core_expr unknown = {
             .tag = DY_CORE_EXPR_UNKNOWN,
