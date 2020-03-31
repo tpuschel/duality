@@ -82,6 +82,8 @@ struct dy_core_expr dy_core_expr_retain(dy_obj_pool_t *pool, struct dy_core_expr
     case DY_CORE_EXPR_PRINT:
         return expr;
     }
+
+    DY_IMPOSSIBLE_ENUM();
 }
 
 void dy_core_expr_release_ptr(dy_obj_pool_t *pool, const struct dy_core_expr *expr)
@@ -145,6 +147,8 @@ void dy_core_expr_release(dy_obj_pool_t *pool, struct dy_core_expr expr)
     case DY_CORE_EXPR_PRINT:
         return;
     }
+
+    DY_IMPOSSIBLE_ENUM();
 }
 
 int dy_core_expr_is_parent(const void *parent, const void *child)
@@ -245,6 +249,8 @@ int dy_core_expr_is_parent(const void *parent, const void *child)
     case DY_CORE_EXPR_PRINT:
         return false;
     }
+
+    DY_IMPOSSIBLE_ENUM();
 }
 
 void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
@@ -382,7 +388,7 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         return;
     }
 
-    dy_bail("should never be reached");
+    DY_IMPOSSIBLE_ENUM();
 }
 
 void add_string(dy_array_t *string, dy_string_t s)
