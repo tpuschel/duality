@@ -19,6 +19,10 @@
 #    include <unistd.h>
 #endif
 
+#ifdef _WIN32
+#    include <Windows.h>
+#endif
+
 struct slot {
     size_t ref_cnt;
     char rest[];
@@ -180,8 +184,12 @@ size_t get_page_size(void)
     long ret = sysconf(_SC_PAGESIZE);
     dy_assert(ret >= 0);
     return (size_t)ret;
+#elif defined _WIN32
+    SYSTEM_INFO info;
+    GetNativeSystemInfo(&info);
+    return info.dwPageSize;
 #else
-    // Just for now
+    // Fallback
     return 0x1000;
 #endif
 }
