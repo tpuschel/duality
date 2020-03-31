@@ -31,6 +31,7 @@ struct dy_lsp_ctx {
     void *env;
 
     dy_obj_pool_t *core_expr_pool;
+    dy_obj_pool_t *ast_expr_pool;
 
     bool is_initialized;
     bool received_shutdown_request;
@@ -67,6 +68,7 @@ dy_lsp_ctx_t *dy_lsp_create(dy_lsp_send_fn send, void *env)
         .send = send,
         .env = env,
         .core_expr_pool = dy_obj_pool_create(sizeof(struct dy_core_expr), _Alignof(struct dy_core_expr)),
+        .ast_expr_pool = dy_obj_pool_create(sizeof(struct dy_ast_expr), _Alignof(struct dy_ast_expr)),
         .is_initialized = false,
         .received_shutdown_request = false,
         .exit_code = 1, // Error by default.
@@ -729,6 +731,10 @@ dy_json_t hover_result(dy_string_t contents)
 
 void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
 {
+    if (doc->ast_is_present) {
+        dy_ast_do_block_release(ctx->ast_expr_pool, doc->ast);
+    }
+
     if (doc->core_is_present) {
         dy_core_expr_release(ctx->core_expr_pool, doc->core);
     }
@@ -739,7 +745,8 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
 
     struct dy_parser_ctx parser_ctx = {
         .stream = stream_from_string(doc->text),
-        .arrays = dy_array_create(sizeof(dy_array_t *), 32)
+        .string_arrays = dy_array_create(sizeof(dy_array_t *), 32),
+        .pool = ctx->ast_expr_pool
     };
 
     struct dy_ast_do_block ast;

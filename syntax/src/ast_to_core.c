@@ -234,27 +234,19 @@ bool dy_ast_negative_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_
 
 bool ast_list_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_list list, enum dy_core_polarity polarity, struct dy_core_expr *expr)
 {
-    dy_assert(list.num_exprs != 0);
-
     struct dy_core_expr e1;
-    bool b1 = dy_ast_expr_to_core(ctx, list.exprs[0], &e1);
+    bool b1 = dy_ast_expr_to_core(ctx, *list.expr, &e1);
 
-    if (list.num_exprs == 1) {
+    if (!list.next_or_null) {
         if (b1) {
             *expr = e1;
-            return true;
-        } else {
-            return false;
         }
+
+        return b1;
     }
 
-    struct dy_ast_list new_list = {
-        .exprs = list.exprs + 1,
-        .num_exprs = list.num_exprs - 1
-    };
-
     struct dy_core_expr e2;
-    bool b2 = dy_ast_list_to_core(ctx, new_list, &e2);
+    bool b2 = dy_ast_list_to_core(ctx, *list.next_or_null, &e2);
 
     if (!b1 || !b2) {
         if (b1) {
@@ -292,27 +284,19 @@ bool dy_ast_choice_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_list ch
 
 bool dy_ast_try_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_list try_block, struct dy_core_expr *expr)
 {
-    dy_assert(try_block.num_exprs != 0);
-
     struct dy_core_expr e1;
-    bool b1 = dy_ast_expr_to_core(ctx, try_block.exprs[0], &e1);
+    bool b1 = dy_ast_expr_to_core(ctx, *try_block.expr, &e1);
 
-    if (try_block.num_exprs == 1) {
+    if (!try_block.next_or_null) {
         if (b1) {
             *expr = e1;
-            return true;
-        } else {
-            return false;
         }
+
+        return b1;
     }
 
-    struct dy_ast_list new_try_block = {
-        .exprs = try_block.exprs + 1,
-        .num_exprs = try_block.num_exprs - 1
-    };
-
     struct dy_core_expr e2;
-    bool b2 = dy_ast_try_block_to_core(ctx, new_try_block, &e2);
+    bool b2 = dy_ast_try_block_to_core(ctx, *try_block.next_or_null, &e2);
 
     if (!b1 || !b2) {
         if (b1) {

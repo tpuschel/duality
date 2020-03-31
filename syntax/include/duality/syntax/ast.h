@@ -9,6 +9,9 @@
 
 #include <duality/support/string.h>
 #include <duality/support/range.h>
+#include <duality/support/obj_pool.h>
+
+#include <duality/syntax/api.h>
 
 struct dy_ast_expr;
 
@@ -67,8 +70,8 @@ struct dy_ast_do_block {
 };
 
 struct dy_ast_list {
-    const struct dy_ast_expr *exprs;
-    size_t num_exprs;
+    const struct dy_ast_expr *expr;
+    const struct dy_ast_list *next_or_null;
 };
 
 struct dy_ast_expr_map_elim {
@@ -126,5 +129,35 @@ struct dy_ast_expr {
 
     enum dy_ast_expr_tag tag;
 };
+
+DY_SYNTAX_API struct dy_ast_expr *dy_ast_expr_new(dy_obj_pool_t *pool, struct dy_ast_expr expr);
+
+DY_SYNTAX_API struct dy_ast_expr dy_ast_expr_retain(dy_obj_pool_t *pool, struct dy_ast_expr expr);
+
+DY_SYNTAX_API struct dy_ast_expr *dy_ast_expr_retain_ptr(dy_obj_pool_t *pool, const struct dy_ast_expr *expr);
+
+DY_SYNTAX_API void dy_ast_expr_release(dy_obj_pool_t *pool, struct dy_ast_expr expr);
+
+DY_SYNTAX_API void dy_ast_expr_release_ptr(dy_obj_pool_t *pool, const struct dy_ast_expr *expr);
+
+DY_SYNTAX_API struct dy_ast_do_block *dy_ast_do_block_new(dy_obj_pool_t *pool, struct dy_ast_do_block do_block);
+
+DY_SYNTAX_API void dy_ast_do_block_retain(dy_obj_pool_t *pool, struct dy_ast_do_block do_block);
+
+DY_SYNTAX_API void dy_ast_do_block_retain_ptr(dy_obj_pool_t *pool, const struct dy_ast_do_block *do_block);
+
+DY_SYNTAX_API void dy_ast_do_block_release(dy_obj_pool_t *pool, struct dy_ast_do_block do_block);
+
+DY_SYNTAX_API void dy_ast_do_block_release_ptr(dy_obj_pool_t *pool, const struct dy_ast_do_block *do_block);
+
+DY_SYNTAX_API struct dy_ast_list *dy_ast_list_new(dy_obj_pool_t *pool, struct dy_ast_list list);
+
+DY_SYNTAX_API void dy_ast_list_retain(dy_obj_pool_t *pool, struct dy_ast_list list);
+
+DY_SYNTAX_API void dy_ast_list_retain_ptr(dy_obj_pool_t *pool, const struct dy_ast_list *list);
+
+DY_SYNTAX_API void dy_ast_list_release(dy_obj_pool_t *pool, struct dy_ast_list list);
+
+DY_SYNTAX_API void dy_ast_list_release_ptr(dy_obj_pool_t *pool, const struct dy_ast_list *list);
 
 #endif // DY_AST_H

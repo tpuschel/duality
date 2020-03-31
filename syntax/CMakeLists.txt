@@ -1,6 +1,7 @@
 add_library(duality-syntax
     "src/ast_to_core.c"
     "src/parser.c"
+    "src/ast.c"
 )
 
 set_target_properties(duality-syntax PROPERTIES C_VISIBILITY_PRESET hidden)

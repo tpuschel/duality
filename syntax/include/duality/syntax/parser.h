@@ -17,7 +17,8 @@
 
 struct dy_parser_ctx {
     struct dy_stream stream;
-    dy_array_t *arrays;
+    dy_array_t *string_arrays;
+    dy_obj_pool_t *pool;
 };
 
 DY_SYNTAX_API bool dy_parse_literal(struct dy_parser_ctx *ctx, dy_string_t s);
