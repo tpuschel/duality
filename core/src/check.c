@@ -20,12 +20,10 @@
 static struct dy_constraint *alloc_constraint(struct dy_constraint constraint);
 
 static bool is_bound(size_t id, struct dy_core_expr expr);
+static size_t num_occurences(size_t id, struct dy_core_expr expr);
 
 static bool resolve_implicit(struct dy_core_ctx ctx, size_t id, struct dy_core_expr type, enum dy_core_polarity polarity, struct dy_constraint constraint, bool have_constraint, struct dy_constraint *new_constraint, bool *have_new_constraint, struct dy_core_expr expr, struct dy_core_expr *new_expr);
 static void remove_id(dy_array_t *ids, size_t id);
-
-static void print_core_expr(struct dy_core_expr expr);
-static void print_constraint(struct dy_constraint c);
 
 static bool is_mentioned_in_constraints(struct dy_core_ctx ctx, size_t id, struct dy_constraint constraint);
 
@@ -746,47 +744,53 @@ bool dy_check_inference_ctx(struct dy_core_ctx ctx, struct dy_core_inference_ctx
 
 bool is_bound(size_t id, struct dy_core_expr expr)
 {
+    return num_occurences(id, expr) > 0;
+}
+
+size_t num_occurences(size_t id, struct dy_core_expr expr)
+{
     switch (expr.tag) {
     case DY_CORE_EXPR_EXPR_MAP:
-        return is_bound(id, *expr.expr_map.e1) || is_bound(id, *expr.expr_map.e2);
-    case DY_CORE_EXPR_TYPE_MAP:
-        if (is_bound(id, *expr.type_map.arg_type)) {
-            return true;
-        }
+        return num_occurences(id, *expr.expr_map.e1) + num_occurences(id, *expr.expr_map.e2);
+    case DY_CORE_EXPR_TYPE_MAP: {
+        size_t x = num_occurences(id, *expr.type_map.arg_type);
 
         if (id == expr.type_map.arg_id) {
-            return false;
+            return x;
         }
 
-        return is_bound(id, *expr.type_map.expr);
+        return x + num_occurences(id, *expr.type_map.expr);
+    }
     case DY_CORE_EXPR_EXPR_MAP_ELIM:
-        return is_bound(id, *expr.expr_map_elim.expr) || is_bound(id, *expr.expr_map_elim.expr_map.e1) || is_bound(id, *expr.expr_map_elim.expr_map.e2);
-    case DY_CORE_EXPR_TYPE_MAP_ELIM:
-        if (is_bound(id, *expr.type_map_elim.expr) || is_bound(id, *expr.type_map_elim.type_map.arg_type)) {
-            return true;
-        }
+        return num_occurences(id, *expr.expr_map_elim.expr) + num_occurences(id, *expr.expr_map_elim.expr_map.e1) + num_occurences(id, *expr.expr_map_elim.expr_map.e2);
+    case DY_CORE_EXPR_TYPE_MAP_ELIM: {
+        size_t x = num_occurences(id, *expr.type_map_elim.expr) + num_occurences(id, *expr.type_map_elim.type_map.arg_type);
 
         if (id == expr.type_map_elim.type_map.arg_id) {
-            return false;
+            return x;
         }
 
-        return is_bound(id, *expr.type_map_elim.type_map.expr);
+        return x + num_occurences(id, *expr.type_map_elim.type_map.expr);
+    }
     case DY_CORE_EXPR_BOTH:
-        return is_bound(id, *expr.both.e1) || is_bound(id, *expr.both.e2);
+        return num_occurences(id, *expr.both.e1) + num_occurences(id, *expr.both.e2);
     case DY_CORE_EXPR_ONE_OF:
-        return is_bound(id, *expr.one_of.first) || is_bound(id, *expr.one_of.second);
+        return num_occurences(id, *expr.one_of.first) + num_occurences(id, *expr.one_of.second);
     case DY_CORE_EXPR_UNKNOWN:
-        return expr.unknown.id == id;
-    case DY_CORE_EXPR_INFERENCE_CTX:
-        if (is_bound(id, *expr.inference_ctx.type)) {
-            return true;
+        if (expr.unknown.id == id) {
+            return 1;
+        } else {
+            return 0;
         }
+    case DY_CORE_EXPR_INFERENCE_CTX: {
+        size_t x = num_occurences(id, *expr.inference_ctx.type);
 
         if (id == expr.inference_ctx.id) {
-            return false;
+            return x;
         }
 
-        return is_bound(id, *expr.inference_ctx.expr);
+        return x + num_occurences(id, *expr.inference_ctx.expr);
+    }
     case DY_CORE_EXPR_STRING:
         // fallthrough
     case DY_CORE_EXPR_TYPE_OF_STRINGS:
@@ -794,7 +798,7 @@ bool is_bound(size_t id, struct dy_core_expr expr)
     case DY_CORE_EXPR_END:
         // fallthrough
     case DY_CORE_EXPR_PRINT:
-        return false;
+        return 0;
     }
 }
 
@@ -875,29 +879,42 @@ bool resolve_implicit(struct dy_core_ctx ctx, size_t id, struct dy_core_expr typ
 
                 expr = substitute(ctx, id, solution.supertype, expr);
             } else {
-                struct dy_core_expr new_unknown = {
-                    .tag = DY_CORE_EXPR_UNKNOWN,
-                    .unknown = {
-                        .id = id,
-                        .type = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, type)),
-                        .is_inference_var = false,
-                    }
-                };
+                struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
-                expr = substitute(ctx, id, new_unknown, expr);
+                if (num_occurences(id, type_of_expr) > 1) {
+                    struct dy_core_expr new_unknown = {
+                        .tag = DY_CORE_EXPR_UNKNOWN,
+                        .unknown = {
+                            .id = id,
+                            .type = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, type)),
+                            .is_inference_var = false,
+                        }
+                    };
 
-                dy_core_expr_release(ctx.expr_pool, new_unknown);
+                    expr = substitute(ctx, id, new_unknown, expr);
 
-                expr = (struct dy_core_expr){
-                    .tag = DY_CORE_EXPR_TYPE_MAP,
-                    .type_map = {
-                        .arg_id = id,
-                        .arg_type = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, type)),
-                        .polarity = DY_CORE_POLARITY_POSITIVE,
-                        .expr = dy_core_expr_new(ctx.expr_pool, expr),
-                        .is_implicit = true,
-                    }
-                };
+                    dy_core_expr_release(ctx.expr_pool, new_unknown);
+
+                    expr = (struct dy_core_expr){
+                        .tag = DY_CORE_EXPR_TYPE_MAP,
+                        .type_map = {
+                            .arg_id = id,
+                            .arg_type = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, type)),
+                            .polarity = DY_CORE_POLARITY_POSITIVE,
+                            .expr = dy_core_expr_new(ctx.expr_pool, expr),
+                            .is_implicit = true,
+                        }
+                    };
+                } else {
+                    struct dy_core_expr all = {
+                        .tag = DY_CORE_EXPR_END,
+                        .end_polarity = DY_CORE_POLARITY_POSITIVE
+                    };
+
+                    expr = substitute(ctx, id, all, expr);
+                }
+
+                dy_core_expr_release(ctx.expr_pool, type_of_expr);
             }
             break;
         case DY_CORE_POLARITY_NEGATIVE:
@@ -910,29 +927,42 @@ bool resolve_implicit(struct dy_core_ctx ctx, size_t id, struct dy_core_expr typ
 
                 expr = substitute(ctx, id, solution.subtype, expr);
             } else {
-                struct dy_core_expr new_unknown = {
-                    .tag = DY_CORE_EXPR_UNKNOWN,
-                    .unknown = {
-                        .id = id,
-                        .type = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, type)),
-                        .is_inference_var = false,
-                    }
-                };
+                struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
-                expr = substitute(ctx, id, new_unknown, expr);
+                if (num_occurences(id, type_of_expr) > 1) {
+                    struct dy_core_expr new_unknown = {
+                        .tag = DY_CORE_EXPR_UNKNOWN,
+                        .unknown = {
+                            .id = id,
+                            .type = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, type)),
+                            .is_inference_var = false,
+                        }
+                    };
 
-                dy_core_expr_release(ctx.expr_pool, new_unknown);
+                    expr = substitute(ctx, id, new_unknown, expr);
 
-                expr = (struct dy_core_expr){
-                    .tag = DY_CORE_EXPR_TYPE_MAP,
-                    .type_map = {
-                        .arg_id = id,
-                        .arg_type = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, type)),
-                        .polarity = DY_CORE_POLARITY_POSITIVE,
-                        .expr = dy_core_expr_new(ctx.expr_pool, expr),
-                        .is_implicit = true,
-                    }
-                };
+                    dy_core_expr_release(ctx.expr_pool, new_unknown);
+
+                    expr = (struct dy_core_expr){
+                        .tag = DY_CORE_EXPR_TYPE_MAP,
+                        .type_map = {
+                            .arg_id = id,
+                            .arg_type = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, type)),
+                            .polarity = DY_CORE_POLARITY_POSITIVE,
+                            .expr = dy_core_expr_new(ctx.expr_pool, expr),
+                            .is_implicit = true,
+                        }
+                    };
+                } else {
+                    struct dy_core_expr nothing = {
+                        .tag = DY_CORE_EXPR_END,
+                        .end_polarity = DY_CORE_POLARITY_NEGATIVE
+                    };
+
+                    expr = substitute(ctx, id, nothing, expr);
+                }
+
+                dy_core_expr_release(ctx.expr_pool, type_of_expr);
             }
             break;
         }
@@ -949,29 +979,54 @@ bool resolve_implicit(struct dy_core_ctx ctx, size_t id, struct dy_core_expr typ
 
         expr = checked_expr;
     } else {
-        struct dy_core_expr new_unknown = {
-            .tag = DY_CORE_EXPR_UNKNOWN,
-            .unknown = {
-                .id = id,
-                .type = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, type)),
-                .is_inference_var = false,
+        struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
+
+        if (num_occurences(id, type_of_expr) > 1) {
+            struct dy_core_expr new_unknown = {
+                .tag = DY_CORE_EXPR_UNKNOWN,
+                .unknown = {
+                    .id = id,
+                    .type = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, type)),
+                    .is_inference_var = false,
+                }
+            };
+
+            expr = substitute(ctx, id, new_unknown, expr);
+
+            dy_core_expr_release(ctx.expr_pool, new_unknown);
+
+            expr = (struct dy_core_expr){
+                .tag = DY_CORE_EXPR_TYPE_MAP,
+                .type_map = {
+                    .arg_id = id,
+                    .arg_type = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, type)),
+                    .polarity = DY_CORE_POLARITY_POSITIVE,
+                    .expr = dy_core_expr_new(ctx.expr_pool, expr),
+                    .is_implicit = true,
+                }
+            };
+        } else {
+            struct dy_core_expr e;
+            switch (polarity) {
+            case DY_CORE_POLARITY_POSITIVE:
+                e = (struct dy_core_expr){
+                    .tag = DY_CORE_EXPR_END,
+                    .end_polarity = DY_CORE_POLARITY_POSITIVE
+                };
+
+                break;
+            case DY_CORE_POLARITY_NEGATIVE:
+                e = (struct dy_core_expr){
+                    .tag = DY_CORE_EXPR_END,
+                    .end_polarity = DY_CORE_POLARITY_NEGATIVE
+                };
+                break;
             }
-        };
 
-        expr = substitute(ctx, id, new_unknown, expr);
+            expr = substitute(ctx, id, e, expr);
+        }
 
-        dy_core_expr_release(ctx.expr_pool, new_unknown);
-
-        expr = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_TYPE_MAP,
-            .type_map = {
-                .arg_id = id,
-                .arg_type = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, type)),
-                .polarity = DY_CORE_POLARITY_POSITIVE,
-                .expr = dy_core_expr_new(ctx.expr_pool, expr),
-                .is_implicit = true,
-            }
-        };
+        dy_core_expr_release(ctx.expr_pool, type_of_expr);
     }
 
     for (size_t i = dy_array_size(ctx.bound_constraints); i-- > 0;) {
@@ -1053,48 +1108,4 @@ bool is_mentioned_in_constraints(struct dy_core_ctx ctx, size_t id, struct dy_co
 struct dy_constraint *alloc_constraint(struct dy_constraint constraint)
 {
     return dy_alloc_and_copy(&constraint, sizeof constraint);
-}
-
-void print_core_expr(struct dy_core_expr expr)
-{
-    dy_array_t *s = dy_array_create(1, 64);
-    dy_core_expr_to_string(expr, s);
-
-    for (size_t i = 0; i < dy_array_size(s); ++i) {
-        char c;
-        dy_array_get(s, i, &c);
-        fprintf(stderr, "%c", c);
-    }
-
-    dy_array_destroy(s);
-}
-
-void print_constraint(struct dy_constraint c)
-{
-    switch (c.tag) {
-    case DY_CONSTRAINT_SINGLE:
-        if (c.single.range.have_subtype) {
-            print_core_expr(c.single.range.subtype);
-            fprintf(stderr, " <: ");
-        }
-        fprintf(stderr, "%zu", c.single.id);
-        if (c.single.range.have_supertype) {
-            fprintf(stderr, " <: ");
-            print_core_expr(c.single.range.supertype);
-        }
-        break;
-    case DY_CONSTRAINT_MULTIPLE:
-        fprintf(stderr, "(");
-        print_constraint(*c.multiple.c1);
-        switch (c.multiple.polarity) {
-        case DY_CORE_POLARITY_POSITIVE:
-            fprintf(stderr, " & ");
-            break;
-        case DY_CORE_POLARITY_NEGATIVE:
-            fprintf(stderr, " | ");
-            break;
-        }
-        print_constraint(*c.multiple.c2);
-        fprintf(stderr, ")");
-    }
 }

@@ -68,6 +68,12 @@ dy_ternary_t dy_is_subtype_no_transformation(struct dy_core_ctx ctx, struct dy_c
 
 dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
+    /*fprintf(stderr, "is subtype check!\n");
+    print_core_expr(subtype);
+    fprintf(stderr, " <: ");
+    print_core_expr(supertype);
+    fprintf(stderr, "\n");*/
+
     if (subtype.tag == DY_CORE_EXPR_UNKNOWN && subtype.unknown.is_inference_var && supertype.tag == DY_CORE_EXPR_UNKNOWN && supertype.unknown.is_inference_var) {
         if (subtype.unknown.id == supertype.unknown.id) {
             return DY_YES;
@@ -213,7 +219,7 @@ dy_ternary_t positive_expr_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                     .e1 = dy_core_expr_retain_ptr(ctx.expr_pool, expr_map.e1),
                     .e2 = dy_core_expr_retain_ptr(ctx.expr_pool, expr_map.e2),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
-                    .is_implicit = false,
+                    .is_implicit = expr_map.is_implicit,
                 },
             }
         };
@@ -240,7 +246,7 @@ dy_ternary_t positive_expr_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                     .e1 = dy_core_expr_retain_ptr(ctx.expr_pool, expr_map.e1),
                     .e2 = dy_core_expr_new(ctx.expr_pool, new_subtype_expr_emap_e2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
-                    .is_implicit = false,
+                    .is_implicit = expr_map.is_implicit,
                 }
             };
 
@@ -295,7 +301,7 @@ dy_ternary_t positive_expr_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                     .e1 = dy_core_expr_retain_ptr(ctx.expr_pool, expr_map.e1),
                     .e2 = dy_core_expr_retain_ptr(ctx.expr_pool, expr_map.e2),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
-                    .is_implicit = false,
+                    .is_implicit = expr_map.is_implicit,
                 },
             }
         };
@@ -389,7 +395,7 @@ dy_ternary_t negative_expr_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                     .e1 = dy_core_expr_retain_ptr(ctx.expr_pool, expr_map.e1),
                     .e2 = dy_core_expr_retain_ptr(ctx.expr_pool, expr_map.e2),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
-                    .is_implicit = false,
+                    .is_implicit = expr_map.is_implicit,
                 },
             }
         };
@@ -597,7 +603,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                     .e1 = dy_core_expr_new(ctx.expr_pool, new_var_expr),
                     .e2 = dy_core_expr_new(ctx.expr_pool, new_type_map_expr),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
-                    .is_implicit = false,
+                    .is_implicit = type_map.is_implicit,
                 },
             }
         };
@@ -626,7 +632,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                     .arg_type = dy_core_expr_retain_ptr(ctx.expr_pool, var.type),
                     .expr = dy_core_expr_new(ctx.expr_pool, new_tmap_e2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
-                    .is_implicit = false,
+                    .is_implicit = type_map.is_implicit,
                 }
             };
 
@@ -678,123 +684,33 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                 .expr = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, subtype_expr)),
                 .expr_map = {
                     .e1 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, unknown)),
-                    .e2 = dy_core_expr_new(ctx.expr_pool, substitute(ctx, type_map.arg_id, unknown, *type_map.expr)),
+                    .e2 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, supertype)),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = true,
                 },
             }
         };
 
-        struct dy_core_expr type_of_e = dy_type_of(ctx, e);
-
-        struct dy_constraint c;
-        bool have_c = false;
-        bool did_transform_e = false;
-        struct dy_core_expr new_e;
-        dy_ternary_t result = dy_is_subtype_sub(ctx, type_of_e, supertype, &c, &have_c, e, &new_e, &did_transform_e);
-
-        dy_core_expr_release(ctx.expr_pool, type_of_e);
-
-        if (result == DY_NO) {
-            dy_core_expr_release(ctx.expr_pool, e);
-            return DY_NO;
-        }
-
-        if (did_transform_e) {
-            dy_core_expr_release(ctx.expr_pool, e);
-        } else {
-            new_e = e;
-        }
-
-        if (!have_c) {
-            fprintf(stderr, "[is_subtype] No constraints, assigning All.\n");
-
-            struct dy_core_expr all = {
-                .tag = DY_CORE_EXPR_END,
-                .end_polarity = DY_CORE_POLARITY_POSITIVE
-            };
-
-            *new_subtype_expr = substitute(ctx, id, all, new_e);
-            *did_transform_subtype_expr = true;
-
-            dy_core_expr_release(ctx.expr_pool, new_e);
-
-            return result;
-        }
-
-        dy_array_t *ids = dy_array_create(sizeof(size_t), 4);
-        dy_binding_contraints(ctx, id, c, have_c, ids);
-
-        if (dy_array_size(ids) != 0) {
-            struct dy_bound_constraint bound_constraint = {
+        struct dy_core_expr inference_ctx = {
+            .tag = DY_CORE_EXPR_INFERENCE_CTX,
+            .inference_ctx = {
                 .id = id,
-                .type = dy_core_expr_retain(ctx.expr_pool, *type_map.arg_type),
-                .binding_ids = ids
-            };
-
-            dy_array_add(ctx.bound_constraints, &bound_constraint);
-
-            *new_subtype_expr = new_e;
-            *did_transform_subtype_expr = true;
-
-            if (have_c) {
-                *constraint = c;
-                *did_generate_constraint = true;
+                .type = dy_core_expr_retain_ptr(ctx.expr_pool, unknown.unknown.type),
+                .expr = dy_core_expr_new(ctx.expr_pool, e),
+                .polarity = DY_CORE_POLARITY_POSITIVE,
             }
+        };
 
-            return result;
-        }
+        bool result = dy_check_expr(ctx, inference_ctx, new_subtype_expr, constraint, did_generate_constraint);
 
-        dy_array_destroy(ids);
+        dy_core_expr_release(ctx.expr_pool, e);
 
-        struct dy_constraint_range solution = dy_constraint_collect(ctx, c, id);
-
-        if (solution.have_subtype) {
-            dy_core_expr_release(ctx.expr_pool, solution.subtype);
-        }
-
-        if (solution.have_supertype) {
-            struct dy_core_expr new_e2 = substitute(ctx, id, solution.supertype, new_e);
-
-            dy_core_expr_release(ctx.expr_pool, solution.supertype);
-            dy_core_expr_release(ctx.expr_pool, new_e);
-
-            new_e = new_e2;
+        if (result) {
+            *did_transform_subtype_expr = true;
+            return DY_YES;
         } else {
-            struct dy_core_expr all = {
-                .tag = DY_CORE_EXPR_END,
-                .end_polarity = DY_CORE_POLARITY_POSITIVE
-            };
-
-            struct dy_core_expr new_e2 = substitute(ctx, id, all, new_e);
-
-            dy_core_expr_release(ctx.expr_pool, new_e);
-
-            new_e = new_e2;
-        }
-
-        struct dy_core_expr type_of_new_e = dy_type_of(ctx, new_e);
-
-        have_c = false;
-        struct dy_core_expr new_e2;
-        result = dy_is_subtype(ctx, type_of_new_e, supertype, &c, &have_c, new_e, &new_e2);
-
-        dy_core_expr_release(ctx.expr_pool, type_of_new_e);
-        dy_core_expr_release(ctx.expr_pool, new_e);
-
-        if (result == DY_NO) {
             return DY_NO;
         }
-
-        *new_subtype_expr = new_e2;
-        *did_transform_subtype_expr = true;
-
-        if (have_c) {
-            *constraint = c;
-            *did_generate_constraint = true;
-        }
-
-        return result;
     }
 
     return DY_NO;
