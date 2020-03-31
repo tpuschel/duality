@@ -24,6 +24,9 @@ static void *last(const dy_array_t *array);
 
 dy_array_t *dy_array_create(size_t elem_size, size_t capacity)
 {
+    dy_assert(elem_size != 0);
+    dy_assert(capacity != 0);
+
     size_t capacity_in_bytes;
     dy_assert(!dy_size_t_mul_overflow(elem_size, capacity, &capacity_in_bytes));
 
