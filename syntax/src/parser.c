@@ -17,11 +17,6 @@ enum infix_op {
     INFIX_OP_BANG
 };
 
-enum assoc {
-    ASSOC_LEFT,
-    ASSOC_RIGHT
-};
-
 static bool left_op_is_first(enum infix_op left, enum infix_op right);
 
 static bool parse_expr_non_left_recursive(struct dy_parser_ctx *ctx, struct dy_ast_expr *expr);
