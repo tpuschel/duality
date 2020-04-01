@@ -6,44 +6,21 @@
 
 #include <duality/support/obj_pool.h>
 
-#include <duality/support/array.h>
 #include <duality/support/allocator.h>
-#include <duality/support/assert.h>
 
 #include <string.h>
-#include <limits.h>
-
-#include <stdio.h>
-
-#ifdef DY_HAVE_UNISTD
-#    include <unistd.h>
-#endif
-
-#ifdef _WIN32
-#    include <Windows.h>
-#endif
 
 struct slot {
     size_t ref_cnt;
     char rest[];
 };
 
-struct block {
-    void *base;
-    void *end;
-};
-
 struct dy_obj_pool {
-    dy_array_t *blocks;
     size_t obj_size;
     size_t slot_padding;
-    size_t page_size;
-    dy_obj_pool_is_parent_cb is_parent_cb;
 };
 
 static size_t compute_padding(size_t addr, size_t align);
-static size_t get_page_size(void);
-static void print_parents(dy_obj_pool_t *pool, const void *child);
 
 dy_obj_pool_t *dy_obj_pool_create(size_t obj_size, size_t obj_align)
 {
@@ -55,11 +32,8 @@ dy_obj_pool_t *dy_obj_pool_create(size_t obj_size, size_t obj_align)
     }
 
     struct dy_obj_pool pool = {
-        .blocks = dy_array_create(sizeof(struct block), 8),
         .obj_size = obj_size,
-        .slot_padding = padding,
-        .page_size = get_page_size(),
-        .is_parent_cb = NULL
+        .slot_padding = padding
     };
 
     return dy_alloc_and_copy(&pool, sizeof pool);
@@ -67,54 +41,21 @@ dy_obj_pool_t *dy_obj_pool_create(size_t obj_size, size_t obj_align)
 
 void *dy_obj_pool_alloc(dy_obj_pool_t *pool)
 {
-    for (size_t i = 0, size = dy_array_size(pool->blocks); i < size; ++i) {
-        struct block *block = dy_array_get_ptr(pool->blocks, i);
+    size_t data_offset = sizeof(struct slot) + pool->slot_padding;
 
-        struct slot *slot = block->base;
-
-        for (;;) {
-            char *data = slot->rest + pool->slot_padding;
-
-            void *slot_end = data + pool->obj_size;
-
-            if (slot_end > block->end) {
-                break;
-            }
-
-            if (slot->ref_cnt != 0) {
-                slot = slot_end;
-                continue;
-            }
-
-            ++slot->ref_cnt;
-
-            return data;
-        }
-
-        // TODO: Try to enlarge block if mmap()ed.
-    }
-
-    // TODO: Use mmap in conjunction with mremap or something like that.
-    struct slot *slot = dy_calloc(1, pool->page_size);
-
-    struct block block = {
-        .base = slot,
-        .end = (char *)slot + pool->page_size
-    };
-
-    dy_array_add(pool->blocks, &block);
-
-    void *data = slot->rest + pool->slot_padding;
+    struct slot *slot = dy_calloc(1, data_offset + pool->obj_size);
 
     ++slot->ref_cnt;
 
-    return data;
+    return (char *)slot + data_offset;
 }
 
 void *dy_obj_pool_new(dy_obj_pool_t *pool, const void *ptr)
 {
     void *p = dy_obj_pool_alloc(pool);
+
     memcpy(p, ptr, pool->obj_size);
+
     return p;
 }
 
@@ -135,35 +76,17 @@ size_t dy_obj_pool_release(dy_obj_pool_t *pool, const void *ptr)
 
     struct slot *slot = (void *)(char_ptr - pool->slot_padding - sizeof(struct slot));
 
-    if (slot->ref_cnt == 0) {
-        if (pool->is_parent_cb != NULL) {
-            fprintf(stderr, "Alive objects referencing this one:\n");
-            print_parents(pool, ptr);
-        }
+    size_t new_ref_cnt = --slot->ref_cnt;
 
-        dy_bail("Trying to release a non-existent object.");
+    if (new_ref_cnt == 0) {
+        dy_free(slot);
     }
 
-    --slot->ref_cnt;
-
-    return slot->ref_cnt;
-}
-
-void dy_obj_pool_set_is_parent_cb(dy_obj_pool_t *pool, dy_obj_pool_is_parent_cb cb)
-{
-    pool->is_parent_cb = cb;
+    return new_ref_cnt;
 }
 
 void dy_obj_pool_destroy(dy_obj_pool_t *pool)
 {
-    for (size_t i = 0, size = dy_array_size(pool->blocks); i < size; ++i) {
-        struct block *block = dy_array_get_ptr(pool->blocks, i);
-
-        dy_free(block->base);
-    }
-
-    dy_array_destroy(pool->blocks);
-
     dy_free(pool);
 }
 
@@ -176,47 +99,4 @@ size_t compute_padding(size_t addr, size_t align)
     }
 
     return padding;
-}
-
-size_t get_page_size(void)
-{
-#ifdef DY_HAVE_UNISTD
-    long ret = sysconf(_SC_PAGESIZE);
-    dy_assert(ret >= 0);
-    return (size_t)ret;
-#elif defined _WIN32
-    SYSTEM_INFO info;
-    GetNativeSystemInfo(&info);
-    return info.dwPageSize;
-#else
-    // Fallback
-    return 0x1000;
-#endif
-}
-
-void print_parents(dy_obj_pool_t *pool, const void *child)
-{
-    for (size_t i = 0, size = dy_array_size(pool->blocks); i < size; ++i) {
-        struct block *block = dy_array_get_ptr(pool->blocks, i);
-
-        struct slot *slot = block->base;
-
-        for (;;) {
-            char *data = slot->rest + pool->slot_padding;
-
-            void *slot_end = data + pool->obj_size;
-
-            if (slot_end > block->end) {
-                break;
-            }
-
-            if (slot->ref_cnt != 0) {
-                if (pool->is_parent_cb(data, child)) {
-                    fprintf(stderr, "%p\n", (void *)data);
-                }
-            }
-
-            slot = slot_end;
-        }
-    }
 }

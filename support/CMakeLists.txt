@@ -10,13 +10,6 @@ add_library(duality-support
     "src/obj_pool.c"
 )
 
-include(CheckIncludeFile)
-
-check_include_file(unistd.h HAVE_UNISTD)
-if(HAVE_UNISTD)
-    target_compile_definitions(duality-support PRIVATE DY_HAVE_UNISTD)
-endif()
-
 set_target_properties(duality-support PROPERTIES C_VISIBILITY_PRESET hidden)
 
 if(BUILD_SHARED_LIBS)

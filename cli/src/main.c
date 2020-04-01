@@ -32,8 +32,6 @@ static void print_unbound_vars_error(dy_array_t *unbound_vars);
 
 static void print_constraint(struct dy_constraint c);
 
-static size_t size_t_max(size_t a, size_t b);
-
 int main(int argc, const char *argv[])
 {
     if (argc > 1 && strcmp(argv[1], "--server") == 0) {
@@ -78,8 +76,6 @@ int main(int argc, const char *argv[])
     dy_array_destroy(parser_ctx.stream.buffer);
 
     dy_obj_pool_t *core_expr_pool = dy_obj_pool_create(sizeof(struct dy_core_expr), _Alignof(struct dy_core_expr));
-
-    dy_obj_pool_set_is_parent_cb(core_expr_pool, dy_core_expr_is_parent);
 
     size_t running_id = 0;
     dy_array_t *unbound_vars = dy_array_create(sizeof(dy_string_t), 2);
@@ -229,14 +225,5 @@ void print_constraint(struct dy_constraint c)
         }
         print_constraint(*c.multiple.c2);
         printf(")");
-    }
-}
-
-size_t size_t_max(size_t a, size_t b)
-{
-    if (a > b) {
-        return a;
-    } else {
-        return b;
     }
 }

@@ -113,6 +113,4 @@ DY_CORE_API void dy_core_expr_release(dy_obj_pool_t *pool, struct dy_core_expr e
 
 DY_CORE_API void dy_core_expr_release_ptr(dy_obj_pool_t *pool, const struct dy_core_expr *expr);
 
-DY_CORE_API int dy_core_expr_is_parent(const void *parent, const void *child);
-
 #endif // DY_CORE_H
