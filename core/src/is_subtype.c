@@ -68,12 +68,6 @@ dy_ternary_t dy_is_subtype_no_transformation(struct dy_core_ctx ctx, struct dy_c
 
 dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
-    /*fprintf(stderr, "is subtype check!\n");
-    print_core_expr(subtype);
-    fprintf(stderr, " <: ");
-    print_core_expr(supertype);
-    fprintf(stderr, "\n");*/
-
     if (subtype.tag == DY_CORE_EXPR_UNKNOWN && subtype.unknown.is_inference_var && supertype.tag == DY_CORE_EXPR_UNKNOWN && supertype.unknown.is_inference_var) {
         if (subtype.unknown.id == supertype.unknown.id) {
             return DY_YES;
@@ -703,7 +697,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
 
         bool result = dy_check_expr(ctx, inference_ctx, new_subtype_expr, constraint, did_generate_constraint);
 
-        dy_core_expr_release(ctx.expr_pool, e);
+        dy_core_expr_release(ctx.expr_pool, inference_ctx);
 
         if (result) {
             *did_transform_subtype_expr = true;
