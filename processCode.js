@@ -26,6 +26,8 @@ let streamCallbackPointer = addFunction((buffer, env) => { }, 'vii')
 
 let coreExprPool
 
+let astExprPool
+
 let textBuffer
 
 let processCode = program => {
@@ -47,7 +49,7 @@ let processCode = program => {
 
 
     // First, parsing
-    let parserCtx = _malloc(20)
+    let parserCtx = _malloc(24)
 
     setValue(parserCtx, streamCallbackPointer, 'i32') // stream
     setValue(parserCtx + 4, textBuffer, 'i32') // buffer
@@ -56,6 +58,12 @@ let processCode = program => {
 
     let stringArrays = _dy_array_create(4, 4)
     setValue(parserCtx + 16, stringArrays, 'i32') // arrays
+
+    if (!astExprPool) {
+        astExprPool = _dy_obj_pool_create(76, 4)
+    }
+
+    setValue(parserCtx + 20, astExprPool, 'i32')
 
     // actually parse
     let resultDoBlock = _malloc(20)
