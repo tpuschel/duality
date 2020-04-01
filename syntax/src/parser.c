@@ -24,10 +24,6 @@ enum assoc {
 
 static bool left_op_is_first(enum infix_op left, enum infix_op right);
 
-static int op_precedence(enum infix_op op);
-
-static enum assoc op_assoc(enum infix_op op);
-
 static bool parse_expr_non_left_recursive(struct dy_parser_ctx *ctx, struct dy_ast_expr *expr);
 
 static enum infix_op parse_infix_op(struct dy_parser_ctx *ctx);
@@ -1162,51 +1158,34 @@ bool combine_infix(struct dy_parser_ctx *ctx, struct dy_ast_expr left, enum infi
 
 bool left_op_is_first(enum infix_op left, enum infix_op right)
 {
-    if (op_precedence(left) > op_precedence(right)) {
+    switch (left) {
+    case INFIX_OP_BANG:
+        return false;
+    case INFIX_OP_JUXTAPOSITION:
         return true;
-    }
-
-    if (op_precedence(left) == op_precedence(right)) {
-        dy_assert(op_assoc(left) == op_assoc(right));
-
-        switch (op_assoc(left)) {
-        case ASSOC_LEFT: return true;
-        case ASSOC_RIGHT: return false;
+    case INFIX_OP_STRAIGHT_ARROW:
+        // fallthrough
+    case INFIX_OP_SQUIGGLY_ARROW:
+        // fallthrough
+    case INFIX_OP_AT_STRAIGHT_ARROW:
+        // fallthrough
+    case INFIX_OP_AT_SQUIGGLY_ARROW:
+        switch (right) {
+        case INFIX_OP_BANG:
+            return true;
+        case INFIX_OP_JUXTAPOSITION:
+            // fallthrough
+        case INFIX_OP_STRAIGHT_ARROW:
+            // fallthrough
+        case INFIX_OP_SQUIGGLY_ARROW:
+            // fallthrough
+        case INFIX_OP_AT_STRAIGHT_ARROW:
+            // fallthrough
+        case INFIX_OP_AT_SQUIGGLY_ARROW:
+            return false;
         }
 
         DY_IMPOSSIBLE_ENUM();
-    }
-
-    return false;
-}
-
-int op_precedence(enum infix_op op)
-{
-    switch (op) {
-    case INFIX_OP_BANG:
-        return 250;
-    case INFIX_OP_STRAIGHT_ARROW:
-    case INFIX_OP_SQUIGGLY_ARROW:
-    case INFIX_OP_AT_STRAIGHT_ARROW:
-    case INFIX_OP_AT_SQUIGGLY_ARROW:
-        return 500;
-    case INFIX_OP_JUXTAPOSITION:
-        return 99999;
-    }
-
-    DY_IMPOSSIBLE_ENUM();
-}
-
-enum assoc op_assoc(enum infix_op op)
-{
-    switch (op) {
-    case INFIX_OP_STRAIGHT_ARROW:
-    case INFIX_OP_SQUIGGLY_ARROW:
-    case INFIX_OP_JUXTAPOSITION:
-    case INFIX_OP_AT_STRAIGHT_ARROW:
-    case INFIX_OP_AT_SQUIGGLY_ARROW:
-    case INFIX_OP_BANG:
-        return ASSOC_LEFT;
     }
 
     DY_IMPOSSIBLE_ENUM();
