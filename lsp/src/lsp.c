@@ -789,11 +789,11 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
     bool have_c = false;
     bool is_valid = dy_check_expr(core_ctx, core, &new_core, &c, &have_c);
 
-    dy_core_expr_release(ctx->core_expr_pool, core);
-
     if (!is_valid) {
         return;
     }
+
+    dy_core_expr_release(ctx->core_expr_pool, core);
 
     doc->core_is_valid = true;
     doc->core = new_core;
