@@ -16,8 +16,6 @@
 
 #include "substitute.h"
 
-#include <stdio.h>
-
 static dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
 static dy_ternary_t expr_map_is_subtype(struct dy_core_ctx ctx, struct dy_core_expr_map expr_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_expr_map);
@@ -1057,6 +1055,7 @@ dy_ternary_t both_is_subtype_of_both(struct dy_core_ctx ctx, struct dy_core_both
     dy_ternary_t res2 = dy_is_subtype_sub(ctx, *p1.e2, *p2.e2, &c2, &have_c2, subtype_expr, &e2, &did_transform_e2);
     if (res2 == DY_NO) {
         dy_core_expr_release(ctx.expr_pool, e1);
+        return DY_NO;
     }
 
     if (!did_transform_e2) {
