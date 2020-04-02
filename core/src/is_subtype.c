@@ -792,7 +792,11 @@ dy_ternary_t positive_both_is_subtype(struct dy_core_ctx ctx, struct dy_core_bot
         dy_core_expr_release(ctx.expr_pool, e2);
     }
 
-    return first_res;
+    if (first_res == DY_MAYBE && second_res == DY_MAYBE) {
+        return DY_MAYBE;
+    }
+
+    return DY_YES;
 }
 
 dy_ternary_t negative_both_is_subtype(struct dy_core_ctx ctx, struct dy_core_both both, struct dy_core_expr expr, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
