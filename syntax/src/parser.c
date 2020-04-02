@@ -49,7 +49,7 @@ static bool skip_line_comment(struct dy_parser_ctx *ctx);
 
 static bool skip_block_comment(struct dy_parser_ctx *ctx);
 
-static bool parse_type_map(struct dy_parser_ctx *ctx, dy_string_t arrow_literal, struct dy_ast_type_map *type_map);
+static bool parse_type_map(struct dy_parser_ctx *ctx, dy_string_t arrow_literal, bool is_implicit, struct dy_ast_type_map *type_map);
 
 static bool parse_do_block_body(struct dy_parser_ctx *ctx, struct dy_ast_do_block *do_block);
 
@@ -291,6 +291,34 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx *ctx, struct dy_ast_expr
             },
             .tag = DY_AST_EXPR_NEGATIVE_TYPE_MAP,
             .negative_type_map = negative_type_map
+        };
+
+        return true;
+    }
+
+    struct dy_ast_type_map implicit_positive_type_map;
+    if (dy_parse_implicit_positive_type_map(ctx, &implicit_positive_type_map)) {
+        *expr = (struct dy_ast_expr){
+            .text_range = {
+                .start = start_index,
+                .end = ctx->stream.current_index,
+            },
+            .tag = DY_AST_EXPR_POSITIVE_TYPE_MAP,
+            .positive_type_map = implicit_positive_type_map
+        };
+
+        return true;
+    }
+
+    struct dy_ast_type_map implicit_negative_type_map;
+    if (dy_parse_implicit_negative_type_map(ctx, &implicit_negative_type_map)) {
+        *expr = (struct dy_ast_expr){
+            .text_range = {
+                .start = start_index,
+                .end = ctx->stream.current_index,
+            },
+            .tag = DY_AST_EXPR_NEGATIVE_TYPE_MAP,
+            .negative_type_map = implicit_negative_type_map
         };
 
         return true;
@@ -919,7 +947,7 @@ bool parse_expr_parenthesized(struct dy_parser_ctx *ctx, struct dy_ast_expr *exp
     return true;
 }
 
-bool parse_type_map(struct dy_parser_ctx *ctx, dy_string_t arrow_literal, struct dy_ast_type_map *type_map)
+bool parse_type_map(struct dy_parser_ctx *ctx, dy_string_t arrow_literal, bool is_implicit, struct dy_ast_type_map *type_map)
 {
     size_t start_index = ctx->stream.current_index;
 
@@ -952,7 +980,8 @@ bool parse_type_map(struct dy_parser_ctx *ctx, dy_string_t arrow_literal, struct
 
     *type_map = (struct dy_ast_type_map){
         .arg = arg,
-        .expr = dy_ast_expr_new(ctx->pool, expr)
+        .expr = dy_ast_expr_new(ctx->pool, expr),
+        .is_implicit = is_implicit
     };
 
     return true;
@@ -960,12 +989,22 @@ bool parse_type_map(struct dy_parser_ctx *ctx, dy_string_t arrow_literal, struct
 
 bool dy_parse_positive_type_map(struct dy_parser_ctx *ctx, struct dy_ast_type_map *type_map)
 {
-    return parse_type_map(ctx, DY_STR_LIT("->"), type_map);
+    return parse_type_map(ctx, DY_STR_LIT("->"), false, type_map);
 }
 
 bool dy_parse_negative_type_map(struct dy_parser_ctx *ctx, struct dy_ast_type_map *type_map)
 {
-    return parse_type_map(ctx, DY_STR_LIT("~>"), type_map);
+    return parse_type_map(ctx, DY_STR_LIT("~>"), false, type_map);
+}
+
+bool dy_parse_implicit_positive_type_map(struct dy_parser_ctx *ctx, struct dy_ast_type_map *type_map)
+{
+    return parse_type_map(ctx, DY_STR_LIT("@->"), true, type_map);
+}
+
+bool dy_parse_implicit_negative_type_map(struct dy_parser_ctx *ctx, struct dy_ast_type_map *type_map)
+{
+    return parse_type_map(ctx, DY_STR_LIT("@~>"), true, type_map);
 }
 
 bool parse_arg(struct dy_parser_ctx *ctx, struct dy_ast_arg *arg)
