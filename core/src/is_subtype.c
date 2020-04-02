@@ -1069,7 +1069,7 @@ dy_ternary_t both_is_subtype_of_both(struct dy_core_ctx ctx, struct dy_core_both
             .multiple = {
                 .c1 = alloc_constraint(c1),
                 .c2 = alloc_constraint(c2),
-                .polarity = DY_CORE_POLARITY_NEGATIVE,
+                .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
         *did_generate_constraint = true;
