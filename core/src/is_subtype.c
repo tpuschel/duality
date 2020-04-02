@@ -74,6 +74,14 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx ctx, struct dy_core_expr subty
         }
     }
 
+    if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
+        return DY_YES;
+    }
+
+    if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_POSITIVE) {
+        return DY_YES;
+    }
+
     if (subtype.tag == DY_CORE_EXPR_UNKNOWN && subtype.unknown.is_inference_var) {
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_SINGLE,
@@ -110,16 +118,8 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx ctx, struct dy_core_expr subty
         return DY_MAYBE;
     }
 
-    if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
-        return DY_YES;
-    }
-
     if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
         return DY_MAYBE;
-    }
-
-    if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_POSITIVE) {
-        return DY_YES;
     }
 
     if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_POSITIVE) {
