@@ -6,7 +6,8 @@
 
 #include <duality/core/constraint.h>
 
-#include <duality/core/is_subtype.h>
+#include <duality/core/are_equal.h>
+
 
 #include <duality/support/assert.h>
 
@@ -55,7 +56,7 @@ struct dy_constraint_range constraint_conjunction(struct dy_core_ctx ctx, struct
 {
     struct dy_core_expr supertype;
     bool have_supertype = false;
-    if (range1.have_supertype && range2.have_supertype) {
+    if (range1.have_supertype && range2.have_supertype && dy_are_equal(ctx, range1.supertype, range2.supertype) != DY_YES) {
         supertype = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
@@ -76,7 +77,7 @@ struct dy_constraint_range constraint_conjunction(struct dy_core_ctx ctx, struct
 
     struct dy_core_expr subtype;
     bool have_subtype = false;
-    if (range1.have_subtype && range2.have_subtype) {
+    if (range1.have_subtype && range2.have_subtype && dy_are_equal(ctx, range1.subtype, range2.subtype) != DY_YES) {
         subtype = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
@@ -108,14 +109,18 @@ struct dy_constraint_range constraint_disjunction(struct dy_core_ctx ctx, struct
     struct dy_core_expr supertype;
     bool have_supertype = false;
     if (range1.have_supertype && range2.have_supertype) {
-        supertype = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_BOTH,
-            .both = {
-                .e1 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range1.supertype)),
-                .e2 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range2.supertype)),
-                .polarity = DY_CORE_POLARITY_NEGATIVE,
-            }
-        };
+        if (dy_are_equal(ctx, range1.supertype, range2.supertype) == DY_YES) {
+            supertype = dy_core_expr_retain(ctx.expr_pool, range1.supertype);
+        } else {
+            supertype = (struct dy_core_expr){
+                .tag = DY_CORE_EXPR_BOTH,
+                .both = {
+                    .e1 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range1.supertype)),
+                    .e2 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range2.supertype)),
+                    .polarity = DY_CORE_POLARITY_NEGATIVE,
+                }
+            };
+        }
 
         have_supertype = true;
     }
@@ -123,14 +128,18 @@ struct dy_constraint_range constraint_disjunction(struct dy_core_ctx ctx, struct
     struct dy_core_expr subtype;
     bool have_subtype = false;
     if (range1.have_subtype && range2.have_subtype) {
-        subtype = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_BOTH,
-            .both = {
-                .e1 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range1.subtype)),
-                .e2 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range2.subtype)),
-                .polarity = DY_CORE_POLARITY_POSITIVE,
-            }
-        };
+        if (dy_are_equal(ctx, range1.subtype, range2.subtype) == DY_YES) {
+            subtype = dy_core_expr_retain(ctx.expr_pool, range1.subtype);
+        } else {
+            subtype = (struct dy_core_expr){
+                .tag = DY_CORE_EXPR_BOTH,
+                .both = {
+                    .e1 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range1.subtype)),
+                    .e2 = dy_core_expr_new(ctx.expr_pool, dy_core_expr_retain(ctx.expr_pool, range2.subtype)),
+                    .polarity = DY_CORE_POLARITY_POSITIVE,
+                }
+            };
+        }
 
         have_subtype = true;
     }
