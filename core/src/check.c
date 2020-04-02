@@ -1035,6 +1035,8 @@ bool resolve_implicit(struct dy_core_ctx ctx, size_t id, struct dy_core_expr typ
 
         remove_id(bound_constraint.binding_ids, id);
 
+        dy_binding_contraints(ctx, bound_constraint.id, constraint, have_constraint, bound_constraint.binding_ids);
+
         if (dy_array_size(bound_constraint.binding_ids) == 0) {
             dy_array_destroy(bound_constraint.binding_ids);
 

@@ -11,7 +11,6 @@
 
 #include <duality/support/obj_pool.h>
 
-// TODO: Remove the binding_ids stuff and just work with constraints directly.
 struct dy_bound_constraint {
     size_t id;
     struct dy_core_expr type;
