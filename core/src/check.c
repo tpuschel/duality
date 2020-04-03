@@ -15,8 +15,6 @@
 
 #include "substitute.h"
 
-#include <stdio.h>
-
 static struct dy_constraint *alloc_constraint(struct dy_constraint constraint);
 
 static bool is_bound(size_t id, struct dy_core_expr expr);
