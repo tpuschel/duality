@@ -232,32 +232,20 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_core_ctx ctx, struct dy_core_expr_m
     dy_core_expr_release(ctx.expr_pool, right);
 
     if (left.tag == DY_CORE_EXPR_BOTH) {
-        struct dy_core_expr type_of_both_e1 = dy_type_of(ctx, *left.both.e1);
+        struct dy_core_expr_map_elim new_elim = {
+            .expr = left.both.e1,
+            .expr_map = expr_map.expr_map,
+        };
 
-        result = dy_is_subtype_no_transformation(ctx, type_of_both_e1, expr_map, &constraint, &have_constraint);
+        result = dy_eval_expr_map_elim(ctx, new_elim, new_expr);
 
-        dy_assert(!have_constraint);
-
-        dy_core_expr_release(ctx.expr_pool, type_of_both_e1);
-
-        if (result == DY_YES) {
-            struct dy_core_expr_map_elim new_elim = {
-                .expr = left.both.e1,
-                .expr_map = expr_map.expr_map,
-            };
-
-            result = dy_eval_expr_map_elim(ctx, new_elim, new_expr);
-
+        if (result != DY_NO) {
             dy_core_expr_release(ctx.expr_pool, left);
             dy_core_expr_release(ctx.expr_pool, expr_map);
-
             return result;
         }
 
-        struct dy_core_expr_map_elim new_elim = {
-            .expr = left.both.e2,
-            .expr_map = expr_map.expr_map,
-        };
+        new_elim.expr = left.both.e2;
 
         result = dy_eval_expr_map_elim(ctx, new_elim, new_expr);
 
