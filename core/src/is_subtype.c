@@ -412,7 +412,7 @@ dy_ternary_t negative_expr_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                 .tag = DY_CORE_EXPR_EXPR_MAP,
                 .expr_map = {
                     .e1 = dy_core_expr_retain_ptr(ctx.expr_pool, expr_map.e1),
-                    .e2 = dy_core_expr_new(ctx.expr_pool, emap_e2),
+                    .e2 = dy_core_expr_new(ctx.expr_pool, new_emap_e2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
                     .is_implicit = expr_map.is_implicit,
                 }
@@ -776,7 +776,7 @@ dy_ternary_t positive_both_is_subtype(struct dy_core_ctx ctx, struct dy_core_bot
         *did_generate_constraint = true;
     }
 
-    if (did_transform_e1 || did_transform_e2) {
+    if (did_transform_e1 && did_transform_e2) {
         *new_subtype_expr = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_BOTH,
             .both = {
