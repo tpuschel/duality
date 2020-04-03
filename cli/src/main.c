@@ -30,8 +30,6 @@ static void print_string(FILE *stream, dy_string_t s);
 
 static void print_unbound_vars_error(dy_array_t *unbound_vars);
 
-static void print_constraint(struct dy_constraint c);
-
 int main(int argc, const char *argv[])
 {
     if (argc > 1 && strcmp(argv[1], "--server") == 0) {
@@ -123,7 +121,6 @@ int main(int argc, const char *argv[])
 
     if (have_constraint) {
         fprintf(stderr, "Constraint on top level??.\n");
-        print_constraint(constraint);
         fprintf(stderr, "\n");
         return -1;
     }
@@ -196,34 +193,4 @@ void read_chunk(dy_array_t *buffer, void *env)
     size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), CHUNK_SIZE, stream);
 
     dy_array_add_to_size(buffer, num_bytes_read);
-}
-
-void print_constraint(struct dy_constraint c)
-{
-    switch (c.tag) {
-    case DY_CONSTRAINT_SINGLE:
-        if (c.single.range.have_subtype) {
-            print_core_expr(c.single.range.subtype);
-            printf(" <: ");
-        }
-        printf("%zu", c.single.id);
-        if (c.single.range.have_supertype) {
-            printf(" <: ");
-            print_core_expr(c.single.range.supertype);
-        }
-        break;
-    case DY_CONSTRAINT_MULTIPLE:
-        printf("(");
-        print_constraint(*c.multiple.c1);
-        switch (c.multiple.polarity) {
-        case DY_CORE_POLARITY_POSITIVE:
-            printf(" & ");
-            break;
-        case DY_CORE_POLARITY_NEGATIVE:
-            printf(" | ");
-            break;
-        }
-        print_constraint(*c.multiple.c2);
-        printf(")");
-    }
 }
