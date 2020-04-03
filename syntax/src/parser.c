@@ -1047,7 +1047,9 @@ bool parse_arg(struct dy_parser_ctx *ctx, struct dy_ast_arg *arg)
     skip_whitespace(ctx);
 
     if (!dy_parse_literal(ctx, DY_STR_LIT("]"))) {
-        dy_ast_expr_release(ctx->pool, type);
+        if (has_type) {
+            dy_ast_expr_release(ctx->pool, type);
+        }
         ctx->stream.current_index = start_index;
         return false;
     }
@@ -1055,7 +1057,7 @@ bool parse_arg(struct dy_parser_ctx *ctx, struct dy_ast_arg *arg)
     *arg = (struct dy_ast_arg){
         .name = name,
         .has_name = has_name,
-        .type = dy_ast_expr_new(ctx->pool, type),
+        .type = has_type ? dy_ast_expr_new(ctx->pool, type) : NULL,
         .has_type = has_type
     };
 
