@@ -1,5 +1,27 @@
+:root {
+    --bg-color: rgb(45, 45, 45);
+    --text-color: rgb(225, 225, 225);
+    --border-color: gray;
+    --code-bg-color: rgb(35, 35, 35);
+    --link-color: rgb(155, 220, 255);
+    --visited-link-color: rgb(185, 125, 180);
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg-color: rgb(255, 255, 255);
+        --text-color: rgb(0, 0, 0);
+        --border-color: black;
+        --code-bg-color: rgb(245, 245, 245);
+        --link-color: rgb(9, 33, 237);
+        --visited-link-color: rgb(83, 38, 135);
+    }
+}
+
 body {
     font-family: Arial, Helvetica, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
 }
 
 nav {
@@ -9,7 +31,7 @@ nav {
 }
 
 #navBar a {
-    color: black;
+    color: var(--text-color);
     margin: 1em;
     font-size: larger;
 }
@@ -29,6 +51,14 @@ a {
 
 a:hover {
     text-decoration: underline;
+}
+
+a:link {
+    color: var(--link-color);
+}
+
+a:visited {
+    color: var(--visited-link-color);
 }
 
 code {
@@ -78,7 +108,7 @@ main p, ul {
 }
 
 #result-div {
-    border-top: thin solid black;
+    border-top: thin solid var(--border-color);
     padding: 1ch;
     font-family: inherit;
     font-size: inherit;
@@ -88,12 +118,12 @@ main p, ul {
 #code-box {
     font-family: Menlo, Monaco, 'Courier New', monospace;
     font-size: smaller;
-    background-color: rgb(245, 245, 245);
-    width: 30em;
+    background-color: var(--code-bg-color);
+    width: 33em;
     height: 30em;
     border-style: solid;
     border-width: 1px;
-    border-color: black;
+    border-color: var(--border-color);
     display: flex;
     flex-direction: column;
     border-radius: 10px;
