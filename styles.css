@@ -89,8 +89,8 @@ main p, ul {
     font-family: Menlo, Monaco, 'Courier New', monospace;
     font-size: smaller;
     background-color: rgb(245, 245, 245);
-    width: 60ch;
-    height: 50ch;
+    width: 30em;
+    height: 30em;
     border-style: solid;
     border-width: 1px;
     border-color: black;
