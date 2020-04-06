@@ -63,7 +63,6 @@ main p, ul {
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
-    margin: 0 -2em;
 }
 
 #persuasion-list {
