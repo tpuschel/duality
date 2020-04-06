@@ -1,21 +1,8 @@
 :root {
-    --bg-color: rgb(45, 45, 45);
-    --text-color: rgb(225, 225, 225);
-    --border-color: gray;
-    --code-bg-color: rgb(35, 35, 35);
-    --link-color: rgb(155, 220, 255);
-    --visited-link-color: rgb(185, 125, 180);
-}
-
-@media (prefers-color-scheme: light) {
-    :root {
-        --bg-color: rgb(255, 255, 255);
-        --text-color: rgb(0, 0, 0);
-        --border-color: black;
-        --code-bg-color: rgb(245, 245, 245);
-        --link-color: rgb(9, 33, 237);
-        --visited-link-color: rgb(83, 38, 135);
-    }
+    --bg-color: rgb(255, 255, 255);
+    --text-color: rgb(0, 0, 0);
+    --border-color: black;
+    --code-bg-color: rgb(245, 245, 245);
 }
 
 body {
@@ -51,14 +38,6 @@ a {
 
 a:hover {
     text-decoration: underline;
-}
-
-a:link {
-    color: var(--link-color);
-}
-
-a:visited {
-    color: var(--visited-link-color);
 }
 
 code {
