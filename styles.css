@@ -84,10 +84,11 @@ main p, ul {
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
+    margin: 0 -2em;
 }
 
 #persuasion-list {
-    margin-left: 2em;
+    margin: 0 2em;
 }
 
 #persuasion-list li {
@@ -127,5 +128,5 @@ main p, ul {
     display: flex;
     flex-direction: column;
     border-radius: 10px;
-    margin-right: 2em;
+    margin: 0 2em;
 }
