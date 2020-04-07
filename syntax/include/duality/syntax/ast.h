@@ -89,6 +89,11 @@ struct dy_ast_juxtaposition {
     const struct dy_ast_expr *right;
 };
 
+struct dy_ast_recursion {
+    struct dy_ast_arg arg;
+    const struct dy_ast_expr *expr;
+};
+
 enum dy_ast_expr_tag {
     DY_AST_EXPR_VARIABLE,
     DY_AST_EXPR_LIST,
@@ -105,7 +110,9 @@ enum dy_ast_expr_tag {
     DY_AST_EXPR_NOTHING,
     DY_AST_EXPR_STRING,
     DY_AST_EXPR_TYPE_STRING,
-    DY_AST_EXPR_JUXTAPOSITION
+    DY_AST_EXPR_JUXTAPOSITION,
+    DY_AST_EXPR_POSITIVE_RECURSION,
+    DY_AST_EXPR_NEGATIVE_RECURSION
 };
 
 struct dy_ast_expr {
@@ -125,6 +132,8 @@ struct dy_ast_expr {
         struct dy_ast_list try_block;
         struct dy_ast_list choice;
         struct dy_ast_juxtaposition juxtaposition;
+        struct dy_ast_recursion positive_recursion;
+        struct dy_ast_recursion negative_recursion;
     };
 
     enum dy_ast_expr_tag tag;

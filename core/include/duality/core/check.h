@@ -30,6 +30,6 @@ DY_CORE_API bool dy_check_one_of(struct dy_core_ctx ctx, struct dy_core_one_of o
 
 DY_CORE_API bool dy_check_inference_ctx(struct dy_core_ctx ctx, struct dy_core_inference_ctx inference_ctx, struct dy_core_expr *new_expr, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-DY_CORE_API void dy_binding_contraints(struct dy_core_ctx ctx, size_t id, struct dy_constraint constraint, bool have_constraint, dy_array_t *ids);
+DY_CORE_API bool dy_check_recursion(struct dy_core_ctx ctx, struct dy_core_recursion recursion, struct dy_core_recursion *new_recursion, struct dy_constraint *constraint, bool *did_generate_constraint);
 
 #endif // DY_CHECK_H

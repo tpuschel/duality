@@ -69,6 +69,13 @@ struct dy_core_inference_ctx {
     enum dy_core_polarity polarity;
 };
 
+struct dy_core_recursion {
+    size_t id;
+    const struct dy_core_expr *type;
+    const struct dy_core_expr *expr;
+    enum dy_core_polarity polarity;
+};
+
 enum dy_core_expr_tag {
     DY_CORE_EXPR_EXPR_MAP,
     DY_CORE_EXPR_TYPE_MAP,
@@ -79,6 +86,7 @@ enum dy_core_expr_tag {
     DY_CORE_EXPR_UNKNOWN,
     DY_CORE_EXPR_END,
     DY_CORE_EXPR_INFERENCE_CTX,
+    DY_CORE_EXPR_RECURSION,
     DY_CORE_EXPR_STRING,
     DY_CORE_EXPR_TYPE_OF_STRINGS,
     DY_CORE_EXPR_PRINT
@@ -94,12 +102,19 @@ struct dy_core_expr {
         struct dy_core_one_of one_of;
         struct dy_core_unknown unknown;
         struct dy_core_inference_ctx inference_ctx;
+        struct dy_core_recursion recursion;
         dy_string_t string;
         enum dy_core_polarity end_polarity;
     };
 
     enum dy_core_expr_tag tag;
 };
+
+DY_CORE_API bool dy_core_expr_is_computation(struct dy_core_expr expr);
+
+DY_CORE_API size_t dy_core_expr_num_ocurrences(size_t id, struct dy_core_expr expr);
+
+DY_CORE_API bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr);
 
 DY_CORE_API void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string);
 

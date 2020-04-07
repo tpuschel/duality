@@ -38,6 +38,10 @@ dy_ternary_t dy_eval_expr(struct dy_core_ctx ctx, struct dy_core_expr expr, stru
     case DY_CORE_EXPR_END:
         *new_expr = dy_core_expr_retain(ctx.expr_pool, expr);
         return DY_YES;
+    case DY_CORE_EXPR_INFERENCE_CTX:
+        dy_bail("should not happen");
+    case DY_CORE_EXPR_RECURSION:
+        return dy_eval_recursion(ctx, expr.recursion, new_expr);
     case DY_CORE_EXPR_STRING:
         *new_expr = dy_core_expr_retain(ctx.expr_pool, expr);
         return DY_YES;
@@ -324,4 +328,20 @@ dy_ternary_t dy_eval_one_of(struct dy_core_ctx ctx, struct dy_core_one_of one_of
     }
 
     return dy_eval_expr(ctx, *one_of.second, new_expr);
+}
+
+dy_ternary_t dy_eval_recursion(struct dy_core_ctx ctx, struct dy_core_recursion rec, struct dy_core_expr *new_expr)
+{
+    struct dy_core_expr rec_expr = {
+        .tag = DY_CORE_EXPR_RECURSION,
+        .recursion = rec
+    };
+
+    struct dy_core_expr e = substitute(ctx, rec.id, rec_expr, *rec.expr);
+
+    dy_ternary_t result = dy_eval_expr(ctx, e, new_expr);
+
+    dy_core_expr_release(ctx.expr_pool, e);
+
+    return result;
 }

@@ -107,7 +107,10 @@ dy_ternary_t dy_are_equal(struct dy_core_ctx ctx, struct dy_core_expr e1, struct
         } else {
             return DY_NO;
         }
+    case DY_CORE_EXPR_RECURSION:
+        dy_bail("not yet implemented");
     case DY_CORE_EXPR_BOTH:
+    case DY_CORE_EXPR_INFERENCE_CTX:
         dy_bail("should not be reachable!");
     }
 

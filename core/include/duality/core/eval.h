@@ -24,4 +24,6 @@ DY_CORE_API dy_ternary_t dy_eval_both(struct dy_core_ctx ctx, struct dy_core_bot
 
 DY_CORE_API dy_ternary_t dy_eval_one_of(struct dy_core_ctx ctx, struct dy_core_one_of one_of, struct dy_core_expr *new_expr);
 
+DY_CORE_API dy_ternary_t dy_eval_recursion(struct dy_core_ctx ctx, struct dy_core_recursion rec, struct dy_core_expr *new_expr);
+
 #endif // DY_EVAL_H

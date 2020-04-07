@@ -51,6 +51,8 @@ static bool skip_block_comment(struct dy_parser_ctx *ctx);
 
 static bool parse_type_map(struct dy_parser_ctx *ctx, dy_string_t arrow_literal, bool is_implicit, struct dy_ast_type_map *type_map);
 
+static bool parse_recursion(struct dy_parser_ctx *ctx, dy_string_t arrow_literal, struct dy_ast_recursion *recursion);
+
 static bool parse_do_block_body(struct dy_parser_ctx *ctx, struct dy_ast_do_block *do_block);
 
 static bool parse_do_block_body_equality(struct dy_parser_ctx *ctx, struct dy_ast_do_block_equality *equality);
@@ -319,6 +321,34 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx *ctx, struct dy_ast_expr
             },
             .tag = DY_AST_EXPR_NEGATIVE_TYPE_MAP,
             .negative_type_map = implicit_negative_type_map
+        };
+
+        return true;
+    }
+
+    struct dy_ast_recursion positive_recursion;
+    if (dy_parse_positive_recursion(ctx, &positive_recursion)) {
+        *expr = (struct dy_ast_expr){
+            .text_range = {
+                .start = start_index,
+                .end = ctx->stream.current_index,
+            },
+            .tag = DY_AST_EXPR_POSITIVE_RECURSION,
+            .positive_recursion = positive_recursion
+        };
+
+        return true;
+    }
+
+    struct dy_ast_recursion negative_recursion;
+    if (dy_parse_negative_recursion(ctx, &negative_recursion)) {
+        *expr = (struct dy_ast_expr){
+            .text_range = {
+                .start = start_index,
+                .end = ctx->stream.current_index,
+            },
+            .tag = DY_AST_EXPR_NEGATIVE_RECURSION,
+            .negative_recursion = negative_recursion
         };
 
         return true;
@@ -945,6 +975,62 @@ bool parse_expr_parenthesized(struct dy_parser_ctx *ctx, struct dy_ast_expr *exp
     *expr = e;
 
     return true;
+}
+
+bool parse_recursion(struct dy_parser_ctx *ctx, dy_string_t arrow_literal, struct dy_ast_recursion *recursion)
+{
+    size_t start_index = ctx->stream.current_index;
+
+    if (!dy_parse_literal(ctx, DY_STR_LIT("rec"))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    skip_whitespace_except_newline(ctx);
+
+    struct dy_ast_arg arg;
+    if (!parse_arg(ctx, &arg)) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    skip_whitespace(ctx);
+
+    if (!dy_parse_literal(ctx, arrow_literal)) {
+        if (arg.has_type) {
+            dy_ast_expr_release_ptr(ctx->pool, arg.type);
+        }
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    skip_whitespace(ctx);
+
+    struct dy_ast_expr expr;
+    if (!dy_parse_expr(ctx, &expr)) {
+        if (arg.has_type) {
+            dy_ast_expr_release_ptr(ctx->pool, arg.type);
+        }
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    *recursion = (struct dy_ast_recursion){
+        .arg = arg,
+        .expr = dy_ast_expr_new(ctx->pool, expr)
+    };
+
+    return true;
+}
+
+bool dy_parse_positive_recursion(struct dy_parser_ctx *ctx, struct dy_ast_recursion *recursion)
+{
+    return parse_recursion(ctx, DY_STR_LIT("->"), recursion);
+}
+
+bool dy_parse_negative_recursion(struct dy_parser_ctx *ctx, struct dy_ast_recursion *recursion)
+{
+    return parse_recursion(ctx, DY_STR_LIT("~>"), recursion);
 }
 
 bool parse_type_map(struct dy_parser_ctx *ctx, dy_string_t arrow_literal, bool is_implicit, struct dy_ast_type_map *type_map)

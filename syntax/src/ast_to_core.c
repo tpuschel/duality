@@ -20,6 +20,8 @@ static bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_d
 
 static bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_ignored_expr ignored_expr, struct dy_core_expr *expr);
 
+static bool recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_recursion rec, enum dy_core_polarity polarity, struct dy_core_expr *expr);
+
 static struct dy_core_unknown create_inference_var(struct dy_ast_to_core_ctx *ctx);
 
 bool dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr expr, struct dy_core_expr *core_expr)
@@ -49,6 +51,10 @@ bool dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr expr
         return dy_ast_variable_to_core(ctx, expr.variable, core_expr);
     case DY_AST_EXPR_JUXTAPOSITION:
         return dy_ast_juxtaposition_to_core(ctx, expr.juxtaposition, core_expr);
+    case DY_AST_EXPR_POSITIVE_RECURSION:
+        return dy_ast_positive_recursion_to_core(ctx, expr.positive_recursion, core_expr);
+    case DY_AST_EXPR_NEGATIVE_RECURSION:
+        return dy_ast_negative_recursion_to_core(ctx, expr.positive_recursion, core_expr);
     case DY_AST_EXPR_STRING:
         *core_expr = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_STRING,
@@ -751,6 +757,122 @@ bool dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
     };
 
     return true;
+}
+
+bool dy_ast_positive_recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_recursion rec, struct dy_core_expr *expr)
+{
+    return recursion_to_core(ctx, rec, DY_CORE_POLARITY_POSITIVE, expr);
+}
+
+bool dy_ast_negative_recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_recursion rec, struct dy_core_expr *expr)
+{
+    return recursion_to_core(ctx, rec, DY_CORE_POLARITY_NEGATIVE, expr);
+}
+
+bool recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_recursion rec, enum dy_core_polarity polarity, struct dy_core_expr *expr)
+{
+    if (rec.arg.has_type) {
+        struct dy_core_expr type;
+        bool arg_type_conversion_succeeded = dy_ast_expr_to_core(ctx, *rec.arg.type, &type);
+
+        size_t id = (*ctx->running_id)++;
+
+        size_t old_size;
+        if (rec.arg.has_name) {
+            struct dy_ast_to_core_bound_var bound_var = {
+                .name = rec.arg.name,
+                .replacement_id = id,
+                .type = type
+            };
+
+            old_size = dy_array_add(ctx->bound_vars, &bound_var);
+        } else {
+            old_size = dy_array_size(ctx->bound_vars);
+        }
+
+        struct dy_core_expr e;
+        bool expr_conversion_succeeded = dy_ast_expr_to_core(ctx, *rec.expr, &e);
+
+        dy_array_set_size(ctx->bound_vars, old_size);
+
+        if (!arg_type_conversion_succeeded || !expr_conversion_succeeded) {
+            if (arg_type_conversion_succeeded) {
+                dy_core_expr_release(ctx->core_expr_pool, type);
+            }
+
+            if (expr_conversion_succeeded) {
+                dy_core_expr_release(ctx->core_expr_pool, e);
+            }
+
+            return false;
+        }
+
+        *expr = (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_RECURSION,
+            .recursion = {
+                .id = id,
+                .type = dy_core_expr_new(ctx->core_expr_pool, dy_core_expr_retain(ctx->core_expr_pool, type)),
+                .expr = dy_core_expr_new(ctx->core_expr_pool, e),
+                .polarity = polarity,
+            }
+        };
+
+        return true;
+    } else {
+        struct dy_core_unknown unknown = create_inference_var(ctx);
+
+        struct dy_core_expr type = {
+            .tag = DY_CORE_EXPR_UNKNOWN,
+            .unknown = unknown
+        };
+
+        size_t id = (*ctx->running_id)++;
+
+        size_t old_size;
+        if (rec.arg.has_name) {
+            struct dy_ast_to_core_bound_var bound_var = {
+                .name = rec.arg.name,
+                .replacement_id = id,
+                .type = type
+            };
+
+            old_size = dy_array_add(ctx->bound_vars, &bound_var);
+        } else {
+            old_size = dy_array_size(ctx->bound_vars);
+        }
+
+        struct dy_core_expr e;
+        bool expr_conversion_succeeded = dy_ast_expr_to_core(ctx, *rec.expr, &e);
+
+        dy_array_set_size(ctx->bound_vars, old_size);
+
+        if (!expr_conversion_succeeded) {
+            dy_core_expr_release_ptr(ctx->core_expr_pool, unknown.type);
+            return false;
+        }
+
+        struct dy_core_expr result_recursion = {
+            .tag = DY_CORE_EXPR_RECURSION,
+            .recursion = {
+                .id = id,
+                .type = dy_core_expr_new(ctx->core_expr_pool, dy_core_expr_retain(ctx->core_expr_pool, type)),
+                .expr = dy_core_expr_new(ctx->core_expr_pool, e),
+                .polarity = polarity,
+            }
+        };
+
+        *expr = (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_INFERENCE_CTX,
+            .inference_ctx = {
+                .id = unknown.id,
+                .type = dy_core_expr_retain_ptr(ctx->core_expr_pool, unknown.type),
+                .expr = dy_core_expr_new(ctx->core_expr_pool, result_recursion),
+                .polarity = DY_CORE_POLARITY_POSITIVE,
+            }
+        };
+
+        return true;
+    }
 }
 
 struct dy_core_unknown create_inference_var(struct dy_ast_to_core_ctx *ctx)

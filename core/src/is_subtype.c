@@ -35,6 +35,14 @@ static dy_ternary_t is_subtype_of_negative_both(struct dy_core_ctx ctx, struct d
 
 static dy_ternary_t both_is_subtype_of_both(struct dy_core_ctx ctx, struct dy_core_both p1, struct dy_core_both p2, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
+static dy_ternary_t positive_recursion_is_subtype(struct dy_core_ctx ctx, struct dy_core_recursion rec, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+
+static dy_ternary_t negative_recursion_is_subtype(struct dy_core_ctx ctx, struct dy_core_recursion rec, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+
+static dy_ternary_t is_subtype_of_positive_recursion(struct dy_core_ctx ctx, struct dy_core_expr subtype, struct dy_core_recursion rec, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+
+static dy_ternary_t is_subtype_of_negative_recursion(struct dy_core_ctx ctx, struct dy_core_expr subtype, struct dy_core_recursion rec, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+
 static struct dy_constraint *alloc_constraint(struct dy_constraint constraint);
 
 dy_ternary_t dy_is_subtype(struct dy_core_ctx ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr)
@@ -116,6 +124,22 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx ctx, struct dy_core_expr subty
         return DY_MAYBE;
     }
 
+    if (subtype.tag == DY_CORE_EXPR_RECURSION && subtype.recursion.polarity == DY_CORE_POLARITY_POSITIVE) {
+        return positive_recursion_is_subtype(ctx, subtype.recursion, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+    }
+
+    if (subtype.tag == DY_CORE_EXPR_RECURSION && subtype.recursion.polarity == DY_CORE_POLARITY_NEGATIVE) {
+        return negative_recursion_is_subtype(ctx, subtype.recursion, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+    }
+
+    if (supertype.tag == DY_CORE_EXPR_RECURSION && supertype.recursion.polarity == DY_CORE_POLARITY_POSITIVE) {
+        return is_subtype_of_positive_recursion(ctx, subtype, supertype.recursion, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+    }
+
+    if (supertype.tag == DY_CORE_EXPR_RECURSION && supertype.recursion.polarity == DY_CORE_POLARITY_NEGATIVE) {
+        return is_subtype_of_positive_recursion(ctx, subtype, supertype.recursion, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+    }
+
     if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
         return DY_MAYBE;
     }
@@ -150,6 +174,8 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx ctx, struct dy_core_expr subty
     case DY_CORE_EXPR_TYPE_MAP:
         return type_map_is_subtype(ctx, subtype.type_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     case DY_CORE_EXPR_END:
+    case DY_CORE_EXPR_RECURSION:
+    case DY_CORE_EXPR_BOTH:
         dy_bail("should not be reached");
     case DY_CORE_EXPR_EXPR_MAP_ELIM:
         // fallthrough
@@ -160,8 +186,6 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx ctx, struct dy_core_expr subty
     case DY_CORE_EXPR_UNKNOWN:
         // fallthrough
     case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        // fallthrough
-    case DY_CORE_EXPR_BOTH:
         // fallthrough
     case DY_CORE_EXPR_PRINT:
         // fallthrough
@@ -1105,6 +1129,26 @@ dy_ternary_t both_is_subtype_of_both(struct dy_core_ctx ctx, struct dy_core_both
     }
 
     return DY_YES;
+}
+
+dy_ternary_t positive_recursion_is_subtype(struct dy_core_ctx ctx, struct dy_core_recursion rec, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
+{
+    dy_bail("not yet implemented");
+}
+
+dy_ternary_t negative_recursion_is_subtype(struct dy_core_ctx ctx, struct dy_core_recursion rec, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
+{
+    dy_bail("not yet implemented");
+}
+
+dy_ternary_t is_subtype_of_positive_recursion(struct dy_core_ctx ctx, struct dy_core_expr subtype, struct dy_core_recursion rec, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
+{
+    dy_bail("not yet implemented");
+}
+
+dy_ternary_t is_subtype_of_negative_recursion(struct dy_core_ctx ctx, struct dy_core_expr subtype, struct dy_core_recursion rec, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
+{
+    dy_bail("not yet implemented");
 }
 
 struct dy_constraint *alloc_constraint(struct dy_constraint constraint)

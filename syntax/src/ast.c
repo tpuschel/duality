@@ -95,6 +95,18 @@ struct dy_ast_expr dy_ast_expr_retain(dy_obj_pool_t *pool, struct dy_ast_expr ex
         dy_ast_expr_retain_ptr(pool, expr.juxtaposition.left);
         dy_ast_expr_retain_ptr(pool, expr.juxtaposition.right);
         return expr;
+    case DY_AST_EXPR_POSITIVE_RECURSION:
+        if (expr.positive_recursion.arg.has_type) {
+            dy_ast_expr_retain_ptr(pool, expr.positive_recursion.arg.type);
+        }
+        dy_ast_expr_retain_ptr(pool, expr.positive_recursion.expr);
+        return expr;
+    case DY_AST_EXPR_NEGATIVE_RECURSION:
+        if (expr.negative_recursion.arg.has_type) {
+            dy_ast_expr_retain_ptr(pool, expr.negative_recursion.arg.type);
+        }
+        dy_ast_expr_retain_ptr(pool, expr.negative_recursion.expr);
+        return expr;
     case DY_AST_EXPR_STRING:
         return expr;
     case DY_AST_EXPR_TYPE_STRING:
@@ -168,6 +180,18 @@ void dy_ast_expr_release(dy_obj_pool_t *pool, struct dy_ast_expr expr)
     case DY_AST_EXPR_JUXTAPOSITION:
         dy_ast_expr_release_ptr(pool, expr.juxtaposition.left);
         dy_ast_expr_release_ptr(pool, expr.juxtaposition.right);
+        return;
+    case DY_AST_EXPR_POSITIVE_RECURSION:
+        if (expr.positive_recursion.arg.has_type) {
+            dy_ast_expr_release_ptr(pool, expr.positive_recursion.arg.type);
+        }
+        dy_ast_expr_release_ptr(pool, expr.positive_recursion.expr);
+        return;
+    case DY_AST_EXPR_NEGATIVE_RECURSION:
+        if (expr.negative_recursion.arg.has_type) {
+            dy_ast_expr_release_ptr(pool, expr.negative_recursion.arg.type);
+        }
+        dy_ast_expr_release_ptr(pool, expr.negative_recursion.expr);
         return;
     case DY_AST_EXPR_STRING:
         return;

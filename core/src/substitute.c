@@ -56,6 +56,14 @@ struct dy_core_expr substitute(struct dy_core_ctx ctx, size_t id, struct dy_core
         expr.inference_ctx.type = dy_core_expr_new(ctx.expr_pool, substitute(ctx, id, sub, *expr.inference_ctx.type));
         expr.inference_ctx.expr = dy_core_expr_new(ctx.expr_pool, substitute(ctx, id, sub, *expr.inference_ctx.expr));
         return expr;
+    case DY_CORE_EXPR_RECURSION:
+        expr.recursion.type = dy_core_expr_new(ctx.expr_pool, substitute(ctx, id, sub, *expr.recursion.type));
+        if (id != expr.recursion.id) {
+            expr.recursion.expr = dy_core_expr_new(ctx.expr_pool, substitute(ctx, id, sub, *expr.recursion.expr));
+        } else {
+            expr.recursion.expr = dy_core_expr_retain_ptr(ctx.expr_pool, expr.recursion.expr);
+        }
+        return expr;
     }
 
     DY_IMPOSSIBLE_ENUM();

@@ -54,4 +54,8 @@ DY_SYNTAX_API bool dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx, 
 
 DY_SYNTAX_API bool dy_ast_variable_to_core(struct dy_ast_to_core_ctx *ctx, dy_string_t variable, struct dy_core_expr *expr);
 
+DY_SYNTAX_API bool dy_ast_positive_recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_recursion rec, struct dy_core_expr *expr);
+
+DY_SYNTAX_API bool dy_ast_negative_recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_recursion rec, struct dy_core_expr *expr);
+
 #endif // DY_AST_TO_CORE_H

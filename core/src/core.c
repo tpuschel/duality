@@ -19,6 +19,100 @@ static void add_string(dy_array_t *string, dy_string_t s);
 static int asprintf(char **ret, const char *format, ...);
 #endif
 
+bool dy_core_expr_is_computation(struct dy_core_expr expr)
+{
+    switch (expr.tag) {
+    case DY_CORE_EXPR_EXPR_MAP:
+        return dy_core_expr_is_computation(*expr.expr_map.e1);
+    case DY_CORE_EXPR_TYPE_MAP:
+        return dy_core_expr_is_computation(*expr.type_map.arg_type);
+    case DY_CORE_EXPR_EXPR_MAP_ELIM:
+        return true;
+    case DY_CORE_EXPR_TYPE_MAP_ELIM:
+        return true;
+    case DY_CORE_EXPR_BOTH:
+        return dy_core_expr_is_computation(*expr.both.e1) || dy_core_expr_is_computation(*expr.both.e2);
+    case DY_CORE_EXPR_ONE_OF:
+        return dy_core_expr_is_computation(*expr.one_of.first) || dy_core_expr_is_computation(*expr.one_of.second);
+    case DY_CORE_EXPR_UNKNOWN:
+        return false;
+    case DY_CORE_EXPR_INFERENCE_CTX:
+        dy_bail("should never be reached");
+    case DY_CORE_EXPR_RECURSION:
+        return dy_core_expr_is_computation(*expr.recursion.type) || dy_core_expr_is_computation(*expr.recursion.expr);
+    case DY_CORE_EXPR_STRING:
+        // fallthrough
+    case DY_CORE_EXPR_TYPE_OF_STRINGS:
+        // fallthrough
+    case DY_CORE_EXPR_END:
+        // fallthrough
+    case DY_CORE_EXPR_PRINT:
+        return false;
+    }
+}
+
+bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr)
+{
+    return dy_core_expr_num_ocurrences(id, expr) > 0;
+}
+
+size_t dy_core_expr_num_ocurrences(size_t id, struct dy_core_expr expr)
+{
+    switch (expr.tag) {
+    case DY_CORE_EXPR_EXPR_MAP:
+        return dy_core_expr_num_ocurrences(id, *expr.expr_map.e1) + dy_core_expr_num_ocurrences(id, *expr.expr_map.e2);
+    case DY_CORE_EXPR_TYPE_MAP: {
+        size_t x = dy_core_expr_num_ocurrences(id, *expr.type_map.arg_type);
+
+        if (id == expr.type_map.arg_id) {
+            return x;
+        }
+
+        return x + dy_core_expr_num_ocurrences(id, *expr.type_map.expr);
+    }
+    case DY_CORE_EXPR_EXPR_MAP_ELIM:
+        return dy_core_expr_num_ocurrences(id, *expr.expr_map_elim.expr) + dy_core_expr_num_ocurrences(id, *expr.expr_map_elim.expr_map.e1) + dy_core_expr_num_ocurrences(id, *expr.expr_map_elim.expr_map.e2);
+    case DY_CORE_EXPR_TYPE_MAP_ELIM: {
+        size_t x = dy_core_expr_num_ocurrences(id, *expr.type_map_elim.expr) + dy_core_expr_num_ocurrences(id, *expr.type_map_elim.type_map.arg_type);
+
+        if (id == expr.type_map_elim.type_map.arg_id) {
+            return x;
+        }
+
+        return x + dy_core_expr_num_ocurrences(id, *expr.type_map_elim.type_map.expr);
+    }
+    case DY_CORE_EXPR_BOTH:
+        return dy_core_expr_num_ocurrences(id, *expr.both.e1) + dy_core_expr_num_ocurrences(id, *expr.both.e2);
+    case DY_CORE_EXPR_ONE_OF:
+        return dy_core_expr_num_ocurrences(id, *expr.one_of.first) + dy_core_expr_num_ocurrences(id, *expr.one_of.second);
+    case DY_CORE_EXPR_UNKNOWN:
+        if (expr.unknown.id == id) {
+            return 1;
+        } else {
+            return 0;
+        }
+    case DY_CORE_EXPR_INFERENCE_CTX:
+        dy_bail("should never be reached");
+    case DY_CORE_EXPR_RECURSION: {
+        size_t x = dy_core_expr_num_ocurrences(id, *expr.recursion.type);
+
+        if (id == expr.recursion.id) {
+            return x;
+        }
+
+        return x + dy_core_expr_num_ocurrences(id, *expr.recursion.expr);
+    }
+    case DY_CORE_EXPR_STRING:
+        // fallthrough
+    case DY_CORE_EXPR_TYPE_OF_STRINGS:
+        // fallthrough
+    case DY_CORE_EXPR_END:
+        // fallthrough
+    case DY_CORE_EXPR_PRINT:
+        return 0;
+    }
+}
+
 struct dy_core_expr *dy_core_expr_new(dy_obj_pool_t *pool, struct dy_core_expr expr)
 {
     return dy_obj_pool_new(pool, &expr);
@@ -71,6 +165,11 @@ struct dy_core_expr dy_core_expr_retain(dy_obj_pool_t *pool, struct dy_core_expr
     case DY_CORE_EXPR_INFERENCE_CTX:
         dy_core_expr_retain_ptr(pool, expr.inference_ctx.type);
         dy_core_expr_retain_ptr(pool, expr.inference_ctx.expr);
+
+        return expr;
+    case DY_CORE_EXPR_RECURSION:
+        dy_core_expr_retain_ptr(pool, expr.recursion.type);
+        dy_core_expr_retain_ptr(pool, expr.recursion.expr);
 
         return expr;
     case DY_CORE_EXPR_END:
@@ -136,6 +235,11 @@ void dy_core_expr_release(dy_obj_pool_t *pool, struct dy_core_expr expr)
     case DY_CORE_EXPR_INFERENCE_CTX:
         dy_core_expr_release_ptr(pool, expr.inference_ctx.type);
         dy_core_expr_release_ptr(pool, expr.inference_ctx.expr);
+
+        return;
+    case DY_CORE_EXPR_RECURSION:
+        dy_core_expr_release_ptr(pool, expr.recursion.type);
+        dy_core_expr_release_ptr(pool, expr.recursion.expr);
 
         return;
     case DY_CORE_EXPR_END:
@@ -291,6 +395,26 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         dy_core_expr_to_string(*expr.one_of.second, string);
         add_string(string, DY_STR_LIT(")"));
         return;
+    case DY_CORE_EXPR_RECURSION: {
+        add_string(string, DY_STR_LIT("(rec "));
+
+        add_string(string, DY_STR_LIT("["));
+        char *c;
+        dy_assert(asprintf(&c, "%zu", expr.recursion.id) != -1);
+        add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
+        free(c);
+        add_string(string, DY_STR_LIT(" "));
+        dy_core_expr_to_string(*expr.recursion.type, string);
+        add_string(string, DY_STR_LIT("]"));
+        if (expr.recursion.polarity == DY_CORE_POLARITY_POSITIVE) {
+            add_string(string, DY_STR_LIT(" -> "));
+        } else {
+            add_string(string, DY_STR_LIT(" ~> "));
+        }
+        dy_core_expr_to_string(*expr.recursion.expr, string);
+        add_string(string, DY_STR_LIT(")"));
+        return;
+    }
     case DY_CORE_EXPR_STRING:
         add_string(string, DY_STR_LIT("\""));
         add_string(string, expr.string);
