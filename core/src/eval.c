@@ -133,6 +133,7 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_core_ctx ctx, struct dy_core_expr_m
                     .polarity = elim.expr_map.polarity,
                     .is_implicit = elim.expr_map.is_implicit,
                 },
+                .check_result = elim.check_result,
             }
         };
 
@@ -151,24 +152,26 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_core_ctx ctx, struct dy_core_expr_m
 
     dy_core_expr_release(ctx.expr_pool, type);
 
-    struct dy_core_expr type_of_left = dy_type_of(ctx, left);
+    if (elim.check_result == DY_MAYBE) {
+        struct dy_core_expr type_of_left = dy_type_of(ctx, left);
 
-    struct dy_constraint constraint;
-    bool have_constraint = false;
-    dy_ternary_t result = dy_is_subtype_no_transformation(ctx, type_of_left, expr_map, &constraint, &have_constraint);
+        struct dy_constraint constraint;
+        bool have_constraint = false;
+        elim.check_result = dy_is_subtype_no_transformation(ctx, type_of_left, expr_map, &constraint, &have_constraint);
 
-    dy_core_expr_release(ctx.expr_pool, type_of_left);
+        dy_assert(!have_constraint);
 
-    if (result == DY_NO) {
+        dy_core_expr_release(ctx.expr_pool, type_of_left);
+    }
+
+    if (elim.check_result == DY_NO) {
         dy_core_expr_release(ctx.expr_pool, left);
         dy_core_expr_release(ctx.expr_pool, right);
         dy_core_expr_release(ctx.expr_pool, expr_map);
         return DY_NO;
     }
 
-    dy_assert(!have_constraint);
-
-    if (result == DY_MAYBE) {
+    if (elim.check_result == DY_MAYBE) {
         dy_core_expr_release(ctx.expr_pool, right);
 
         *new_expr = (struct dy_core_expr){
@@ -176,6 +179,7 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_core_ctx ctx, struct dy_core_expr_m
             .expr_map_elim = {
                 .expr = dy_core_expr_new(ctx.expr_pool, left),
                 .expr_map = expr_map.expr_map,
+                .check_result = DY_MAYBE,
             }
         };
 
@@ -200,7 +204,7 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_core_ctx ctx, struct dy_core_expr_m
         dy_core_expr_release(ctx.expr_pool, expr_map);
         dy_core_expr_release(ctx.expr_pool, right);
 
-        result = dy_eval_expr(ctx, *left.expr_map.e2, new_expr);
+        dy_ternary_t result = dy_eval_expr(ctx, *left.expr_map.e2, new_expr);
 
         dy_core_expr_release(ctx.expr_pool, left);
 
@@ -215,20 +219,9 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_core_ctx ctx, struct dy_core_expr_m
         dy_core_expr_release(ctx.expr_pool, left);
         dy_core_expr_release(ctx.expr_pool, right);
 
-        struct dy_core_expr new_e;
-        result = dy_check_expr(ctx, e, &new_e, &constraint, &have_constraint);
+        dy_ternary_t result = dy_eval_expr(ctx, e, new_expr);
 
         dy_core_expr_release(ctx.expr_pool, e);
-
-        if (!result) {
-            return DY_NO;
-        }
-
-        dy_assert(!have_constraint);
-
-        result = dy_eval_expr(ctx, new_e, new_expr);
-
-        dy_core_expr_release(ctx.expr_pool, new_e);
 
         return result;
     }
@@ -239,9 +232,10 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_core_ctx ctx, struct dy_core_expr_m
         struct dy_core_expr_map_elim new_elim = {
             .expr = left.both.e1,
             .expr_map = expr_map.expr_map,
+            .check_result = DY_MAYBE
         };
 
-        result = dy_eval_expr_map_elim(ctx, new_elim, new_expr);
+        dy_ternary_t result = dy_eval_expr_map_elim(ctx, new_elim, new_expr);
 
         if (result != DY_NO) {
             dy_core_expr_release(ctx.expr_pool, left);
@@ -264,6 +258,7 @@ dy_ternary_t dy_eval_expr_map_elim(struct dy_core_ctx ctx, struct dy_core_expr_m
         .expr_map_elim = {
             .expr = dy_core_expr_new(ctx.expr_pool, left),
             .expr_map = expr_map.expr_map,
+            .check_result = elim.check_result,
         }
     };
 

@@ -442,6 +442,7 @@ bool do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = false,
             },
+            .check_result = DY_MAYBE,
         }
     };
 
@@ -539,6 +540,7 @@ bool do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = false,
             },
+            .check_result = DY_MAYBE,
         }
     };
 
@@ -624,6 +626,7 @@ bool do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = false,
             },
+            .check_result = DY_MAYBE,
         }
     };
 
@@ -667,6 +670,7 @@ bool dy_ast_expr_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
         .expr_map_elim = {
             .expr = dy_core_expr_new(ctx->core_expr_pool, e1),
             .expr_map = e2.expr_map,
+            .check_result = DY_MAYBE,
         }
     };
 
@@ -700,6 +704,7 @@ bool dy_ast_type_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
         .type_map_elim = {
             .expr = dy_core_expr_new(ctx->core_expr_pool, e1),
             .type_map = e2.type_map,
+            .check_result = DY_MAYBE,
         }
     };
 
@@ -743,6 +748,7 @@ bool dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = false,
             },
+            .check_result = DY_MAYBE,
         }
     };
 

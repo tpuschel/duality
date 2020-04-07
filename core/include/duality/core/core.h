@@ -13,6 +13,12 @@
 
 #include <duality/core/api.h>
 
+typedef enum dy_ternary {
+    DY_YES,
+    DY_NO,
+    DY_MAYBE
+} dy_ternary_t;
+
 struct dy_core_expr;
 
 enum dy_core_polarity {
@@ -44,11 +50,13 @@ struct dy_core_type_map {
 struct dy_core_expr_map_elim {
     const struct dy_core_expr *expr;
     struct dy_core_expr_map expr_map;
+    dy_ternary_t check_result;
 };
 
 struct dy_core_type_map_elim {
     const struct dy_core_expr *expr;
     struct dy_core_type_map type_map;
+    dy_ternary_t check_result;
 };
 
 struct dy_core_one_of {
@@ -74,6 +82,7 @@ struct dy_core_recursion {
     const struct dy_core_expr *type;
     const struct dy_core_expr *expr;
     enum dy_core_polarity polarity;
+    dy_ternary_t check_result;
 };
 
 enum dy_core_expr_tag {

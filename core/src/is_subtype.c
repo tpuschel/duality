@@ -237,6 +237,7 @@ dy_ternary_t positive_expr_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = expr_map.is_implicit,
                 },
+                .check_result = DY_MAYBE,
             }
         };
 
@@ -319,6 +320,7 @@ dy_ternary_t positive_expr_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = expr_map.is_implicit,
                 },
+                .check_result = DY_MAYBE,
             }
         };
 
@@ -413,6 +415,7 @@ dy_ternary_t negative_expr_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = expr_map.is_implicit,
                 },
+                .check_result = DY_MAYBE,
             }
         };
 
@@ -513,6 +516,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = type_map.is_implicit,
                 },
+                .check_result = DY_MAYBE,
             }
         };
 
@@ -621,6 +625,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = type_map.is_implicit,
                 },
+                .check_result = DY_MAYBE,
             }
         };
 
@@ -704,6 +709,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                     .is_implicit = true,
                 },
+                .check_result = DY_MAYBE,
             }
         };
 
@@ -717,16 +723,12 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx ctx, struct dy_core
             }
         };
 
-        bool result = dy_check_expr(ctx, inference_ctx, new_subtype_expr, constraint, did_generate_constraint);
+        *new_subtype_expr = dy_check_expr(ctx, inference_ctx, constraint, did_generate_constraint);
+        *did_transform_subtype_expr = true;
 
         dy_core_expr_release(ctx.expr_pool, inference_ctx);
 
-        if (result) {
-            *did_transform_subtype_expr = true;
-            return DY_YES;
-        } else {
-            return DY_NO;
-        }
+        return DY_YES;
     }
 
     return DY_NO;

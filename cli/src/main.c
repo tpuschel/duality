@@ -105,13 +105,9 @@ int main(int argc, const char *argv[])
         .expr_pool = core_expr_pool
     };
 
-    struct dy_core_expr checked_program;
     struct dy_constraint constraint;
     bool have_constraint = false;
-    if (!dy_check_expr(core_ctx, program, &checked_program, &constraint, &have_constraint)) {
-        fprintf(stderr, "Program failed check.\n");
-        return -1;
-    }
+    struct dy_core_expr checked_program = dy_check_expr(core_ctx, program, &constraint, &have_constraint);
 
     /*
     printf("Checked Core:\n");

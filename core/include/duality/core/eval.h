@@ -8,7 +8,6 @@
 #define DY_EVAL_H
 
 #include <duality/core/ctx.h>
-#include <duality/core/ternary.h>
 
 DY_CORE_API dy_ternary_t dy_eval_expr(struct dy_core_ctx ctx, struct dy_core_expr expr, struct dy_core_expr *new_expr);
 

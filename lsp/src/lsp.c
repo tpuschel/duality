@@ -784,14 +784,9 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
         .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), 1)
     };
 
-    struct dy_core_expr new_core;
     struct dy_constraint c;
     bool have_c = false;
-    bool is_valid = dy_check_expr(core_ctx, core, &new_core, &c, &have_c);
-
-    if (!is_valid) {
-        return;
-    }
+    struct dy_core_expr new_core = dy_check_expr(core_ctx, core, &c, &have_c);
 
     dy_core_expr_release(ctx->core_expr_pool, core);
 
