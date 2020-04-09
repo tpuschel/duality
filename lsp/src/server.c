@@ -134,7 +134,7 @@ void stream_callback(dy_array_t *buffer, void *env)
 {
     struct dy_lsp_stream_env *state = env;
 
-    if (feof(stdin) || ferror(stdin)) {
+    if (feof(state->file) || ferror(state->file)) {
         return;
     }
 
@@ -145,7 +145,7 @@ void stream_callback(dy_array_t *buffer, void *env)
 
         dy_array_set_excess_capacity(buffer, state->bound_size_in_bytes);
 
-        size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), state->bound_size_in_bytes, stdin);
+        size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), state->bound_size_in_bytes, state->file);
 
         dy_array_add_to_size(buffer, num_bytes_read);
 
@@ -153,7 +153,7 @@ void stream_callback(dy_array_t *buffer, void *env)
     } else {
         dy_array_set_excess_capacity(buffer, 1);
 
-        size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), 1, stdin);
+        size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), 1, state->file);
 
         dy_array_add_to_size(buffer, num_bytes_read);
     }
