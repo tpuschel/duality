@@ -13,23 +13,23 @@
 #include "constraint.h"
 #include "is_subtype.h"
 
-static inline struct dy_core_expr dy_eval_expr(struct dy_core_ctx ctx, struct dy_core_expr expr, bool *is_value);
+static inline struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value);
 
-static inline struct dy_core_expr dy_eval_expr_map(struct dy_core_ctx ctx, struct dy_core_expr_map expr_map, bool *is_value);
+static inline struct dy_core_expr dy_eval_expr_map(struct dy_core_ctx *ctx, struct dy_core_expr_map expr_map, bool *is_value);
 
-static inline struct dy_core_expr dy_eval_type_map(struct dy_core_ctx ctx, struct dy_core_type_map type_map, bool *is_value);
+static inline struct dy_core_expr dy_eval_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map, bool *is_value);
 
-static inline struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx ctx, struct dy_core_expr_map_elim elim, bool *is_value);
+static inline struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_core_expr_map_elim elim, bool *is_value);
 
-static inline struct dy_core_expr dy_eval_type_map_elim(struct dy_core_ctx ctx, struct dy_core_type_map_elim elim, bool *is_value);
+static inline struct dy_core_expr dy_eval_type_map_elim(struct dy_core_ctx *ctx, struct dy_core_type_map_elim elim, bool *is_value);
 
-static inline struct dy_core_expr dy_eval_both(struct dy_core_ctx ctx, struct dy_core_both both, bool *is_value);
+static inline struct dy_core_expr dy_eval_both(struct dy_core_ctx *ctx, struct dy_core_both both, bool *is_value);
 
-static inline struct dy_core_expr dy_eval_one_of(struct dy_core_ctx ctx, struct dy_core_one_of one_of, bool *is_value);
+static inline struct dy_core_expr dy_eval_one_of(struct dy_core_ctx *ctx, struct dy_core_one_of one_of, bool *is_value);
 
-static inline struct dy_core_expr dy_eval_recursion(struct dy_core_ctx ctx, struct dy_core_recursion rec, bool *is_value);
+static inline struct dy_core_expr dy_eval_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion rec, bool *is_value);
 
-struct dy_core_expr dy_eval_expr(struct dy_core_ctx ctx, struct dy_core_expr expr, bool *is_value)
+struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value)
 {
     switch (expr.tag) {
     case DY_CORE_EXPR_EXPR_MAP:
@@ -74,7 +74,7 @@ struct dy_core_expr dy_eval_expr(struct dy_core_ctx ctx, struct dy_core_expr exp
     DY_IMPOSSIBLE_ENUM();
 }
 
-struct dy_core_expr dy_eval_expr_map(struct dy_core_ctx ctx, struct dy_core_expr_map expr_map, bool *is_value)
+struct dy_core_expr dy_eval_expr_map(struct dy_core_ctx *ctx, struct dy_core_expr_map expr_map, bool *is_value)
 {
     expr_map.e1 = dy_core_expr_new(dy_eval_expr(ctx, *expr_map.e1, is_value));
     dy_core_expr_retain_ptr(expr_map.e2);
@@ -85,7 +85,7 @@ struct dy_core_expr dy_eval_expr_map(struct dy_core_ctx ctx, struct dy_core_expr
     };
 }
 
-struct dy_core_expr dy_eval_type_map(struct dy_core_ctx ctx, struct dy_core_type_map type_map, bool *is_value)
+struct dy_core_expr dy_eval_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map, bool *is_value)
 {
     type_map.binding.type = dy_core_expr_new(dy_eval_expr(ctx, *type_map.binding.type, is_value));
     dy_core_expr_retain_ptr(type_map.expr);
@@ -96,7 +96,7 @@ struct dy_core_expr dy_eval_type_map(struct dy_core_ctx ctx, struct dy_core_type
     };
 }
 
-struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx ctx, struct dy_core_expr_map_elim elim, bool *is_value)
+struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_core_expr_map_elim elim, bool *is_value)
 {
     bool left_is_value = false;
     struct dy_core_expr left = dy_eval_expr(ctx, *elim.expr, &left_is_value);
@@ -234,12 +234,12 @@ struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx ctx, struct dy_core
     };
 }
 
-struct dy_core_expr dy_eval_type_map_elim(struct dy_core_ctx ctx, struct dy_core_type_map_elim elim, bool *is_value)
+struct dy_core_expr dy_eval_type_map_elim(struct dy_core_ctx *ctx, struct dy_core_type_map_elim elim, bool *is_value)
 {
     dy_bail("Not yet implemented.");
 }
 
-struct dy_core_expr dy_eval_both(struct dy_core_ctx ctx, struct dy_core_both both, bool *is_value)
+struct dy_core_expr dy_eval_both(struct dy_core_ctx *ctx, struct dy_core_both both, bool *is_value)
 {
     bool e1_is_value = false;
     both.e1 = dy_core_expr_new(dy_eval_expr(ctx, *both.e1, &e1_is_value));
@@ -255,7 +255,7 @@ struct dy_core_expr dy_eval_both(struct dy_core_ctx ctx, struct dy_core_both bot
     };
 }
 
-struct dy_core_expr dy_eval_one_of(struct dy_core_ctx ctx, struct dy_core_one_of one_of, bool *is_value)
+struct dy_core_expr dy_eval_one_of(struct dy_core_ctx *ctx, struct dy_core_one_of one_of, bool *is_value)
 {
     bool first_is_value = false;
     struct dy_core_expr first = dy_eval_expr(ctx, *one_of.first, &first_is_value);
@@ -281,7 +281,7 @@ struct dy_core_expr dy_eval_one_of(struct dy_core_ctx ctx, struct dy_core_one_of
     };
 }
 
-struct dy_core_expr dy_eval_recursion(struct dy_core_ctx ctx, struct dy_core_recursion recursion, bool *is_value)
+struct dy_core_expr dy_eval_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, bool *is_value)
 {
     struct dy_core_expr rec_expr = {
         .tag = DY_CORE_EXPR_RECURSION,

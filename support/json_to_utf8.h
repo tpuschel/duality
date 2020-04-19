@@ -108,11 +108,11 @@ void dy_number_to_utf8(struct dy_json_number number, dy_array_t *utf8)
 
     long absolute = labs(number.integer);
 
-    dy_array_t *local = dy_array_create(sizeof(char), 4);
+    dy_array_t local = dy_array_create(sizeof(char), 4);
     for (;;) {
         char digit = (absolute % 10) + '0';
 
-        dy_array_add(local, &digit);
+        dy_array_add(&local, &digit);
 
         absolute = absolute / 10;
 
@@ -121,8 +121,8 @@ void dy_number_to_utf8(struct dy_json_number number, dy_array_t *utf8)
         }
     }
 
-    for (size_t i = dy_array_size(local); i-- > 0;) {
-        dy_array_add(utf8, dy_array_get_ptr(local, i));
+    for (size_t i = local.num_elems; i-- > 0;) {
+        dy_array_add(utf8, dy_array_pos(local, i));
     }
 
     dy_array_destroy(local);

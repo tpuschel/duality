@@ -22,8 +22,8 @@ struct dy_ast_to_core_bound_var {
 };
 
 struct dy_ast_to_core_ctx {
-    size_t *running_id;
-    dy_array_t *bound_vars;
+    size_t running_id;
+    dy_array_t bound_vars;
 };
 
 static inline struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr expr);
@@ -133,7 +133,7 @@ struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct d
 
 struct dy_core_expr dy_ast_variable_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_literal variable)
 {
-    for (size_t i = dy_array_size(ctx->bound_vars); i-- > 0;) {
+    for (size_t i = ctx->bound_vars.num_elems; i-- > 0;) {
         struct dy_ast_to_core_bound_var bound_var;
         dy_array_get(ctx->bound_vars, i, &bound_var);
 
@@ -168,7 +168,7 @@ struct dy_core_expr ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct 
     if (type_map.arg.has_type) {
         struct dy_core_expr type = dy_ast_expr_to_core(ctx, *type_map.arg.type);
 
-        size_t id = (*ctx->running_id)++;
+        size_t id = ctx->running_id++;
 
         size_t old_size;
         if (type_map.arg.has_name) {
@@ -178,14 +178,14 @@ struct dy_core_expr ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct 
                 .type = type
             };
 
-            old_size = dy_array_add(ctx->bound_vars, &bound_var);
+            old_size = dy_array_add(&ctx->bound_vars, &bound_var);
         } else {
-            old_size = dy_array_size(ctx->bound_vars);
+            old_size = ctx->bound_vars.num_elems;
         }
 
         struct dy_core_expr e = dy_ast_expr_to_core(ctx, *type_map.expr);
 
-        dy_array_set_size(ctx->bound_vars, old_size);
+        ctx->bound_vars.num_elems = old_size;
 
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_TYPE_MAP,
@@ -207,7 +207,7 @@ struct dy_core_expr ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct 
             .inference_variable = variable
         };
 
-        size_t id = (*ctx->running_id)++;
+        size_t id = ctx->running_id++;
 
         size_t old_size;
         if (type_map.arg.has_name) {
@@ -217,14 +217,14 @@ struct dy_core_expr ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct 
                 .type = type
             };
 
-            old_size = dy_array_add(ctx->bound_vars, &bound_var);
+            old_size = dy_array_add(&ctx->bound_vars, &bound_var);
         } else {
-            old_size = dy_array_size(ctx->bound_vars);
+            old_size = ctx->bound_vars.num_elems;
         }
 
         struct dy_core_expr e = dy_ast_expr_to_core(ctx, *type_map.expr);
 
-        dy_array_set_size(ctx->bound_vars, old_size);
+        ctx->bound_vars.num_elems = old_size;
 
         struct dy_core_expr result_type_map = {
             .tag = DY_CORE_EXPR_TYPE_MAP,
@@ -387,7 +387,7 @@ struct dy_core_expr do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, st
     struct dy_core_expr result_type = {
         .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
         .inference_variable = {
-            .id = (*ctx->running_id)++,
+            .id = ctx->running_id++,
             .type = dy_core_expr_new(all),
         }
     };
@@ -423,7 +423,7 @@ struct dy_core_expr do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct 
 {
     struct dy_core_expr e = dy_ast_expr_to_core(ctx, *let.expr);
 
-    size_t id = (*ctx->running_id)++;
+    size_t id = ctx->running_id++;
 
     struct dy_core_variable variable = create_inference_var(ctx);
 
@@ -438,11 +438,11 @@ struct dy_core_expr do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct 
         .type = arg_type
     };
 
-    size_t old_size = dy_array_add(ctx->bound_vars, &bound_var);
+    size_t old_size = dy_array_add(&ctx->bound_vars, &bound_var);
 
     struct dy_core_expr rest = ast_do_block_body_to_core(ctx, *let.rest);
 
-    dy_array_set_size(ctx->bound_vars, old_size);
+    ctx->bound_vars.num_elems = old_size;
 
     struct dy_core_expr positive_type_map = {
         .tag = DY_CORE_EXPR_TYPE_MAP,
@@ -477,7 +477,7 @@ struct dy_core_expr do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct 
     struct dy_core_expr result_type = {
         .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
         .inference_variable = {
-            .id = (*ctx->running_id)++,
+            .id = ctx->running_id++,
             .type = dy_core_expr_new(all),
         }
     };
@@ -526,7 +526,7 @@ struct dy_core_expr do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx
         .tag = DY_CORE_EXPR_TYPE_MAP,
         .type_map = {
             .binding = {
-                .id = (*ctx->running_id)++,
+                .id = ctx->running_id++,
                 .type = dy_core_expr_new(inference_var_expr),
             },
             .expr = dy_core_expr_new(rest),
@@ -555,7 +555,7 @@ struct dy_core_expr do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx
     struct dy_core_expr result_type = {
         .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
         .inference_variable = {
-            .id = (*ctx->running_id)++,
+            .id = ctx->running_id++,
             .type = dy_core_expr_new(all),
         }
     };
@@ -678,7 +678,7 @@ struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_
     if (rec.arg.has_type) {
         struct dy_core_expr type = dy_ast_expr_to_core(ctx, *rec.arg.type);
 
-        size_t id = (*ctx->running_id)++;
+        size_t id = ctx->running_id++;
 
         size_t old_size;
         if (rec.arg.has_name) {
@@ -688,14 +688,14 @@ struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_
                 .type = type
             };
 
-            old_size = dy_array_add(ctx->bound_vars, &bound_var);
+            old_size = dy_array_add(&ctx->bound_vars, &bound_var);
         } else {
-            old_size = dy_array_size(ctx->bound_vars);
+            old_size = ctx->bound_vars.num_elems;
         }
 
         struct dy_core_expr e = dy_ast_expr_to_core(ctx, *rec.expr);
 
-        dy_array_set_size(ctx->bound_vars, old_size);
+        ctx->bound_vars.num_elems = old_size;
 
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_RECURSION,
@@ -718,7 +718,7 @@ struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_
             .inference_variable = variable
         };
 
-        size_t id = (*ctx->running_id)++;
+        size_t id = ctx->running_id++;
 
         size_t old_size;
         if (rec.arg.has_name) {
@@ -728,14 +728,14 @@ struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_
                 .type = type
             };
 
-            old_size = dy_array_add(ctx->bound_vars, &bound_var);
+            old_size = dy_array_add(&ctx->bound_vars, &bound_var);
         } else {
-            old_size = dy_array_size(ctx->bound_vars);
+            old_size = ctx->bound_vars.num_elems;
         }
 
         struct dy_core_expr e = dy_ast_expr_to_core(ctx, *rec.expr);
 
-        dy_array_set_size(ctx->bound_vars, old_size);
+        ctx->bound_vars.num_elems = old_size;
 
         struct dy_core_expr result_recursion = {
             .tag = DY_CORE_EXPR_RECURSION,
@@ -774,7 +774,7 @@ struct dy_core_variable create_inference_var(struct dy_ast_to_core_ctx *ctx)
     };
 
     return (struct dy_core_variable){
-        .id = (*ctx->running_id)++,
+        .id = ctx->running_id++,
         .type = dy_core_expr_new(type_all)
     };
 }

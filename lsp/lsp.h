@@ -58,7 +58,7 @@ struct dy_lsp_ctx {
     bool is_initialized;
     bool received_shutdown_request;
     int exit_code;
-    dy_array_t *documents;
+    dy_array_t documents;
 };
 
 static inline dy_json_t invalid_request(dy_string_t message);
@@ -79,9 +79,9 @@ static inline void process_document(struct dy_lsp_ctx *ctx, struct document *doc
 static inline struct dy_stream stream_from_string(dy_string_t s);
 static inline void null_stream(dy_array_t *buffer, void *env);
 static inline bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, size_t *byte_offset);
-static inline void produce_diagnostics(struct dy_core_ctx ctx, struct dy_core_expr expr, dy_string_t text, dy_array_t *diagnostics);
+static inline void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_string_t text, dy_array_t *diagnostics);
 static inline dy_json_t compute_lsp_range(dy_string_t text, struct dy_range range);
-static inline dy_json_t error_message(struct dy_core_ctx ctx, struct dy_core_expr_map_elim elim);
+static inline dy_json_t error_message(struct dy_core_ctx *ctx, struct dy_core_expr_map_elim elim);
 static inline dy_json_t make_diagnostic(dy_json_t range, dy_json_t severity, dy_json_t message);
 static inline dy_json_t make_diagnostics_params(dy_string_t uri, dy_json_t diagnostics);
 
@@ -454,17 +454,17 @@ void dy_lsp_did_open(dy_lsp_ctx_t *ctx, dy_string_t uri, dy_string_t text)
 
     process_document(ctx, &doc);
 
-    dy_array_add(ctx->documents, &doc);
+    dy_array_add(&ctx->documents, &doc);
 }
 
 void dy_lsp_did_close(dy_lsp_ctx_t *ctx, dy_string_t uri)
 {
-    for (size_t i = 0, size = dy_array_size(ctx->documents); i < size; ++i) {
+    for (size_t i = 0, size = ctx->documents.num_elems; i < size; ++i) {
         struct document doc;
         dy_array_get(ctx->documents, i, &doc);
 
         if (dy_string_are_equal(doc.uri, uri)) {
-            dy_array_remove(ctx->documents, i);
+            dy_array_remove(&ctx->documents, i);
             break;
         }
     }
@@ -472,8 +472,8 @@ void dy_lsp_did_close(dy_lsp_ctx_t *ctx, dy_string_t uri)
 
 void dy_lsp_did_change(dy_lsp_ctx_t *ctx, dy_string_t uri, struct dy_json_array content_changes)
 {
-    for (size_t i = 0, size = dy_array_size(ctx->documents); i < size; ++i) {
-        struct document *doc = dy_array_get_ptr(ctx->documents, i);
+    for (size_t i = 0, size = ctx->documents.num_elems; i < size; ++i) {
+        struct document *doc = dy_array_pos(ctx->documents, i);
 
         if (!dy_string_are_equal(doc->uri, uri)) {
             continue;
@@ -508,8 +508,8 @@ void dy_lsp_did_change(dy_lsp_ctx_t *ctx, dy_string_t uri, struct dy_json_array 
 
 bool dy_lsp_hover(dy_lsp_ctx_t *ctx, dy_string_t uri, long line_number, long utf16_char_offset, dy_json_t *result, dy_json_t *error)
 {
-    for (size_t i = 0, size = dy_array_size(ctx->documents); i < size; ++i) {
-        struct document *doc = dy_array_get_ptr(ctx->documents, i);
+    for (size_t i = 0, size = ctx->documents.num_elems; i < size; ++i) {
+        struct document *doc = dy_array_pos(ctx->documents, i);
 
         if (!dy_string_are_equal(doc->uri, uri)) {
             continue;
@@ -547,15 +547,15 @@ dy_json_t initialize_response()
         .value = server_info()
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 2);
-    dy_array_add(members, &capabilities);
-    dy_array_add(members, &m_server_info);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_add(&members, &capabilities);
+    dy_array_add(&members, &m_server_info);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }
@@ -582,15 +582,15 @@ dy_json_t response_error(long code, dy_string_t message)
         .value = dy_json_string(message)
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 2);
-    dy_array_add(members, &m_code);
-    dy_array_add(members, &m_message);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_add(&members, &m_code);
+    dy_array_add(&members, &m_message);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }
@@ -607,15 +607,15 @@ dy_json_t server_capabilities()
         .value = dy_json_true()
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 2);
-    dy_array_add(members, &text_document_sync);
-    dy_array_add(members, &hover_provider);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_add(&members, &text_document_sync);
+    dy_array_add(&members, &hover_provider);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }
@@ -632,15 +632,15 @@ dy_json_t server_info(void)
         .value = dy_json_string(DY_STR_LIT("0.0.1"))
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 2);
-    dy_array_add(members, &name);
-    dy_array_add(members, &version);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_add(&members, &name);
+    dy_array_add(&members, &version);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }
@@ -657,15 +657,15 @@ dy_json_t text_document_sync_options(void)
         .value = dy_json_integer(1)
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 2);
-    dy_array_add(members, &open_close);
-    dy_array_add(members, &change);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_add(&members, &open_close);
+    dy_array_add(&members, &change);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }
@@ -687,16 +687,16 @@ dy_json_t error_response(dy_json_t id, dy_json_t error)
         .value = error
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 3);
-    dy_array_add(members, &jsonrpc);
-    dy_array_add(members, &m_id);
-    dy_array_add(members, &m_error);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 3);
+    dy_array_add(&members, &jsonrpc);
+    dy_array_add(&members, &m_id);
+    dy_array_add(&members, &m_error);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }
@@ -718,16 +718,16 @@ dy_json_t success_response(dy_json_t id, dy_json_t result)
         .value = result
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 3);
-    dy_array_add(members, &jsonrpc);
-    dy_array_add(members, &m_id);
-    dy_array_add(members, &m_result);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 3);
+    dy_array_add(&members, &jsonrpc);
+    dy_array_add(&members, &m_id);
+    dy_array_add(&members, &m_result);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }
@@ -739,14 +739,14 @@ dy_json_t hover_result(dy_string_t contents)
         .value = dy_json_string(contents)
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 1);
-    dy_array_add(members, &m_contents);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 1);
+    dy_array_add(&members, &m_contents);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }
@@ -768,16 +768,16 @@ dy_json_t make_notification(dy_string_t method, dy_json_t params)
         .value = params
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 3);
-    dy_array_add(members, &jsonrpc_member);
-    dy_array_add(members, &method_member);
-    dy_array_add(members, &params_member);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 3);
+    dy_array_add(&members, &jsonrpc_member);
+    dy_array_add(&members, &method_member);
+    dy_array_add(&members, &params_member);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }
@@ -803,9 +803,8 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
         return;
     }
 
-    size_t running_id = 0;
     struct dy_ast_to_core_ctx ast_to_core_ctx = {
-        .running_id = &running_id,
+        .running_id = 0,
         .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), 64)
     };
 
@@ -814,27 +813,27 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
     dy_ast_do_block_release(ast.body);
 
     struct dy_core_ctx core_ctx = {
-        .running_id = &running_id,
+        .running_id = ast_to_core_ctx.running_id,
         .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), 1)
     };
 
     struct dy_constraint c;
     bool have_c = false;
-    struct dy_core_expr new_core = dy_check_expr(core_ctx, core, &c, &have_c);
+    struct dy_core_expr new_core = dy_check_expr(&core_ctx, core, &c, &have_c);
 
     dy_core_expr_release(core);
 
     doc->core_is_present = true;
     doc->core = new_core;
 
-    dy_array_t *diagnostics = dy_array_create(sizeof(dy_json_t), 8);
-    produce_diagnostics(core_ctx, new_core, doc->text, diagnostics);
+    dy_array_t diagnostics = dy_array_create(sizeof(dy_json_t), 8);
+    produce_diagnostics(&core_ctx, new_core, doc->text, &diagnostics);
 
     dy_json_t diag_json = {
         .tag = DY_JSON_VALUE_ARRAY,
         .array = {
-            .values = dy_array_buffer(diagnostics),
-            .num_values = dy_array_size(diagnostics),
+            .values = diagnostics.buffer,
+            .num_values = diagnostics.num_elems,
         }
     };
 
@@ -845,9 +844,9 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
 
 struct dy_stream stream_from_string(dy_string_t s)
 {
-    dy_array_t *buffer = dy_array_create(sizeof(char), s.size);
+    dy_array_t buffer = dy_array_create(sizeof(char), s.size);
     for (size_t i = 0; i < s.size; ++i) {
-        dy_array_add(buffer, s.ptr + i);
+        dy_array_add(&buffer, s.ptr + i);
     }
 
     return (struct dy_stream){
@@ -906,7 +905,7 @@ bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, 
     return true;
 }
 
-void produce_diagnostics(struct dy_core_ctx ctx, struct dy_core_expr expr, dy_string_t text, dy_array_t *diagnostics)
+void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_string_t text, dy_array_t *diagnostics)
 {
     switch (expr.tag) {
     case DY_CORE_EXPR_EXPR_MAP:
@@ -1026,7 +1025,7 @@ dy_json_t compute_lsp_range(dy_string_t text, struct dy_range range)
     return make_range(make_position(line_start, character_start), make_position(line_end, character_end));
 }
 
-dy_json_t error_message(struct dy_core_ctx ctx, struct dy_core_expr_map_elim elim)
+dy_json_t error_message(struct dy_core_ctx *ctx, struct dy_core_expr_map_elim elim)
 {
     if (elim.check_result == DY_NO) {
         return dy_json_string(DY_STR_LIT("Error message placeholder."));
@@ -1052,16 +1051,16 @@ dy_json_t make_diagnostic(dy_json_t range, dy_json_t severity, dy_json_t message
         .value = message
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 3);
-    dy_array_add(members, &range_member);
-    dy_array_add(members, &severity_member);
-    dy_array_add(members, &message_member);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 3);
+    dy_array_add(&members, &range_member);
+    dy_array_add(&members, &severity_member);
+    dy_array_add(&members, &message_member);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }
@@ -1078,15 +1077,15 @@ dy_json_t make_diagnostics_params(dy_string_t uri, dy_json_t diagnostics)
         .value = diagnostics
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 3);
-    dy_array_add(members, &uri_member);
-    dy_array_add(members, &diagnostics_member);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 3);
+    dy_array_add(&members, &uri_member);
+    dy_array_add(&members, &diagnostics_member);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }
@@ -1103,15 +1102,15 @@ dy_json_t make_position(long line, long character)
         .value = dy_json_integer(character)
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 2);
-    dy_array_add(members, &line_member);
-    dy_array_add(members, &character_member);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_add(&members, &line_member);
+    dy_array_add(&members, &character_member);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }
@@ -1128,15 +1127,15 @@ dy_json_t make_range(dy_json_t start, dy_json_t end)
         .value = end
     };
 
-    dy_array_t *members = dy_array_create(sizeof(struct dy_json_member), 2);
-    dy_array_add(members, &start_member);
-    dy_array_add(members, &end_member);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_add(&members, &start_member);
+    dy_array_add(&members, &end_member);
 
     return (dy_json_t){
         .tag = DY_JSON_VALUE_OBJECT,
         .object = {
-            .members = dy_array_buffer(members),
-            .num_members = dy_array_size(members),
+            .members = members.buffer,
+            .num_members = members.num_elems,
         }
     };
 }

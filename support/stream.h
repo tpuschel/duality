@@ -15,7 +15,7 @@
 
 struct dy_stream {
     void (*get_chars)(dy_array_t *buffer, void *env);
-    dy_array_t *buffer;
+    dy_array_t buffer;
     void *env;
 
     size_t current_index;
@@ -35,10 +35,10 @@ static inline void dy_stream_dump(struct dy_stream *stream, FILE *file);
 
 bool dy_stream_get_char(struct dy_stream *stream, char *c)
 {
-    if (stream->current_index == dy_array_size(stream->buffer)) {
-        stream->get_chars(stream->buffer, stream->env);
+    if (stream->current_index == stream->buffer.num_elems) {
+        stream->get_chars(&stream->buffer, stream->env);
 
-        if (stream->current_index == dy_array_size(stream->buffer)) {
+        if (stream->current_index == stream->buffer.num_elems) {
             return false;
         }
     }
@@ -55,7 +55,7 @@ void dy_stream_put_last_char_back(struct dy_stream *stream)
 
 void dy_stream_reset(struct dy_stream *stream)
 {
-    dy_array_set_size(stream->buffer, 0);
+    stream->buffer.num_elems = 0;
     stream->current_index = 0;
 }
 
@@ -128,8 +128,8 @@ void dy_stream_dump(struct dy_stream *stream, FILE *file)
 {
     fprintf(file, "[Stream dump - begin]\n");
 
-    for (size_t i = stream->current_index; i < dy_array_size(stream->buffer); ++i) {
-        char c = *(char *)dy_array_get_ptr(stream->buffer, i);
+    for (size_t i = stream->current_index; i < stream->buffer.num_elems; ++i) {
+        char c = *(char *)dy_array_pos(stream->buffer, i);
         if (c == '\n') {
             fprintf(file, "\\n");
         } else if (c == '\t') {

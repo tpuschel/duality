@@ -200,15 +200,15 @@ bool parse_nonempty_object(struct dy_stream *stream, struct dy_json_object *obje
 
 bool parse_object_members(struct dy_stream *stream, struct dy_json_object *object)
 {
-    dy_array_t *member_storage = dy_array_create(sizeof(struct dy_json_member), 4);
+    dy_array_t member_storage = dy_array_create(sizeof(struct dy_json_member), 4);
 
-    if (!parse_object_members_storage(stream, member_storage)) {
+    if (!parse_object_members_storage(stream, &member_storage)) {
         return false;
     }
 
     *object = (struct dy_json_object){
-        .members = dy_array_buffer(member_storage),
-        .num_members = dy_array_size(member_storage)
+        .members = member_storage.buffer,
+        .num_members = member_storage.num_elems
     };
 
     return true;
@@ -307,14 +307,14 @@ bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
 {
     size_t start_index = stream->current_index;
 
-    dy_array_t *characters_storage = dy_array_create(sizeof(char), 8);
+    dy_array_t characters_storage = dy_array_create(sizeof(char), 8);
 
     for (;;) {
         char c;
         if (!dy_stream_get_char(stream, &c)) {
             *characters = (dy_string_t){
-                .ptr = dy_array_buffer(characters_storage),
-                .size = dy_array_size(characters_storage)
+                .ptr = characters_storage.buffer,
+                .size = characters_storage.num_elems
             };
 
             return true;
@@ -324,8 +324,8 @@ bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
             dy_stream_put_last_char_back(stream);
 
             *characters = (dy_string_t){
-                .ptr = dy_array_buffer(characters_storage),
-                .size = dy_array_size(characters_storage)
+                .ptr = characters_storage.buffer,
+                .size = characters_storage.num_elems
             };
 
             return true;
@@ -339,42 +339,42 @@ bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
             }
 
             if (c2 == '\"') {
-                dy_array_add(characters_storage, &(char){ '\"' });
+                dy_array_add(&characters_storage, &(char){ '\"' });
                 continue;
             }
 
             if (c2 == '\\') {
-                dy_array_add(characters_storage, &(char){ '\\' });
+                dy_array_add(&characters_storage, &(char){ '\\' });
                 continue;
             }
 
             if (c2 == '/') {
-                dy_array_add(characters_storage, &(char){ '/' });
+                dy_array_add(&characters_storage, &(char){ '/' });
                 continue;
             }
 
             if (c2 == 'b') {
-                dy_array_add(characters_storage, &(char){ '\b' });
+                dy_array_add(&characters_storage, &(char){ '\b' });
                 continue;
             }
 
             if (c2 == 'f') {
-                dy_array_add(characters_storage, &(char){ '\f' });
+                dy_array_add(&characters_storage, &(char){ '\f' });
                 continue;
             }
 
             if (c2 == 'n') {
-                dy_array_add(characters_storage, &(char){ '\n' });
+                dy_array_add(&characters_storage, &(char){ '\n' });
                 continue;
             }
 
             if (c2 == 'r') {
-                dy_array_add(characters_storage, &(char){ '\r' });
+                dy_array_add(&characters_storage, &(char){ '\r' });
                 continue;
             }
 
             if (c2 == 't') {
-                dy_array_add(characters_storage, &(char){ '\t' });
+                dy_array_add(&characters_storage, &(char){ '\t' });
                 continue;
             }
 
@@ -410,19 +410,19 @@ bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
                 uint16_t hex = (uint16_t)((hex1 << 12) | (hex2 << 8) | (hex3 << 4) | hex4);
 
                 if (!(hex & 0xff80)) {
-                    dy_array_add(characters_storage, &(char){ (char)hex });
+                    dy_array_add(&characters_storage, &(char){ (char)hex });
                     continue;
                 }
 
                 if (!(hex & 0xf800)) {
-                    dy_array_add(characters_storage, &(char){ (char)(0xc | (hex & 0x07c0) >> 6) });
-                    dy_array_add(characters_storage, &(char){ (char)(0x8 | (hex & 0x003f)) });
+                    dy_array_add(&characters_storage, &(char){ (char)(0xc | (hex & 0x07c0) >> 6) });
+                    dy_array_add(&characters_storage, &(char){ (char)(0x8 | (hex & 0x003f)) });
                     continue;
                 }
 
-                dy_array_add(characters_storage, &(char){ (char)(0xe | (hex & 0xf000) >> (6 + 6)) });
-                dy_array_add(characters_storage, &(char){ (char)(0x8 | (hex & 0x0fc0) >> 6) });
-                dy_array_add(characters_storage, &(char){ (char)(0x8 | (hex & 0x003f)) });
+                dy_array_add(&characters_storage, &(char){ (char)(0xe | (hex & 0xf000) >> (6 + 6)) });
+                dy_array_add(&characters_storage, &(char){ (char)(0x8 | (hex & 0x0fc0) >> 6) });
+                dy_array_add(&characters_storage, &(char){ (char)(0x8 | (hex & 0x003f)) });
 
                 continue;
             }
@@ -432,7 +432,7 @@ bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
             return false;
         }
 
-        dy_array_add(characters_storage, &c);
+        dy_array_add(&characters_storage, &c);
     }
 }
 
@@ -502,15 +502,15 @@ bool parse_nonempty_array(struct dy_stream *stream, struct dy_json_array *array)
 
 bool parse_array_elements(struct dy_stream *stream, struct dy_json_array *array)
 {
-    dy_array_t *element_storage = dy_array_create(sizeof(struct dy_json_value), 4);
+    dy_array_t element_storage = dy_array_create(sizeof(struct dy_json_value), 4);
 
-    if (!parse_array_elements_storage(stream, element_storage)) {
+    if (!parse_array_elements_storage(stream, &element_storage)) {
         return false;
     }
 
     *array = (struct dy_json_array){
-        .values = dy_array_buffer(element_storage),
-        .num_values = dy_array_size(element_storage)
+        .values = element_storage.buffer,
+        .num_values = element_storage.num_elems
     };
 
     return true;

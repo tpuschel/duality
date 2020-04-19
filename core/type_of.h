@@ -9,9 +9,9 @@
 
 #include "ctx.h"
 
-static inline struct dy_core_expr dy_type_of(struct dy_core_ctx ctx, struct dy_core_expr expr);
+static inline struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr);
 
-struct dy_core_expr dy_type_of(struct dy_core_ctx ctx, struct dy_core_expr expr)
+struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr)
 {
     switch (expr.tag) {
     case DY_CORE_EXPR_EXPR_MAP:
@@ -20,7 +20,7 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx ctx, struct dy_core_expr expr)
                 .tag = DY_CORE_EXPR_TYPE_MAP,
                 .type_map = {
                     .binding = {
-                        .id = (*ctx.running_id)++,
+                        .id = ctx->running_id++,
                         .type = dy_core_expr_new(dy_type_of(ctx, *expr.expr_map.e1)),
                     },
                     .expr = dy_core_expr_new(dy_type_of(ctx, *expr.expr_map.e2)),
@@ -106,7 +106,7 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx ctx, struct dy_core_expr expr)
             .tag = DY_CORE_EXPR_TYPE_MAP,
             .type_map = {
                 .binding = {
-                    .id = (*ctx.running_id)++,
+                    .id = ctx->running_id++,
                     .type = dy_core_expr_new((struct dy_core_expr){ .tag = DY_CORE_EXPR_TYPE_OF_STRINGS }),
                 },
                 .expr = dy_core_expr_new((struct dy_core_expr){ .tag = DY_CORE_EXPR_TYPE_OF_STRINGS }),

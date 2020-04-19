@@ -8,6 +8,7 @@
 #define DY_RC_H
 
 #include "alloc.h"
+#include "util.h"
 
 struct dy_rc_slot {
     size_t ref_cnt;
@@ -20,14 +21,14 @@ struct dy_rc_slot {
             : 0)
 
 #define DY_RC_PADDING(size, alignment)                                    \
-    (alignment >= _Alignof(struct dy_rc_slot)                             \
+    (alignment >= DY_ALIGNOF(struct dy_rc_slot)                             \
             ? DY_RC_COMPUTE_PADDING(sizeof(struct dy_rc_slot), alignment) \
-            : DY_RC_COMPUTE_PADDING(size, _Alignof(struct dy_rc_slot)))
+            : DY_RC_COMPUTE_PADDING(size, DY_ALIGNOF(struct dy_rc_slot)))
 
 #define DY_RC_OFFSET(size, alignment) \
     (DY_RC_PADDING(size, alignment) + sizeof(struct dy_rc_slot))
 
-#define DY_RC_OFFSET_OF_TYPE(type) DY_RC_OFFSET(sizeof(type), _Alignof(type))
+#define DY_RC_OFFSET_OF_TYPE(type) DY_RC_OFFSET(sizeof(type), DY_ALIGNOF(type))
 
 static inline const void *dy_rc_new(const void *ptr, size_t size, size_t offset);
 static inline const void *dy_rc_retain(const void *ptr, size_t offset);

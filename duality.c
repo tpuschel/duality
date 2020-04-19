@@ -67,10 +67,8 @@ int main(int argc, const char *argv[])
         return -1;
     }
 
-    size_t running_id = 0;
-
     struct dy_ast_to_core_ctx ast_to_core_ctx = {
-        .running_id = &running_id,
+        .running_id = 0,
         .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), 64)
     };
 
@@ -85,22 +83,22 @@ int main(int argc, const char *argv[])
     */
 
     struct dy_core_ctx core_ctx = {
-        .running_id = &running_id,
+        .running_id = ast_to_core_ctx.running_id,
         .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), 64)
     };
 
     struct dy_constraint constraint;
     bool have_constraint = false;
-    struct dy_core_expr checked_program = dy_check_expr(core_ctx, program, &constraint, &have_constraint);
+    struct dy_core_expr checked_program = dy_check_expr(&core_ctx, program, &constraint, &have_constraint);
     dy_assert(!have_constraint);
 
     if (core_has_error(checked_program)) {
-        print_core_errors(stderr, checked_program, dy_array_buffer(parser_ctx.stream.buffer), dy_array_size(parser_ctx.stream.buffer));
+        print_core_errors(stderr, checked_program, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
         return -1;
     }
 
     bool is_value = false;
-    struct dy_core_expr result = dy_eval_expr(core_ctx, checked_program, &is_value);
+    struct dy_core_expr result = dy_eval_expr(&core_ctx, checked_program, &is_value);
 
     printf("Result: ");
     print_core_expr(stdout, result);
@@ -110,7 +108,7 @@ int main(int argc, const char *argv[])
         fprintf(stderr, "Unable to fully evaluate the program.\n");
 
         if (core_has_error(result)) {
-            print_core_errors(stderr, result, dy_array_buffer(parser_ctx.stream.buffer), dy_array_size(parser_ctx.stream.buffer));
+            print_core_errors(stderr, result, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
         }
         return -1;
     } else {
@@ -120,10 +118,10 @@ int main(int argc, const char *argv[])
 
 void print_core_expr(FILE *file, struct dy_core_expr expr)
 {
-    dy_array_t *s = dy_array_create(1, 64);
-    dy_core_expr_to_string(expr, s);
+    dy_array_t s = dy_array_create(1, 64);
+    dy_core_expr_to_string(expr, &s);
 
-    for (size_t i = 0; i < dy_array_size(s); ++i) {
+    for (size_t i = 0; i < s.num_elems; ++i) {
         char c;
         dy_array_get(s, i, &c);
         fprintf(file, "%c", c);
@@ -142,7 +140,7 @@ void read_chunk(dy_array_t *buffer, void *env)
 
     dy_array_set_excess_capacity(buffer, CHUNK_SIZE);
 
-    size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), CHUNK_SIZE, stream);
+    size_t num_bytes_read = fread(dy_array_excess_buffer(*buffer), sizeof(char), CHUNK_SIZE, stream);
 
     dy_array_add_to_size(buffer, num_bytes_read);
 }

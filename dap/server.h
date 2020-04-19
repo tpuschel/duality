@@ -28,7 +28,7 @@ struct dy_dap_stream_env {
 };
 
 struct send_env {
-    dy_array_t *buffer;
+    dy_array_t buffer;
     FILE *file;
 };
 

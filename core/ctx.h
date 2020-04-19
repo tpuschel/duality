@@ -12,12 +12,12 @@
 struct dy_bound_constraint {
     size_t id;
     struct dy_core_expr type;
-    dy_array_t *binding_ids;
+    dy_array_t binding_ids;
 };
 
 struct dy_core_ctx {
-    size_t *running_id;
-    dy_array_t *bound_constraints;
+    size_t running_id;
+    dy_array_t bound_constraints;
 };
 
 #endif // DY_CORE_CTX_H

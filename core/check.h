@@ -12,34 +12,32 @@
 #include "type_of.h"
 #include "is_subtype.h"
 
-static inline struct dy_core_expr dy_check_expr(struct dy_core_ctx ctx, struct dy_core_expr expr, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_expr_map dy_check_expr_map(struct dy_core_ctx *ctx, struct dy_core_expr_map expr_map, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-static inline struct dy_core_expr_map dy_check_expr_map(struct dy_core_ctx ctx, struct dy_core_expr_map expr_map, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_type_map dy_check_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-static inline struct dy_core_type_map dy_check_type_map(struct dy_core_ctx ctx, struct dy_core_type_map type_map, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_expr_map_elim dy_check_expr_map_elim(struct dy_core_ctx *ctx, struct dy_core_expr_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-static inline struct dy_core_expr_map_elim dy_check_expr_map_elim(struct dy_core_ctx ctx, struct dy_core_expr_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_type_map_elim dy_check_type_map_elim(struct dy_core_ctx *ctx, struct dy_core_type_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-static inline struct dy_core_type_map_elim dy_check_type_map_elim(struct dy_core_ctx ctx, struct dy_core_type_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_both dy_check_both(struct dy_core_ctx *ctx, struct dy_core_both both, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-static inline struct dy_core_both dy_check_both(struct dy_core_ctx ctx, struct dy_core_both both, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_one_of dy_check_one_of(struct dy_core_ctx *ctx, struct dy_core_one_of one_of, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-static inline struct dy_core_one_of dy_check_one_of(struct dy_core_ctx ctx, struct dy_core_one_of one_of, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map inference_type_map, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-static inline struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx ctx, struct dy_core_type_map inference_type_map, struct dy_constraint *constraint, bool *did_generate_constraint);
-
-static inline struct dy_core_recursion dy_check_recursion(struct dy_core_ctx ctx, struct dy_core_recursion recursion, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, struct dy_constraint *constraint, bool *did_generate_constraint);
 
 static inline const struct dy_constraint *alloc_constraint(struct dy_constraint constraint);
 
-static inline void dy_binding_contraints(struct dy_core_ctx ctx, size_t id, struct dy_constraint constraint, bool have_constraint, dy_array_t *ids);
+static inline void dy_binding_contraints(struct dy_core_ctx *ctx, size_t id, struct dy_constraint constraint, bool have_constraint, dy_array_t *ids);
 
-static inline struct dy_core_expr resolve_implicit(struct dy_core_ctx ctx, size_t id, struct dy_core_expr type, enum dy_core_polarity polarity, struct dy_constraint constraint, bool have_constraint, struct dy_constraint *new_constraint, bool *have_new_constraint, struct dy_core_expr expr);
+static inline struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr type, enum dy_core_polarity polarity, struct dy_constraint constraint, bool have_constraint, struct dy_constraint *new_constraint, bool *have_new_constraint, struct dy_core_expr expr);
 static inline void remove_id(dy_array_t *ids, size_t id);
 
-static inline bool is_mentioned_in_constraints(struct dy_core_ctx ctx, size_t id, struct dy_constraint constraint);
+static inline bool is_mentioned_in_constraints(struct dy_core_ctx *ctx, size_t id, struct dy_constraint constraint);
 
-struct dy_core_expr dy_check_expr(struct dy_core_ctx ctx, struct dy_core_expr expr, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_expr dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     switch (expr.tag) {
     case DY_CORE_EXPR_EXPR_MAP:
@@ -84,7 +82,7 @@ struct dy_core_expr dy_check_expr(struct dy_core_ctx ctx, struct dy_core_expr ex
     DY_IMPOSSIBLE_ENUM();
 }
 
-struct dy_core_expr_map dy_check_expr_map(struct dy_core_ctx ctx, struct dy_core_expr_map expr_map, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_expr_map dy_check_expr_map(struct dy_core_ctx *ctx, struct dy_core_expr_map expr_map, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
@@ -117,7 +115,7 @@ struct dy_core_expr_map dy_check_expr_map(struct dy_core_ctx ctx, struct dy_core
     return expr_map;
 }
 
-struct dy_core_type_map dy_check_type_map(struct dy_core_ctx ctx, struct dy_core_type_map type_map, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_type_map dy_check_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
@@ -172,7 +170,7 @@ struct dy_core_type_map dy_check_type_map(struct dy_core_ctx ctx, struct dy_core
     return type_map;
 }
 
-struct dy_core_expr_map_elim dy_check_expr_map_elim(struct dy_core_ctx ctx, struct dy_core_expr_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_expr_map_elim dy_check_expr_map_elim(struct dy_core_ctx *ctx, struct dy_core_expr_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
@@ -195,7 +193,7 @@ struct dy_core_expr_map_elim dy_check_expr_map_elim(struct dy_core_ctx ctx, stru
                 .tag = DY_CORE_EXPR_TYPE_MAP,
                 .type_map = {
                     .binding = {
-                        .id = (*ctx.running_id)++,
+                        .id = ctx->running_id++,
                         .type = dy_core_expr_new(type_of_expr_map_e1),
                     },
                     .expr = dy_core_expr_retain_ptr(elim.map.e2),
@@ -288,7 +286,7 @@ struct dy_core_expr_map_elim dy_check_expr_map_elim(struct dy_core_ctx ctx, stru
     return elim;
 }
 
-struct dy_core_type_map_elim dy_check_type_map_elim(struct dy_core_ctx ctx, struct dy_core_type_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_type_map_elim dy_check_type_map_elim(struct dy_core_ctx *ctx, struct dy_core_type_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
@@ -383,7 +381,7 @@ struct dy_core_type_map_elim dy_check_type_map_elim(struct dy_core_ctx ctx, stru
     return elim;
 }
 
-struct dy_core_both dy_check_both(struct dy_core_ctx ctx, struct dy_core_both both, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_both dy_check_both(struct dy_core_ctx *ctx, struct dy_core_both both, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
@@ -416,7 +414,7 @@ struct dy_core_both dy_check_both(struct dy_core_ctx ctx, struct dy_core_both bo
     return both;
 }
 
-struct dy_core_one_of dy_check_one_of(struct dy_core_ctx ctx, struct dy_core_one_of one_of, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_one_of dy_check_one_of(struct dy_core_ctx *ctx, struct dy_core_one_of one_of, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
@@ -443,7 +441,7 @@ struct dy_core_one_of dy_check_one_of(struct dy_core_ctx ctx, struct dy_core_one
     return one_of;
 }
 
-struct dy_core_recursion dy_check_recursion(struct dy_core_ctx ctx, struct dy_core_recursion recursion, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
@@ -483,7 +481,7 @@ struct dy_core_recursion dy_check_recursion(struct dy_core_ctx ctx, struct dy_co
     return recursion;
 }
 
-struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx ctx, struct dy_core_type_map inference_type_map, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map inference_type_map, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
@@ -507,10 +505,10 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx ctx, struct d
 
     dy_core_expr_release(inner_expr);
 
-    dy_array_t *ids = dy_array_create(sizeof(size_t), 4);
-    dy_binding_contraints(ctx, inference_type_map.binding.id, c2, have_c2, ids);
+    dy_array_t ids = dy_array_create(sizeof(size_t), 4);
+    dy_binding_contraints(ctx, inference_type_map.binding.id, c2, have_c2, &ids);
 
-    if (dy_array_size(ids) == 0) {
+    if (ids.num_elems == 0) {
         dy_array_destroy(ids);
 
         dy_core_expr_release(type);
@@ -532,7 +530,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx ctx, struct d
             .binding_ids = ids
         };
 
-        dy_array_add(ctx.bound_constraints, &bound_constraint);
+        dy_array_add(&ctx->bound_constraints, &bound_constraint);
     }
 
     if (have_c1 && have_c2) {
@@ -556,7 +554,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx ctx, struct d
     return new_inner_expr;
 }
 
-void dy_binding_contraints(struct dy_core_ctx ctx, size_t id, struct dy_constraint constraint, bool have_constraint, dy_array_t *ids)
+void dy_binding_contraints(struct dy_core_ctx *ctx, size_t id, struct dy_constraint constraint, bool have_constraint, dy_array_t *ids)
 {
     if (!have_constraint) {
         return;
@@ -569,9 +567,9 @@ void dy_binding_contraints(struct dy_core_ctx ctx, size_t id, struct dy_constrai
         }
 
         // No duplicates.
-        for (size_t i = 0; i < dy_array_size(ids); ++i) {
+        for (size_t i = 0; i < ids->num_elems; ++i) {
             size_t binding_id;
-            dy_array_get(ids, i, &binding_id);
+            dy_array_get(*ids, i, &binding_id);
 
             if (constraint.single.id == binding_id) {
                 return;
@@ -580,15 +578,15 @@ void dy_binding_contraints(struct dy_core_ctx ctx, size_t id, struct dy_constrai
 
         // No mutually recursive dependencies.
         // TODO: Actually follow indirection.
-        for (size_t i = dy_array_size(ctx.bound_constraints); i-- > 0;) {
+        for (size_t i = ctx->bound_constraints.num_elems; i-- > 0;) {
             struct dy_bound_constraint bound_constraint;
-            dy_array_get(ctx.bound_constraints, i, &bound_constraint);
+            dy_array_get(ctx->bound_constraints, i, &bound_constraint);
 
             if (constraint.single.id != bound_constraint.id) {
                 continue;
             }
 
-            for (size_t k = 0, size = dy_array_size(bound_constraint.binding_ids); k < size; ++k) {
+            for (size_t k = 0, size = bound_constraint.binding_ids.num_elems; k < size; ++k) {
                 size_t binding_id;
                 dy_array_get(bound_constraint.binding_ids, k, &binding_id);
                 if (binding_id == id) {
@@ -617,7 +615,7 @@ void dy_binding_contraints(struct dy_core_ctx ctx, size_t id, struct dy_constrai
     DY_IMPOSSIBLE_ENUM();
 }
 
-struct dy_core_expr resolve_implicit(struct dy_core_ctx ctx, size_t id, struct dy_core_expr type, enum dy_core_polarity polarity, struct dy_constraint constraint, bool have_constraint, struct dy_constraint *new_constraint, bool *have_new_constraint, struct dy_core_expr expr)
+struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr type, enum dy_core_polarity polarity, struct dy_constraint constraint, bool have_constraint, struct dy_constraint *new_constraint, bool *have_new_constraint, struct dy_core_expr expr)
 {
     if (have_constraint) {
         struct dy_constraint_range solution = dy_constraint_collect(constraint, id);
@@ -769,22 +767,23 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx ctx, size_t id, struct d
         dy_core_expr_release(type_of_expr);
     }
 
-    for (size_t i = dy_array_size(ctx.bound_constraints); i-- > 0;) {
-        struct dy_bound_constraint bound_constraint;
-        dy_array_get(ctx.bound_constraints, i, &bound_constraint);
+    for (size_t i = ctx->bound_constraints.num_elems; i-- > 0;) {
+        struct dy_bound_constraint *bound_constraint = dy_array_pos(ctx->bound_constraints, i);
 
-        remove_id(bound_constraint.binding_ids, id);
+        remove_id(&bound_constraint->binding_ids, id);
 
-        dy_binding_contraints(ctx, bound_constraint.id, constraint, have_constraint, bound_constraint.binding_ids);
+        dy_binding_contraints(ctx, bound_constraint->id, constraint, have_constraint, &bound_constraint->binding_ids);
 
-        if (dy_array_size(bound_constraint.binding_ids) == 0) {
-            dy_array_destroy(bound_constraint.binding_ids);
+        if (bound_constraint->binding_ids.num_elems == 0) {
+            dy_array_destroy(bound_constraint->binding_ids);
 
-            dy_array_remove(ctx.bound_constraints, i);
+            struct dy_bound_constraint bound_constraint_copy = *bound_constraint;
+
+            dy_array_remove(&ctx->bound_constraints, i);
 
             struct dy_constraint resolved_constraint;
             bool have_new_constraint2 = false;
-            struct dy_core_expr resolved_expr = resolve_implicit(ctx, bound_constraint.id, bound_constraint.type, polarity, constraint, have_constraint, &resolved_constraint, &have_new_constraint2, expr);
+            struct dy_core_expr resolved_expr = resolve_implicit(ctx, bound_constraint_copy.id, bound_constraint_copy.type, polarity, constraint, have_constraint, &resolved_constraint, &have_new_constraint2, expr);
 
             dy_core_expr_release(expr);
 
@@ -796,7 +795,7 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx ctx, size_t id, struct d
             have_constraint = have_new_constraint2;
             constraint = resolved_constraint;
 
-            i = dy_array_size(ctx.bound_constraints);
+            i = ctx->bound_constraints.num_elems;
         }
     }
 
@@ -810,9 +809,9 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx ctx, size_t id, struct d
 
 void remove_id(dy_array_t *ids, size_t id_to_remove)
 {
-    for (size_t i = 0, size = dy_array_size(ids); i < size; ++i) {
+    for (size_t i = 0, size = ids->num_elems; i < size; ++i) {
         size_t id;
-        dy_array_get(ids, i, &id);
+        dy_array_get(*ids, i, &id);
 
         if (id == id_to_remove) {
             dy_array_remove(ids, i);
@@ -821,7 +820,7 @@ void remove_id(dy_array_t *ids, size_t id_to_remove)
     }
 }
 
-bool is_mentioned_in_constraints(struct dy_core_ctx ctx, size_t id, struct dy_constraint constraint)
+bool is_mentioned_in_constraints(struct dy_core_ctx *ctx, size_t id, struct dy_constraint constraint)
 {
     switch (constraint.tag) {
     case DY_CONSTRAINT_SINGLE:

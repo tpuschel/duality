@@ -14,7 +14,7 @@
 
 struct dy_parser_ctx {
     struct dy_stream stream;
-    dy_array_t *string_arrays;
+    dy_array_t string_arrays;
 };
 
 enum infix_op {
@@ -120,8 +120,8 @@ bool dy_parse_variable(struct dy_parser_ctx *ctx, struct dy_ast_literal *var)
 {
     size_t start_index = ctx->stream.current_index;
 
-    dy_array_t *var_name = dy_array_create(sizeof(char), 8);
-    dy_array_add(ctx->string_arrays, &var_name);
+    dy_array_t var_name = dy_array_create(sizeof(char), 8);
+    dy_array_add(&ctx->string_arrays, &var_name);
 
     char c;
     if (!parse_one_of(ctx, DY_STR_LIT("abcdefghijklmnopqrstuvwxyz"), &c)) {
@@ -129,13 +129,13 @@ bool dy_parse_variable(struct dy_parser_ctx *ctx, struct dy_ast_literal *var)
         return false;
     }
 
-    dy_array_add(var_name, &c);
+    dy_array_add(&var_name, &c);
 
     for (;;) {
         if (!parse_one_of(ctx, DY_STR_LIT("abcdefghijklmnopqrstuvwxyz0123456789-?"), &c)) {
             dy_string_t final_var = {
-                .ptr = dy_array_buffer(var_name),
-                .size = dy_array_size(var_name)
+                .ptr = var_name.buffer,
+                .size = var_name.num_elems
             };
 
             if (dy_string_are_equal(final_var, DY_STR_LIT("list"))
@@ -161,7 +161,7 @@ bool dy_parse_variable(struct dy_parser_ctx *ctx, struct dy_ast_literal *var)
             return true;
         }
 
-        dy_array_add(var_name, &c);
+        dy_array_add(&var_name, &c);
     }
 }
 
@@ -487,8 +487,8 @@ bool dy_parse_string(struct dy_parser_ctx *ctx, struct dy_ast_literal *string)
         return false;
     }
 
-    dy_array_t *string_storage = dy_array_create(sizeof(char), 8);
-    dy_array_add(ctx->string_arrays, &string_storage);
+    dy_array_t string_storage = dy_array_create(sizeof(char), 8);
+    dy_array_add(&ctx->string_arrays, &string_storage);
 
     for (;;) {
         char c;
@@ -504,15 +504,15 @@ bool dy_parse_string(struct dy_parser_ctx *ctx, struct dy_ast_literal *string)
                     .end = ctx->stream.current_index,
                 },
                 .value = {
-                    .ptr = dy_array_buffer(string_storage),
-                    .size = dy_array_size(string_storage),
+                    .ptr = string_storage.buffer,
+                    .size = string_storage.num_elems,
                 }
             };
 
             return true;
         }
 
-        dy_array_add(string_storage, &c);
+        dy_array_add(&string_storage, &c);
     }
 }
 
