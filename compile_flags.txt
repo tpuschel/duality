@@ -1,0 +1,5 @@
+-Weverything
+-Wno-padded
+-Wno-c++98-compat
+-Wno-unused-parameter
+-ferror-limit=0

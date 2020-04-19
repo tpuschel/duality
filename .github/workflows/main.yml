@@ -9,14 +9,12 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Build for Windows
-      run: |
-        cmake -S . -B build -G "Visual Studio 16 2019" -A x64 -D BUILD_SHARED_LIBS=ON -D CMAKE_C_FLAGS="/Wall /wd4668 /wd4710 /wd4711 /wd5045 /wd4820 /wd4201 /wd4204" -D CPACK_PACKAGE_FILE_NAME=windows-latest
-        cmake --build build --target package --config Release
+      run: cl duality.c /O2
     - name: Upload artifact
       uses: actions/upload-artifact@v1
       with:
-        name: windows-latest
-        path: build/windows-latest.zip
+        name: windows
+        path: duality.exe
 
   build-ubuntu:
     runs-on: ubuntu-latest
@@ -24,14 +22,12 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Build for Ubuntu
-      run: |
-        cmake -S . -B build -D BUILD_SHARED_LIBS=ON -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_FLAGS="-Wall -Wextra -O2 -flto" -D CPACK_PACKAGE_FILE_NAME=linux-latest
-        cmake --build build --target package
+      run: gcc duality.c -O2 -o duality
     - name: Upload artifact
       uses: actions/upload-artifact@v1
       with:
-        name: linux-latest
-        path: build/linux-latest.zip
+        name: linux
+        path: duality
 
   build-macos:
     runs-on: macOS-latest
@@ -39,14 +35,12 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Build for macOS
-      run: |
-        cmake -S . -B build -D BUILD_SHARED_LIBS=ON -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_FLAGS="-Weverything -Wno-padded -O2 -flto" -D CPACK_PACKAGE_FILE_NAME=darwin-latest
-        cmake --build build --target package
+      run: clang duality.c -O2 -o duality
     - name: Upload artifact
       uses: actions/upload-artifact@v1
       with:
-        name: darwin-latest
-        path: build/darwin-latest.zip
+        name: macos
+        path: duality
 
   upload-to-s3:
     runs-on: ubuntu-latest
@@ -56,20 +50,20 @@ jobs:
     - name: Download win artifact
       uses: actions/download-artifact@v1
       with:
-        name: windows-latest
+        name: windows
     - name: Download linux artifact
       uses: actions/download-artifact@v1
       with:
-        name: linux-latest
-    - name: Download darwin artifact
+        name: linux
+    - name: Download macOS artifact
       uses: actions/download-artifact@v1
       with:
-        name: darwin-latest
+        name: macos
     - name: Upload to S3
       run: |
-        aws s3 cp windows-latest/windows-latest.zip s3://duality-releases/windows-latest.zip --region us-east-1 --output text --acl public-read
-        aws s3 cp linux-latest/linux-latest.zip s3://duality-releases/linux-latest.zip --region us-east-1 --output text --acl public-read
-        aws s3 cp darwin-latest/darwin-latest.zip s3://duality-releases/darwin-latest.zip --region us-east-1 --output text --acl public-read
+        aws s3 cp windows/duality.exe s3://duality-releases/windows/duality.exe --region us-east-1 --output text --acl public-read
+        aws s3 cp linux/duality s3://duality-releases/linux/duality --region us-east-1 --output text --acl public-read
+        aws s3 cp macos/duality s3://duality-releases/macos/duality --region us-east-1 --output text --acl public-read
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.aws_access_key_id }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.aws_secret_access_key }}
