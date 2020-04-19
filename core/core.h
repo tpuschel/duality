@@ -13,6 +13,7 @@
 #include "../support/range.h"
 
 #include <stdio.h>
+#include <stdarg.h>
 
 typedef enum dy_ternary {
     DY_YES,
