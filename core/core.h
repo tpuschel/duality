@@ -12,6 +12,8 @@
 #include "../support/rc.h"
 #include "../support/range.h"
 
+#include <stdio.h>
+
 typedef enum dy_ternary {
     DY_YES,
     DY_NO,
