@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#define _GNU_SOURCE // For glibc's asprintf.
+
 #include "syntax/parser.h"
 #include "syntax/ast_to_core.h"
 
