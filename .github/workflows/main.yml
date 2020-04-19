@@ -9,7 +9,9 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Build for Windows
-      run: cl duality.c /O2
+      run: |
+        "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        cl duality.c /O2
     - name: Upload artifact
       uses: actions/upload-artifact@v1
       with:
