@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
