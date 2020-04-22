@@ -97,9 +97,10 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
     case DY_CORE_EXPR_END:
         // fallthrough
     case DY_CORE_EXPR_TYPE_OF_STRINGS:
+        // fallthrough
+    case DY_CORE_EXPR_SYMBOL:
         return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_END,
-            .end_polarity = DY_CORE_POLARITY_POSITIVE
+            .tag = DY_CORE_EXPR_SYMBOL,
         };
     case DY_CORE_EXPR_PRINT:
         return (struct dy_core_expr){

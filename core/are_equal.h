@@ -118,6 +118,12 @@ dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
         } else {
             return DY_NO;
         }
+    case DY_CORE_EXPR_SYMBOL:
+        if (e2.tag == DY_CORE_EXPR_SYMBOL) {
+            return DY_YES;
+        } else {
+            return DY_NO;
+        }
     case DY_CORE_EXPR_RECURSION:
         dy_bail("not yet implemented");
     case DY_CORE_EXPR_BOTH:

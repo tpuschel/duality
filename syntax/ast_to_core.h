@@ -126,6 +126,10 @@ struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct d
             .tag = DY_CORE_EXPR_END,
             .end_polarity = DY_CORE_POLARITY_NEGATIVE
         };
+    case DY_AST_EXPR_SYMBOL:
+        return (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_SYMBOL
+        };
     }
 
     DY_IMPOSSIBLE_ENUM();

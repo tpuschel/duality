@@ -145,7 +145,8 @@ bool dy_parse_variable(struct dy_parser_ctx *ctx, struct dy_ast_literal *var)
                 || dy_string_are_equal(final_var, DY_STR_LIT("String"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("All"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("Nothing"))
-                || dy_string_are_equal(final_var, DY_STR_LIT("rec"))) {
+                || dy_string_are_equal(final_var, DY_STR_LIT("rec"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("Symbol"))) {
                 ctx->stream.current_index = start_index;
                 return false;
             }
@@ -450,6 +451,18 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx *ctx, struct dy_ast_expr
                 .end = ctx->stream.current_index,
             },
             .tag = DY_AST_EXPR_TYPE_STRING
+        };
+
+        return true;
+    }
+
+    if (dy_parse_literal(ctx, DY_STR_LIT("Symbol"))) {
+        *expr = (struct dy_ast_expr){
+            .static_literal_text_range = {
+                .start = start_index,
+                .end = ctx->stream.current_index,
+            },
+            .tag = DY_AST_EXPR_SYMBOL
         };
 
         return true;

@@ -134,7 +134,8 @@ enum dy_ast_expr_tag {
     DY_AST_EXPR_TYPE_STRING,
     DY_AST_EXPR_JUXTAPOSITION,
     DY_AST_EXPR_POSITIVE_RECURSION,
-    DY_AST_EXPR_NEGATIVE_RECURSION
+    DY_AST_EXPR_NEGATIVE_RECURSION,
+    DY_AST_EXPR_SYMBOL
 };
 
 struct dy_ast_expr {
@@ -292,6 +293,8 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
         return expr;
     case DY_AST_EXPR_NOTHING:
         return expr;
+    case DY_AST_EXPR_SYMBOL:
+        return expr;
     }
 
     DY_IMPOSSIBLE_ENUM();
@@ -377,6 +380,8 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
     case DY_AST_EXPR_ALL:
         return;
     case DY_AST_EXPR_NOTHING:
+        return;
+    case DY_AST_EXPR_SYMBOL:
         return;
     }
 

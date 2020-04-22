@@ -991,6 +991,10 @@ void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_s
         return;
     case DY_CORE_EXPR_PRINT:
         return;
+    case DY_CORE_EXPR_INFERENCE_VARIABLE:
+        return;
+    case DY_CORE_EXPR_SYMBOL:
+        return;
     }
 
     DY_IMPOSSIBLE_ENUM();

@@ -199,6 +199,8 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
     case DY_CORE_EXPR_STRING:
         // fallthrough
     case DY_CORE_EXPR_INVALID:
+        // fallthrough
+    case DY_CORE_EXPR_SYMBOL:
         return dy_are_equal(subtype, supertype);
     }
 

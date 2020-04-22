@@ -98,6 +98,7 @@ enum dy_core_expr_tag {
     DY_CORE_EXPR_RECURSION,
     DY_CORE_EXPR_INFERENCE_VARIABLE,
     DY_CORE_EXPR_INFERENCE_TYPE_MAP,
+    DY_CORE_EXPR_SYMBOL,
     DY_CORE_EXPR_INVALID,
     DY_CORE_EXPR_STRING,
     DY_CORE_EXPR_TYPE_OF_STRINGS,
@@ -185,6 +186,8 @@ bool dy_core_expr_is_computation(struct dy_core_expr expr)
     case DY_CORE_EXPR_PRINT:
         // fallthrough
     case DY_CORE_EXPR_INVALID:
+        // fallthrough
+    case DY_CORE_EXPR_SYMBOL:
         return false;
     }
 
@@ -258,6 +261,8 @@ size_t dy_core_expr_num_ocurrences(size_t id, struct dy_core_expr expr)
     case DY_CORE_EXPR_PRINT:
         // fallthrough
     case DY_CORE_EXPR_INVALID:
+        // fallthrough
+    case DY_CORE_EXPR_SYMBOL:
         return 0;
     }
 
@@ -336,6 +341,8 @@ struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
     case DY_CORE_EXPR_PRINT:
         // fallthrough
     case DY_CORE_EXPR_INVALID:
+        // fallthrough
+    case DY_CORE_EXPR_SYMBOL:
         return expr;
     }
 
@@ -412,6 +419,8 @@ void dy_core_expr_release(struct dy_core_expr expr)
     case DY_CORE_EXPR_PRINT:
         // fallthrough
     case DY_CORE_EXPR_INVALID:
+        // fallthrough
+    case DY_CORE_EXPR_SYMBOL:
         return;
     }
 
@@ -605,6 +614,12 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         return;
     case DY_CORE_EXPR_PRINT:
         add_string(string, DY_STR_LIT("print"));
+        return;
+    case DY_CORE_EXPR_SYMBOL:
+        add_string(string, DY_STR_LIT("Symbol"));
+        return;
+    case DY_CORE_EXPR_INVALID:
+        add_string(string, DY_STR_LIT("<Invalid>"));
         return;
     }
 

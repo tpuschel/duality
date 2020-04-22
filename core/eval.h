@@ -69,6 +69,9 @@ struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr ex
     case DY_CORE_EXPR_INVALID:
         *is_value = false;
         return dy_core_expr_retain(expr);
+    case DY_CORE_EXPR_SYMBOL:
+        *is_value = false;
+        return dy_core_expr_retain(expr);
     }
 
     DY_IMPOSSIBLE_ENUM();

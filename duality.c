@@ -185,6 +185,10 @@ bool core_has_error(struct dy_core_expr expr)
     case DY_CORE_EXPR_END:
         // fallthrough
     case DY_CORE_EXPR_PRINT:
+        // fallthrough
+    case DY_CORE_EXPR_SYMBOL:
+        // fallthrough
+    case DY_CORE_EXPR_INFERENCE_VARIABLE:
         return false;
     }
 
@@ -265,6 +269,10 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
     case DY_CORE_EXPR_END:
         return;
     case DY_CORE_EXPR_PRINT:
+        return;
+    case DY_CORE_EXPR_INFERENCE_VARIABLE:
+        return;
+    case DY_CORE_EXPR_SYMBOL:
         return;
     }
 

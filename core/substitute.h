@@ -27,6 +27,8 @@ struct dy_core_expr substitute(struct dy_core_expr expr, size_t id, struct dy_co
     case DY_CORE_EXPR_STRING:
         // fallthrough
     case DY_CORE_EXPR_INVALID:
+        // fallthrough
+    case DY_CORE_EXPR_SYMBOL:
         return dy_core_expr_retain(expr);
     case DY_CORE_EXPR_EXPR_MAP:
         expr.expr_map = substitute_expr_map(expr.expr_map, id, sub);
