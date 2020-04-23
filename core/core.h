@@ -542,36 +542,24 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         return;
     }
     case DY_CORE_EXPR_VARIABLE: {
-        add_string(string, DY_STR_LIT("("));
-
         char *c;
         dy_assert(asprintf(&c, "%zu", expr.variable.id) != -1);
         add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
         free(c);
-
-        add_string(string, DY_STR_LIT(" : "));
-        dy_core_expr_to_string(*expr.variable.type, string);
-        add_string(string, DY_STR_LIT(")"));
         return;
     }
     case DY_CORE_EXPR_INFERENCE_VARIABLE: {
-        add_string(string, DY_STR_LIT("("));
-
         char *c;
         dy_assert(asprintf(&c, "?%zu", expr.inference_variable.id) != -1);
         add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
         free(c);
-
-        add_string(string, DY_STR_LIT(" : "));
-        dy_core_expr_to_string(*expr.variable.type, string);
-        add_string(string, DY_STR_LIT(")"));
         return;
     }
     case DY_CORE_EXPR_END:
         if (expr.end_polarity == DY_CORE_POLARITY_POSITIVE) {
             add_string(string, DY_STR_LIT("All"));
         } else if (expr.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
-            add_string(string, DY_STR_LIT("Nothing"));
+            add_string(string, DY_STR_LIT("Any"));
         } else {
             dy_bail("Invalid polarity!\n");
         }

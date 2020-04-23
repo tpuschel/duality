@@ -129,7 +129,7 @@ enum dy_ast_expr_tag {
     DY_AST_EXPR_TYPE_MAP_ELIM,
     DY_AST_EXPR_DO_BLOCK,
     DY_AST_EXPR_ALL,
-    DY_AST_EXPR_NOTHING,
+    DY_AST_EXPR_ANY,
     DY_AST_EXPR_JUXTAPOSITION,
     DY_AST_EXPR_POSITIVE_RECURSION,
     DY_AST_EXPR_NEGATIVE_RECURSION,
@@ -285,7 +285,7 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
         return expr;
     case DY_AST_EXPR_ALL:
         return expr;
-    case DY_AST_EXPR_NOTHING:
+    case DY_AST_EXPR_ANY:
         return expr;
     case DY_AST_EXPR_SYMBOL:
         return expr;
@@ -369,7 +369,7 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
         return;
     case DY_AST_EXPR_ALL:
         return;
-    case DY_AST_EXPR_NOTHING:
+    case DY_AST_EXPR_ANY:
         return;
     case DY_AST_EXPR_SYMBOL:
         return;

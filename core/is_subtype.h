@@ -81,11 +81,11 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         }
     }
 
-    if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
+    if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
         return DY_YES;
     }
 
-    if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_POSITIVE) {
+    if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_POSITIVE) {
         return DY_YES;
     }
 
@@ -141,12 +141,12 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         return is_subtype_of_positive_recursion(ctx, subtype, supertype.recursion, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
 
-    if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
+    if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
         return DY_MAYBE;
     }
 
-    if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_POSITIVE) {
-        return DY_MAYBE;
+    if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_POSITIVE) {
+        return DY_NO;
     }
 
     if (subtype.tag == DY_CORE_EXPR_BOTH && subtype.both.polarity == DY_CORE_POLARITY_POSITIVE) {
@@ -730,7 +730,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
                     .type = dy_core_expr_retain_ptr(unknown.inference_variable.type),
                 },
                 .expr = dy_core_expr_new(e),
-                .polarity = DY_CORE_POLARITY_POSITIVE,
+                .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
 

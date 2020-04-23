@@ -112,7 +112,7 @@ struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct d
             .tag = DY_CORE_EXPR_END,
             .end_polarity = DY_CORE_POLARITY_POSITIVE
         };
-    case DY_AST_EXPR_NOTHING:
+    case DY_AST_EXPR_ANY:
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_END,
             .end_polarity = DY_CORE_POLARITY_NEGATIVE
@@ -231,7 +231,7 @@ struct dy_core_expr ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct 
                     .type = dy_core_expr_retain_ptr(variable.type),
                 },
                 .expr = dy_core_expr_new(result_type_map),
-                .polarity = DY_CORE_POLARITY_POSITIVE,
+                .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
     }
@@ -363,17 +363,9 @@ struct dy_core_expr do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, st
         }
     };
 
-    struct dy_core_expr all = {
-        .tag = DY_CORE_EXPR_END,
-        .end_polarity = DY_CORE_POLARITY_POSITIVE
-    };
-
     struct dy_core_expr result_type = {
         .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = {
-            .id = ctx->running_id++,
-            .type = dy_core_expr_new(all),
-        }
+        .inference_variable = create_inference_var(ctx)
     };
 
     struct dy_core_expr elim = {
@@ -398,7 +390,7 @@ struct dy_core_expr do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, st
                 .type = result_type.variable.type,
             },
             .expr = dy_core_expr_new(elim),
-            .polarity = DY_CORE_POLARITY_NEGATIVE,
+            .polarity = DY_CORE_POLARITY_POSITIVE,
         }
     };
 }
@@ -449,21 +441,13 @@ struct dy_core_expr do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct 
                 .type = dy_core_expr_retain_ptr(variable.type),
             },
             .expr = dy_core_expr_new(positive_type_map),
-            .polarity = DY_CORE_POLARITY_POSITIVE,
+            .polarity = DY_CORE_POLARITY_NEGATIVE,
         }
-    };
-
-    struct dy_core_expr all = {
-        .tag = DY_CORE_EXPR_END,
-        .end_polarity = DY_CORE_POLARITY_POSITIVE
     };
 
     struct dy_core_expr result_type = {
         .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = {
-            .id = ctx->running_id++,
-            .type = dy_core_expr_new(all),
-        }
+        .inference_variable = create_inference_var(ctx)
     };
 
     struct dy_core_expr elim = {
@@ -488,7 +472,7 @@ struct dy_core_expr do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct 
                 .type = result_type.variable.type,
             },
             .expr = dy_core_expr_new(elim),
-            .polarity = DY_CORE_POLARITY_NEGATIVE,
+            .polarity = DY_CORE_POLARITY_POSITIVE,
         }
     };
 }
@@ -527,21 +511,13 @@ struct dy_core_expr do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx
                 .type = dy_core_expr_retain_ptr(variable.type),
             },
             .expr = dy_core_expr_new(positive_type_map),
-            .polarity = DY_CORE_POLARITY_POSITIVE,
+            .polarity = DY_CORE_POLARITY_NEGATIVE,
         }
-    };
-
-    struct dy_core_expr all = {
-        .tag = DY_CORE_EXPR_END,
-        .end_polarity = DY_CORE_POLARITY_POSITIVE
     };
 
     struct dy_core_expr result_type = {
         .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = {
-            .id = ctx->running_id++,
-            .type = dy_core_expr_new(all),
-        }
+        .inference_variable = create_inference_var(ctx)
     };
 
     struct dy_core_expr elim = {
@@ -566,7 +542,7 @@ struct dy_core_expr do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx
                 .type = dy_core_expr_retain_ptr(result_type.inference_variable.type),
             },
             .expr = dy_core_expr_new(elim),
-            .polarity = DY_CORE_POLARITY_NEGATIVE,
+            .polarity = DY_CORE_POLARITY_POSITIVE,
         }
     };
 }
@@ -642,7 +618,7 @@ struct dy_core_expr dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx,
                 .type = dy_core_expr_retain_ptr(variable.type),
             },
             .expr = dy_core_expr_new(elim),
-            .polarity = DY_CORE_POLARITY_NEGATIVE,
+            .polarity = DY_CORE_POLARITY_POSITIVE,
         }
     };
 }
@@ -692,7 +668,8 @@ struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_
                     .expr = dy_core_expr_new(e),
                     .polarity = polarity,
                 },
-                .check_result = DY_MAYBE }
+                .check_result = DY_MAYBE
+            }
         };
     } else {
         struct dy_core_variable variable = create_inference_var(ctx);
@@ -744,7 +721,7 @@ struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_
                     .type = dy_core_expr_retain_ptr(variable.type),
                 },
                 .expr = dy_core_expr_new(result_recursion),
-                .polarity = DY_CORE_POLARITY_POSITIVE,
+                .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
     }
@@ -752,14 +729,14 @@ struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_
 
 struct dy_core_variable create_inference_var(struct dy_ast_to_core_ctx *ctx)
 {
-    struct dy_core_expr type_all = {
+    struct dy_core_expr any = {
         .tag = DY_CORE_EXPR_END,
-        .end_polarity = DY_CORE_POLARITY_POSITIVE
+        .end_polarity = DY_CORE_POLARITY_NEGATIVE
     };
 
     return (struct dy_core_variable){
         .id = ctx->running_id++,
-        .type = dy_core_expr_new(type_all)
+        .type = dy_core_expr_new(any)
     };
 }
 

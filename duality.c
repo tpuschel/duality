@@ -76,12 +76,6 @@ int main(int argc, const char *argv[])
 
     dy_ast_do_block_release(program_ast.body);
 
-    /*
-    fprintf(stderr, "Core:\n");
-    print_core_expr(stderr, program);
-    fprintf(stderr, "\n");
-    */
-
     struct dy_core_ctx core_ctx = {
         .running_id = ast_to_core_ctx.running_id,
         .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), 64)
@@ -100,7 +94,6 @@ int main(int argc, const char *argv[])
     bool is_value = false;
     struct dy_core_expr result = dy_eval_expr(&core_ctx, checked_program, &is_value);
 
-    printf("Result: ");
     print_core_expr(stdout, result);
     printf("\n");
 

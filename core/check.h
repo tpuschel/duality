@@ -618,14 +618,14 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
 
         switch (polarity) {
         case DY_CORE_POLARITY_POSITIVE:
-            if (solution.have_subtype) {
-                dy_core_expr_release(solution.subtype);
+            if (solution.have_supertype) {
+                dy_core_expr_release(solution.supertype);
             }
 
-            if (solution.have_supertype) {
-                dy_assert(!dy_core_expr_is_bound(id, solution.supertype));
+            if (solution.have_subtype) {
+                dy_assert(!dy_core_expr_is_bound(id, solution.subtype));
 
-                expr = substitute(expr, id, solution.supertype);
+                expr = substitute(expr, id, solution.subtype);
             } else {
                 struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
@@ -667,14 +667,14 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
             }
             break;
         case DY_CORE_POLARITY_NEGATIVE:
-            if (solution.have_supertype) {
-                dy_core_expr_release(solution.supertype);
+            if (solution.have_subtype) {
+                dy_core_expr_release(solution.subtype);
             }
 
-            if (solution.have_subtype) {
-                dy_assert(!dy_core_expr_is_bound(id, solution.subtype));
+            if (solution.have_supertype) {
+                dy_assert(!dy_core_expr_is_bound(id, solution.supertype));
 
-                expr = substitute(expr, id, solution.subtype);
+                expr = substitute(expr, id, solution.supertype);
             } else {
                 struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
@@ -704,17 +704,18 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
                         }
                     };
                 } else {
-                    struct dy_core_expr nothing = {
+                    struct dy_core_expr any = {
                         .tag = DY_CORE_EXPR_END,
                         .end_polarity = DY_CORE_POLARITY_NEGATIVE
                     };
 
-                    expr = substitute(expr, id, nothing);
+                    expr = substitute(expr, id, any);
                 }
 
                 dy_core_expr_release(type_of_expr);
             }
             break;
+
         }
 
         have_constraint = false;

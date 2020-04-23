@@ -60,7 +60,7 @@ struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr ex
     case DY_CORE_EXPR_CUSTOM:
         return expr.custom.eval(expr.custom.data, ctx, is_value);
     case DY_CORE_EXPR_SYMBOL:
-        *is_value = false;
+        *is_value = true;
         return dy_core_expr_retain(expr);
     }
 

@@ -429,13 +429,13 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx *ctx, struct dy_ast_expr
         return true;
     }
 
-    if (dy_parse_literal(ctx, DY_STR_LIT("Nothing"))) {
+    if (dy_parse_literal(ctx, DY_STR_LIT("Any"))) {
         *expr = (struct dy_ast_expr){
             .static_literal_text_range = {
                 .start = start_index,
                 .end = ctx->stream.current_index,
             },
-            .tag = DY_AST_EXPR_NOTHING
+            .tag = DY_AST_EXPR_ANY
         };
 
         return true;
