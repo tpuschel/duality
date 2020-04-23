@@ -107,15 +107,6 @@ struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct d
         return dy_ast_positive_recursion_to_core(ctx, expr.positive_recursion);
     case DY_AST_EXPR_NEGATIVE_RECURSION:
         return dy_ast_negative_recursion_to_core(ctx, expr.positive_recursion);
-    case DY_AST_EXPR_STRING:
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_STRING,
-            .string = expr.string.value
-        };
-    case DY_AST_EXPR_TYPE_STRING:
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_TYPE_OF_STRINGS
-        };
     case DY_AST_EXPR_ALL:
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_END,
@@ -152,19 +143,8 @@ struct dy_core_expr dy_ast_variable_to_core(struct dy_ast_to_core_ctx *ctx, stru
         }
     }
 
-    if (dy_string_are_equal(variable.value, DY_STR_LIT("print"))) {
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_PRINT
-        };
-    }
-
-    return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_INVALID,
-        .invalid = {
-            .has_text_range = true,
-            .text_range = variable.text_range,
-        }
-    };
+    // TODO: Reintroduce 'invalid' as a custom core expr.
+    dy_bail("not yet implemented");
 }
 
 struct dy_core_expr ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map type_map, enum dy_core_polarity polarity)

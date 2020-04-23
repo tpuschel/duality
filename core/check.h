@@ -8,7 +8,7 @@
 #define DY_CHECK_H
 
 #include "constraint.h"
-#include "ctx.h"
+#include "core.h"
 #include "type_of.h"
 #include "is_subtype.h"
 
@@ -69,14 +69,8 @@ struct dy_core_expr dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr e
         return dy_core_expr_retain(expr);
     case DY_CORE_EXPR_END:
         return dy_core_expr_retain(expr);
-    case DY_CORE_EXPR_STRING:
-        return dy_core_expr_retain(expr);
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        return dy_core_expr_retain(expr);
-    case DY_CORE_EXPR_PRINT:
-        return dy_core_expr_retain(expr);
-    case DY_CORE_EXPR_INVALID:
-        return dy_core_expr_retain(expr);
+    case DY_CORE_EXPR_CUSTOM:
+        return expr.custom.check(expr.custom.data, ctx, constraint, did_generate_constraint);
     case DY_CORE_EXPR_SYMBOL:
         return dy_core_expr_retain(expr);
     }

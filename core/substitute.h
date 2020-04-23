@@ -18,15 +18,9 @@ static inline struct dy_core_type_map substitute_type_map(struct dy_core_type_ma
 struct dy_core_expr substitute(struct dy_core_expr expr, size_t id, struct dy_core_expr sub)
 {
     switch (expr.tag) {
+    case DY_CORE_EXPR_CUSTOM:
+        return expr.custom.substitute(expr.custom.data, id, sub);
     case DY_CORE_EXPR_END:
-        // fallthrough
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        // fallthrough
-    case DY_CORE_EXPR_PRINT:
-        // fallthrough
-    case DY_CORE_EXPR_STRING:
-        // fallthrough
-    case DY_CORE_EXPR_INVALID:
         // fallthrough
     case DY_CORE_EXPR_SYMBOL:
         return dy_core_expr_retain(expr);

@@ -962,34 +962,16 @@ void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_s
         return;
     case DY_CORE_EXPR_VARIABLE:
         return;
-    case DY_CORE_EXPR_INVALID: {
-        if (!expr.invalid.has_text_range) {
-            return;
-        }
-
-        dy_json_t range = compute_lsp_range(text, expr.invalid.text_range);
-
-        dy_json_t msg = dy_json_string(DY_STR_LIT("Invalid."));
-
-        dy_json_t diagnostic = make_diagnostic(range, dy_json_integer(1), msg);
-
-        dy_array_add(diagnostics, &diagnostic);
-
-        return;
-    }
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
         produce_diagnostics(ctx, *expr.recursion.map.binding.type, text, diagnostics);
         produce_diagnostics(ctx, *expr.recursion.map.expr, text, diagnostics);
         return;
-    case DY_CORE_EXPR_STRING:
-        return;
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        return;
     case DY_CORE_EXPR_END:
         return;
-    case DY_CORE_EXPR_PRINT:
+    case DY_CORE_EXPR_CUSTOM:
+        // TODO: Add diagnostics callback to custom exprs.
         return;
     case DY_CORE_EXPR_INFERENCE_VARIABLE:
         return;

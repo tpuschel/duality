@@ -15,6 +15,11 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+struct dy_core_ctx {
+    size_t running_id;
+    dy_array_t bound_constraints;
+};
+
 typedef enum dy_ternary {
     DY_YES,
     DY_NO,
@@ -22,6 +27,7 @@ typedef enum dy_ternary {
 } dy_ternary_t;
 
 struct dy_core_expr;
+struct dy_constraint;
 
 enum dy_core_polarity {
     DY_CORE_POLARITY_POSITIVE,
@@ -76,14 +82,41 @@ struct dy_core_one_of {
     const struct dy_core_expr *second;
 };
 
-struct dy_core_expr_invalid {
-    struct dy_range text_range;
-    bool has_text_range;
-};
-
 struct dy_core_recursion {
     struct dy_core_type_map map;
     dy_ternary_t check_result;
+};
+
+struct dy_core_custom {
+    size_t id;
+    void *data;
+    bool can_be_eliminated;
+
+    struct dy_core_expr (*type_of)(void *data, struct dy_core_ctx *ctx);
+
+    dy_ternary_t (*is_equal)(void *data, struct dy_core_expr expr);
+
+    struct dy_core_expr (*check)(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint);
+
+    struct dy_core_expr (*eval)(void *data, struct dy_core_ctx *ctx, bool *is_value);
+
+    struct dy_core_expr (*substitute)(void *data, size_t id, struct dy_core_expr sub);
+
+    dy_ternary_t (*is_subtype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);
+
+    dy_ternary_t (*is_supertype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);
+
+    struct dy_core_expr (*eliminate)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value);
+
+    bool (*is_computation)(void *data);
+
+    size_t (*num_ocurrences)(void *data, size_t id);
+
+    void (*retain)(void *data);
+
+    void (*release)(void *data);
+
+    void (*to_string)(void *data, dy_array_t *string);
 };
 
 enum dy_core_expr_tag {
@@ -99,10 +132,7 @@ enum dy_core_expr_tag {
     DY_CORE_EXPR_INFERENCE_VARIABLE,
     DY_CORE_EXPR_INFERENCE_TYPE_MAP,
     DY_CORE_EXPR_SYMBOL,
-    DY_CORE_EXPR_INVALID,
-    DY_CORE_EXPR_STRING,
-    DY_CORE_EXPR_TYPE_OF_STRINGS,
-    DY_CORE_EXPR_PRINT
+    DY_CORE_EXPR_CUSTOM
 };
 
 struct dy_core_expr {
@@ -117,12 +147,17 @@ struct dy_core_expr {
         struct dy_core_variable inference_variable;
         struct dy_core_type_map inference_type_map;
         struct dy_core_recursion recursion;
-        dy_string_t string;
         enum dy_core_polarity end_polarity;
-        struct dy_core_expr_invalid invalid;
+        struct dy_core_custom custom;
     };
 
     enum dy_core_expr_tag tag;
+};
+
+struct dy_bound_constraint {
+    size_t id;
+    struct dy_core_expr type;
+    dy_array_t binding_ids;
 };
 
 
@@ -177,18 +212,12 @@ bool dy_core_expr_is_computation(struct dy_core_expr expr)
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
         return dy_core_expr_is_computation(*expr.recursion.map.binding.type) || dy_core_expr_is_computation(*expr.recursion.map.expr);
-    case DY_CORE_EXPR_STRING:
-        // fallthrough
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        // fallthrough
     case DY_CORE_EXPR_END:
-        // fallthrough
-    case DY_CORE_EXPR_PRINT:
-        // fallthrough
-    case DY_CORE_EXPR_INVALID:
         // fallthrough
     case DY_CORE_EXPR_SYMBOL:
         return false;
+    case DY_CORE_EXPR_CUSTOM:
+        return expr.custom.is_computation(expr.custom.data);
     }
 
     DY_IMPOSSIBLE_ENUM();
@@ -252,18 +281,12 @@ size_t dy_core_expr_num_ocurrences(size_t id, struct dy_core_expr expr)
 
         return x + dy_core_expr_num_ocurrences(id, *expr.recursion.map.expr);
     }
-    case DY_CORE_EXPR_STRING:
-        // fallthrough
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        // fallthrough
     case DY_CORE_EXPR_END:
-        // fallthrough
-    case DY_CORE_EXPR_PRINT:
-        // fallthrough
-    case DY_CORE_EXPR_INVALID:
         // fallthrough
     case DY_CORE_EXPR_SYMBOL:
         return 0;
+    case DY_CORE_EXPR_CUSTOM:
+        return expr.custom.num_ocurrences(expr.custom.data, id);
     }
 
     DY_IMPOSSIBLE_ENUM();
@@ -334,15 +357,10 @@ struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
         return expr;
     case DY_CORE_EXPR_END:
         // fallthrough
-    case DY_CORE_EXPR_STRING:
-        // fallthrough
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        // fallthroughs
-    case DY_CORE_EXPR_PRINT:
-        // fallthrough
-    case DY_CORE_EXPR_INVALID:
-        // fallthrough
     case DY_CORE_EXPR_SYMBOL:
+        return expr;
+    case DY_CORE_EXPR_CUSTOM:
+        expr.custom.retain(expr.custom.data);
         return expr;
     }
 
@@ -412,15 +430,10 @@ void dy_core_expr_release(struct dy_core_expr expr)
         return;
     case DY_CORE_EXPR_END:
         // fallthrough
-    case DY_CORE_EXPR_STRING:
-        // fallthrough
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        // fallthrough
-    case DY_CORE_EXPR_PRINT:
-        // fallthrough
-    case DY_CORE_EXPR_INVALID:
-        // fallthrough
     case DY_CORE_EXPR_SYMBOL:
+        return;
+    case DY_CORE_EXPR_CUSTOM:
+        expr.custom.release(expr.custom.data);
         return;
     }
 
@@ -604,22 +617,11 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         add_string(string, DY_STR_LIT(")"));
         return;
     }
-    case DY_CORE_EXPR_STRING:
-        add_string(string, DY_STR_LIT("\""));
-        add_string(string, expr.string);
-        add_string(string, DY_STR_LIT("\""));
-        return;
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        add_string(string, DY_STR_LIT("String"));
-        return;
-    case DY_CORE_EXPR_PRINT:
-        add_string(string, DY_STR_LIT("print"));
-        return;
     case DY_CORE_EXPR_SYMBOL:
         add_string(string, DY_STR_LIT("Symbol"));
         return;
-    case DY_CORE_EXPR_INVALID:
-        add_string(string, DY_STR_LIT("<Invalid>"));
+    case DY_CORE_EXPR_CUSTOM:
+        expr.custom.to_string(expr.custom.data, string);
         return;
     }
 

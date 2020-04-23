@@ -130,8 +130,6 @@ enum dy_ast_expr_tag {
     DY_AST_EXPR_DO_BLOCK,
     DY_AST_EXPR_ALL,
     DY_AST_EXPR_NOTHING,
-    DY_AST_EXPR_STRING,
-    DY_AST_EXPR_TYPE_STRING,
     DY_AST_EXPR_JUXTAPOSITION,
     DY_AST_EXPR_POSITIVE_RECURSION,
     DY_AST_EXPR_NEGATIVE_RECURSION,
@@ -285,10 +283,6 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
         }
         dy_ast_expr_retain_ptr(expr.negative_recursion.expr);
         return expr;
-    case DY_AST_EXPR_STRING:
-        return expr;
-    case DY_AST_EXPR_TYPE_STRING:
-        return expr;
     case DY_AST_EXPR_ALL:
         return expr;
     case DY_AST_EXPR_NOTHING:
@@ -372,10 +366,6 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
             dy_ast_expr_release_ptr(expr.negative_recursion.arg.type);
         }
         dy_ast_expr_release_ptr(expr.negative_recursion.expr);
-        return;
-    case DY_AST_EXPR_STRING:
-        return;
-    case DY_AST_EXPR_TYPE_STRING:
         return;
     case DY_AST_EXPR_ALL:
         return;

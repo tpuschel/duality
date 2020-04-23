@@ -7,7 +7,7 @@
 #ifndef DY_EVAL_H
 #define DY_EVAL_H
 
-#include "ctx.h"
+#include "core.h"
 #include "substitute.h"
 #include "type_of.h"
 #include "constraint.h"
@@ -57,18 +57,8 @@ struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr ex
         dy_bail("should not happen");
     case DY_CORE_EXPR_RECURSION:
         return dy_eval_recursion(ctx, expr.recursion, is_value);
-    case DY_CORE_EXPR_STRING:
-        *is_value = true;
-        return dy_core_expr_retain(expr);
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        *is_value = true;
-        return dy_core_expr_retain(expr);
-    case DY_CORE_EXPR_PRINT:
-        *is_value = true;
-        return dy_core_expr_retain(expr);
-    case DY_CORE_EXPR_INVALID:
-        *is_value = false;
-        return dy_core_expr_retain(expr);
+    case DY_CORE_EXPR_CUSTOM:
+        return expr.custom.eval(expr.custom.data, ctx, is_value);
     case DY_CORE_EXPR_SYMBOL:
         *is_value = false;
         return dy_core_expr_retain(expr);
@@ -161,19 +151,6 @@ struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_cor
         };
     }
 
-    if (left.tag == DY_CORE_EXPR_PRINT) {
-        for (size_t i = 0; i < right.string.size; ++i) {
-            fprintf(stderr, "%c", right.string.ptr[i]);
-        }
-        fprintf(stderr, "\n");
-
-        dy_core_expr_release(left);
-        dy_core_expr_release(expr_map);
-
-        *is_value = true;
-        return right;
-    }
-
     if (left.tag == DY_CORE_EXPR_EXPR_MAP) {
         dy_core_expr_release(expr_map);
         dy_core_expr_release(right);
@@ -225,6 +202,10 @@ struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_cor
         dy_core_expr_release(expr_map);
 
         return new_expr;
+    }
+
+    if (left.tag == DY_CORE_EXPR_CUSTOM && left.custom.can_be_eliminated) {
+        return left.custom.eliminate(left.custom.data, ctx, right, is_value);
     }
 
     return (struct dy_core_expr){

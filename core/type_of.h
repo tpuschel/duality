@@ -7,7 +7,7 @@
 #ifndef DY_TYPE_OF_H
 #define DY_TYPE_OF_H
 
-#include "ctx.h"
+#include "core.h"
 
 static inline struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr);
 
@@ -61,11 +61,8 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
         return dy_core_expr_retain(*expr.variable.type);
     case DY_CORE_EXPR_INFERENCE_VARIABLE:
         return dy_core_expr_retain(*expr.inference_variable.type);
-    case DY_CORE_EXPR_INVALID:
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_END,
-            .end_polarity = DY_CORE_POLARITY_NEGATIVE
-        };
+    case DY_CORE_EXPR_CUSTOM:
+        return expr.custom.type_of(expr.custom.data, ctx);
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should not happen\n");
     case DY_CORE_EXPR_RECURSION: {
@@ -90,30 +87,11 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
             return type;
         }
     }
-    case DY_CORE_EXPR_STRING:
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_TYPE_OF_STRINGS
-        };
     case DY_CORE_EXPR_END:
-        // fallthrough
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
         // fallthrough
     case DY_CORE_EXPR_SYMBOL:
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_SYMBOL,
-        };
-    case DY_CORE_EXPR_PRINT:
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_TYPE_MAP,
-            .type_map = {
-                .binding = {
-                    .id = ctx->running_id++,
-                    .type = dy_core_expr_new((struct dy_core_expr){ .tag = DY_CORE_EXPR_TYPE_OF_STRINGS }),
-                },
-                .expr = dy_core_expr_new((struct dy_core_expr){ .tag = DY_CORE_EXPR_TYPE_OF_STRINGS }),
-                .polarity = DY_CORE_POLARITY_POSITIVE,
-                .is_implicit = false,
-            }
         };
     }
 

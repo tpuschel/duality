@@ -7,7 +7,7 @@
 #ifndef DY_IS_SUBTYPE_H
 #define DY_IS_SUBTYPE_H
 
-#include "ctx.h"
+#include "core.h"
 #include "constraint.h"
 #include "type_of.h"
 
@@ -61,7 +61,7 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
 dy_ternary_t dy_is_subtype_no_transformation(struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_core_expr e = {
-        .tag = DY_CORE_EXPR_TYPE_OF_STRINGS // arbitrary
+        .tag = DY_CORE_EXPR_SYMBOL // arbitrary
     };
     bool did_transform_e = false;
     dy_ternary_t result = dy_is_subtype_sub(ctx, subtype, supertype, constraint, did_generate_constraint, e, &e, &did_transform_e);
@@ -169,6 +169,10 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         return dy_are_equal(subtype, supertype);
     }
 
+    if (supertype.tag == DY_CORE_EXPR_CUSTOM) {
+        return supertype.custom.is_supertype(supertype.custom.data, ctx, subtype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr);
+    }
+
     switch (subtype.tag) {
     case DY_CORE_EXPR_EXPR_MAP:
         return expr_map_is_subtype(ctx, subtype.expr_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
@@ -192,16 +196,10 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         // fallthrough
     case DY_CORE_EXPR_VARIABLE:
         // fallthrough
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        // fallthrough
-    case DY_CORE_EXPR_PRINT:
-        // fallthrough
-    case DY_CORE_EXPR_STRING:
-        // fallthrough
-    case DY_CORE_EXPR_INVALID:
-        // fallthrough
     case DY_CORE_EXPR_SYMBOL:
         return dy_are_equal(subtype, supertype);
+    case DY_CORE_EXPR_CUSTOM:
+        return subtype.custom.is_subtype(subtype.custom.data, ctx, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr);
     }
 
     DY_IMPOSSIBLE_ENUM();

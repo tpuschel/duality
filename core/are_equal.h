@@ -35,10 +35,6 @@ static inline dy_ternary_t one_of_is_equal(struct dy_core_one_of one_of, struct 
 
 dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
 {
-    if (e1.tag == DY_CORE_EXPR_INVALID || e2.tag == DY_CORE_EXPR_INVALID) {
-        return DY_NO;
-    }
-
     if (e1.tag == DY_CORE_EXPR_BOTH && e1.both.polarity == DY_CORE_POLARITY_POSITIVE) {
         return is_equal_to_both_positive(e2, e1.both);
     }
@@ -75,6 +71,10 @@ dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
         return one_of_is_equal(e2.one_of, e1);
     }
 
+    if (e2.tag == DY_CORE_EXPR_CUSTOM) {
+        return e2.custom.is_equal(e2.custom.data, e1);
+    }
+
     switch (e1.tag) {
     case DY_CORE_EXPR_EXPR_MAP:
         return expr_map_is_equal(e1.expr_map, e2);
@@ -96,28 +96,8 @@ dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
         } else {
             return DY_NO;
         }
-    case DY_CORE_EXPR_STRING:
-        if (e2.tag != DY_CORE_EXPR_STRING) {
-            return DY_NO;
-        }
-
-        if (dy_string_are_equal(e1.string, e2.string)) {
-            return DY_YES;
-        } else {
-            return DY_NO;
-        }
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        if (e2.tag == DY_CORE_EXPR_TYPE_OF_STRINGS) {
-            return DY_YES;
-        } else {
-            return DY_NO;
-        }
-    case DY_CORE_EXPR_PRINT:
-        if (e2.tag == DY_CORE_EXPR_PRINT) {
-            return DY_YES;
-        } else {
-            return DY_NO;
-        }
+    case DY_CORE_EXPR_CUSTOM:
+        return e1.custom.is_equal(e1.custom.data, e2);
     case DY_CORE_EXPR_SYMBOL:
         if (e2.tag == DY_CORE_EXPR_SYMBOL) {
             return DY_YES;
@@ -127,8 +107,8 @@ dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
     case DY_CORE_EXPR_RECURSION:
         dy_bail("not yet implemented");
     case DY_CORE_EXPR_BOTH:
+        // fallthrough
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-    case DY_CORE_EXPR_INVALID:
         dy_bail("should not be reachable!");
     }
 

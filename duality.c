@@ -172,19 +172,13 @@ bool core_has_error(struct dy_core_expr expr)
         return core_has_error(*expr.one_of.first) || core_has_error(*expr.one_of.second);
     case DY_CORE_EXPR_VARIABLE:
         return false;
-    case DY_CORE_EXPR_INVALID:
-        return true;
+    case DY_CORE_EXPR_CUSTOM:
+        return false;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
         return core_has_error(*expr.recursion.map.binding.type) || core_has_error(*expr.recursion.map.expr);
-    case DY_CORE_EXPR_STRING:
-        // fallthrough
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        // fallthrough
     case DY_CORE_EXPR_END:
-        // fallthrough
-    case DY_CORE_EXPR_PRINT:
         // fallthrough
     case DY_CORE_EXPR_SYMBOL:
         // fallthrough
@@ -246,29 +240,15 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
         return;
     case DY_CORE_EXPR_VARIABLE:
         return;
-    case DY_CORE_EXPR_INVALID: {
-        if (!expr.invalid.has_text_range) {
-            fprintf(file, "Invalid expr without source attribution.\n");
-            return;
-        }
-
-        print_error_fragment(file, expr.invalid.text_range, text, text_size);
-
-        return;
-    }
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
         print_core_errors(file, *expr.recursion.map.binding.type, text, text_size);
         print_core_errors(file, *expr.recursion.map.expr, text, text_size);
         return;
-    case DY_CORE_EXPR_STRING:
-        return;
-    case DY_CORE_EXPR_TYPE_OF_STRINGS:
-        return;
     case DY_CORE_EXPR_END:
         return;
-    case DY_CORE_EXPR_PRINT:
+    case DY_CORE_EXPR_CUSTOM:
         return;
     case DY_CORE_EXPR_INFERENCE_VARIABLE:
         return;

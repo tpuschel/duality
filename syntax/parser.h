@@ -54,8 +54,6 @@ static inline bool dy_parse_try_block(struct dy_parser_ctx *ctx, struct dy_ast_l
 
 static inline bool dy_parse_choice(struct dy_parser_ctx *ctx, struct dy_ast_list *choice);
 
-static inline bool dy_parse_string(struct dy_parser_ctx *ctx, struct dy_ast_literal *string);
-
 static inline bool left_op_is_first(enum infix_op left, enum infix_op right);
 
 static inline bool parse_expr_non_left_recursive(struct dy_parser_ctx *ctx, struct dy_ast_expr *expr);
@@ -142,7 +140,6 @@ bool dy_parse_variable(struct dy_parser_ctx *ctx, struct dy_ast_literal *var)
                 || dy_string_are_equal(final_var, DY_STR_LIT("try"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("let"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("choice"))
-                || dy_string_are_equal(final_var, DY_STR_LIT("String"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("All"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("Nothing"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("rec"))
@@ -444,18 +441,6 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx *ctx, struct dy_ast_expr
         return true;
     }
 
-    if (dy_parse_literal(ctx, DY_STR_LIT("String"))) {
-        *expr = (struct dy_ast_expr){
-            .static_literal_text_range = {
-                .start = start_index,
-                .end = ctx->stream.current_index,
-            },
-            .tag = DY_AST_EXPR_TYPE_STRING
-        };
-
-        return true;
-    }
-
     if (dy_parse_literal(ctx, DY_STR_LIT("Symbol"))) {
         *expr = (struct dy_ast_expr){
             .static_literal_text_range = {
@@ -478,55 +463,7 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx *ctx, struct dy_ast_expr
         return true;
     }
 
-    struct dy_ast_literal string;
-    if (dy_parse_string(ctx, &string)) {
-        *expr = (struct dy_ast_expr){
-            .tag = DY_AST_EXPR_STRING,
-            .string = string
-        };
-
-        return true;
-    }
-
     return false;
-}
-
-bool dy_parse_string(struct dy_parser_ctx *ctx, struct dy_ast_literal *string)
-{
-    size_t start_index = ctx->stream.current_index;
-
-    if (!parse_exactly_one(ctx, '\"')) {
-        ctx->stream.current_index = start_index;
-        return false;
-    }
-
-    dy_array_t string_storage = dy_array_create(sizeof(char), 8);
-    dy_array_add(&ctx->string_arrays, &string_storage);
-
-    for (;;) {
-        char c;
-        if (!get_char(ctx, &c)) {
-            ctx->stream.current_index = start_index;
-            return false;
-        }
-
-        if (c == '\"') {
-            *string = (struct dy_ast_literal){
-                .text_range = {
-                    .start = start_index,
-                    .end = ctx->stream.current_index,
-                },
-                .value = {
-                    .ptr = string_storage.buffer,
-                    .size = string_storage.num_elems,
-                }
-            };
-
-            return true;
-        }
-
-        dy_array_add(&string_storage, &c);
-    }
 }
 
 enum infix_op parse_infix_op(struct dy_parser_ctx *ctx)
