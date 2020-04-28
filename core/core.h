@@ -15,11 +15,21 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+/**
+ * This file implements the data structure that represents Core,
+ * and any associated auxiliary functions.
+ */
+
+/**
+ * Context passed to functions who need to generate new type maps
+ * or need access to currently bound constraints.
+ */
 struct dy_core_ctx {
     size_t running_id;
     dy_array_t bound_constraints;
 };
 
+/** Hopefully self-explanatory :) */
 typedef enum dy_ternary {
     DY_YES,
     DY_NO,
@@ -29,6 +39,11 @@ typedef enum dy_ternary {
 struct dy_core_expr;
 struct dy_constraint;
 
+/**
+ * A lot of pairs of objects in Core are essentially the same,
+ * differing only in 1 bit of information. This difference is
+ * called by 'polarity'.
+ */
 enum dy_core_polarity {
     DY_CORE_POLARITY_POSITIVE,
     DY_CORE_POLARITY_NEGATIVE
@@ -110,7 +125,7 @@ struct dy_core_custom {
 
     bool (*is_computation)(void *data);
 
-    size_t (*num_ocurrences)(void *data, size_t id);
+    size_t (*num_occurrences)(void *data, size_t id);
 
     void (*retain)(void *data);
 
@@ -160,16 +175,22 @@ struct dy_bound_constraint {
     dy_array_t binding_ids;
 };
 
-
+/**
+ * Determines if an expression is syntactically a value or a computation.
+ */
 static inline bool dy_core_expr_is_computation(struct dy_core_expr expr);
 
-static inline size_t dy_core_expr_num_ocurrences(size_t id, struct dy_core_expr expr);
+/** How often 'id' is mentioned in 'expr'. */
+static inline size_t dy_core_expr_num_occurrences(size_t id, struct dy_core_expr expr);
 
+/** Returns whether 'id' occurs in expr at all. */
 static inline bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr);
 
+/** Appends a utf8 represention of expr to 'string'. */
 static inline void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string);
 
 
+/** Boring ref-count stuff. */
 static const size_t dy_core_expr_rc_offset = DY_RC_OFFSET_OF_TYPE(struct dy_core_expr);
 
 static inline const struct dy_core_expr *dy_core_expr_new(struct dy_core_expr expr);
@@ -182,10 +203,11 @@ static inline void dy_core_expr_release(struct dy_core_expr expr);
 
 static inline void dy_core_expr_release_ptr(const struct dy_core_expr *expr);
 
-
+/** Helper to add a string literal to a dynamic char array. */
 static inline void add_string(dy_array_t *string, dy_string_t s);
 
 #ifdef _WIN32
+/** asprintf() implementation since Windows doesn't have one. */
 static inline int asprintf(char **ret, const char *format, ...);
 #endif
 
@@ -225,39 +247,39 @@ bool dy_core_expr_is_computation(struct dy_core_expr expr)
 
 bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr)
 {
-    // TODO: Optimize by not using num_ocurrences (can stop traversing after finding one instance).
-    return dy_core_expr_num_ocurrences(id, expr) > 0;
+    // TODO: Optimize by not using num_occurrences (can stop traversing after finding one instance).
+    return dy_core_expr_num_occurrences(id, expr) > 0;
 }
 
-size_t dy_core_expr_num_ocurrences(size_t id, struct dy_core_expr expr)
+size_t dy_core_expr_num_occurrences(size_t id, struct dy_core_expr expr)
 {
     switch (expr.tag) {
     case DY_CORE_EXPR_EQUALITY_MAP:
-        return dy_core_expr_num_ocurrences(id, *expr.equality_map.e1) + dy_core_expr_num_ocurrences(id, *expr.equality_map.e2);
+        return dy_core_expr_num_occurrences(id, *expr.equality_map.e1) + dy_core_expr_num_occurrences(id, *expr.equality_map.e2);
     case DY_CORE_EXPR_TYPE_MAP: {
-        size_t x = dy_core_expr_num_ocurrences(id, *expr.type_map.binding.type);
+        size_t x = dy_core_expr_num_occurrences(id, *expr.type_map.binding.type);
 
         if (id == expr.type_map.binding.id) {
             return x;
         }
 
-        return x + dy_core_expr_num_ocurrences(id, *expr.type_map.expr);
+        return x + dy_core_expr_num_occurrences(id, *expr.type_map.expr);
     }
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
-        return dy_core_expr_num_ocurrences(id, *expr.equality_map_elim.expr) + dy_core_expr_num_ocurrences(id, *expr.equality_map_elim.map.e1) + dy_core_expr_num_ocurrences(id, *expr.equality_map_elim.map.e2);
+        return dy_core_expr_num_occurrences(id, *expr.equality_map_elim.expr) + dy_core_expr_num_occurrences(id, *expr.equality_map_elim.map.e1) + dy_core_expr_num_occurrences(id, *expr.equality_map_elim.map.e2);
     case DY_CORE_EXPR_TYPE_MAP_ELIM: {
-        size_t x = dy_core_expr_num_ocurrences(id, *expr.type_map_elim.expr) + dy_core_expr_num_ocurrences(id, *expr.type_map_elim.map.binding.type);
+        size_t x = dy_core_expr_num_occurrences(id, *expr.type_map_elim.expr) + dy_core_expr_num_occurrences(id, *expr.type_map_elim.map.binding.type);
 
         if (id == expr.type_map_elim.map.binding.id) {
             return x;
         }
 
-        return x + dy_core_expr_num_ocurrences(id, *expr.type_map_elim.map.expr);
+        return x + dy_core_expr_num_occurrences(id, *expr.type_map_elim.map.expr);
     }
     case DY_CORE_EXPR_BOTH:
-        return dy_core_expr_num_ocurrences(id, *expr.both.e1) + dy_core_expr_num_ocurrences(id, *expr.both.e2);
+        return dy_core_expr_num_occurrences(id, *expr.both.e1) + dy_core_expr_num_occurrences(id, *expr.both.e2);
     case DY_CORE_EXPR_ONE_OF:
-        return dy_core_expr_num_ocurrences(id, *expr.one_of.first) + dy_core_expr_num_ocurrences(id, *expr.one_of.second);
+        return dy_core_expr_num_occurrences(id, *expr.one_of.first) + dy_core_expr_num_occurrences(id, *expr.one_of.second);
     case DY_CORE_EXPR_VARIABLE:
         if (expr.variable.id == id) {
             return 1;
@@ -273,20 +295,20 @@ size_t dy_core_expr_num_ocurrences(size_t id, struct dy_core_expr expr)
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION: {
-        size_t x = dy_core_expr_num_ocurrences(id, *expr.recursion.map.binding.type);
+        size_t x = dy_core_expr_num_occurrences(id, *expr.recursion.map.binding.type);
 
         if (id == expr.recursion.map.binding.id) {
             return x;
         }
 
-        return x + dy_core_expr_num_ocurrences(id, *expr.recursion.map.expr);
+        return x + dy_core_expr_num_occurrences(id, *expr.recursion.map.expr);
     }
     case DY_CORE_EXPR_END:
         // fallthrough
     case DY_CORE_EXPR_SYMBOL:
         return 0;
     case DY_CORE_EXPR_CUSTOM:
-        return expr.custom.num_ocurrences(expr.custom.data, id);
+        return expr.custom.num_occurrences(expr.custom.data, id);
     }
 
     DY_IMPOSSIBLE_ENUM();

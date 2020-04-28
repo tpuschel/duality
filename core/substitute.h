@@ -9,6 +9,10 @@
 
 #include "core.h"
 
+/**
+ * This file implements substitution for every object of Core.
+ */
+
 static inline struct dy_core_expr substitute(struct dy_core_expr expr, size_t id, struct dy_core_expr sub);
 
 static inline struct dy_core_equality_map substitute_equality_map(struct dy_core_equality_map equality_map, size_t id, struct dy_core_expr sub);

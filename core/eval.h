@@ -13,6 +13,11 @@
 #include "constraint.h"
 #include "is_subtype.h"
 
+/**
+ * Evaluates/reduces/normalizes/executes/whatever the given expression.
+ * Returns the new expression and if that new expression is a value (fully reduced) or not.
+ */
+
 static inline struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value);
 
 static inline struct dy_core_expr dy_eval_equality_map(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, bool *is_value);

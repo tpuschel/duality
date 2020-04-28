@@ -11,6 +11,17 @@
 #include "constraint.h"
 #include "type_of.h"
 
+/**
+ * Implementation of the subtype check.
+ *
+ * A subtype check does three things:
+ *   (1) Check whether the supposed subtype actually is a subtype of the supposed supertype.
+ *       This results in a ternary result.
+ *   (2) Collect constraints generated while doing (1).
+ *   (3) Transform the expression that is of type 'subtype' according to the information recovered during (2).
+ */
+
+/** Forward declaration since check_expr() and is_subtype() recursively depend on each other. */
 static inline struct dy_core_expr dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, struct dy_constraint *constraint, bool *did_generate_constraint);
 
 static inline dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);

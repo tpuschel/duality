@@ -9,6 +9,9 @@
 
 #include "core.h"
 
+/**
+ * Determines the type of the expression 'expr'.
+ */
 static inline struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr);
 
 struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr)

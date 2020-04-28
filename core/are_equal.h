@@ -9,6 +9,15 @@
 
 #include "substitute.h"
 
+/**
+ * The functions here define equality for all objects of Core.
+ *
+ * Equality is generally purely syntactical, except for the following objects:
+ *   - Type maps are alpha-converted (might use De-Bruijn indices at some point).
+ *   - Positive and negative 'both' act like conjunction/disjunction on their constituents.
+ *   - Recursion is treated like its infinite unfolding instead of its finite syntactical representation.
+ */
+
 static inline dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2);
 
 static inline dy_ternary_t is_equal_to_both_positive(struct dy_core_expr expr, struct dy_core_both both);
