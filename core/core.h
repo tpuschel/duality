@@ -42,7 +42,7 @@ struct dy_constraint;
 /**
  * A lot of pairs of objects in Core are essentially the same,
  * differing only in 1 bit of information. This difference is
- * called by 'polarity'.
+ * called 'polarity'.
  */
 enum dy_core_polarity {
     DY_CORE_POLARITY_POSITIVE,
