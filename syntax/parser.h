@@ -1151,19 +1151,19 @@ bool combine_infix(struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr
 {
     switch (op) {
     case INFIX_OP_BANG:
-        if (right.tag == DY_AST_EXPR_NEGATIVE_EXPR_MAP) {
+        if (right.tag == DY_AST_EXPR_NEGATIVE_EQUALITY_MAP) {
             *expr = (struct dy_ast_expr){
-                .tag = DY_AST_EXPR_EXPR_MAP_ELIM,
-                .expr_map_elim = {
+                .tag = DY_AST_EXPR_EQUALITY_MAP_ELIM,
+                .equality_map_elim = {
                     .text_range = {
                         .start = ((struct dy_range *)&left)->start,
                         .end = ((struct dy_range *)&right)->end,
                     },
                     .expr = dy_ast_expr_new(dy_ast_expr_retain(left)),
-                    .expr_map = {
-                        .e1 = dy_ast_expr_retain_ptr(right.negative_expr_map.e1),
-                        .e2 = dy_ast_expr_retain_ptr(right.negative_expr_map.e2),
-                        .is_implicit = right.negative_expr_map.is_implicit,
+                    .equality_map = {
+                        .e1 = dy_ast_expr_retain_ptr(right.negative_equality_map.e1),
+                        .e2 = dy_ast_expr_retain_ptr(right.negative_equality_map.e2),
+                        .is_implicit = right.negative_equality_map.is_implicit,
                     },
                 }
             };
@@ -1198,8 +1198,8 @@ bool combine_infix(struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr
         return false;
     case INFIX_OP_STRAIGHT_ARROW:
         *expr = (struct dy_ast_expr){
-            .tag = DY_AST_EXPR_POSITIVE_EXPR_MAP,
-            .positive_expr_map = {
+            .tag = DY_AST_EXPR_POSITIVE_EQUALITY_MAP,
+            .positive_equality_map = {
                 .text_range = {
                     .start = ((struct dy_range *)&left)->start,
                     .end = ((struct dy_range *)&right)->end,
@@ -1213,8 +1213,8 @@ bool combine_infix(struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr
         return true;
     case INFIX_OP_SQUIGGLY_ARROW:
         *expr = (struct dy_ast_expr){
-            .tag = DY_AST_EXPR_NEGATIVE_EXPR_MAP,
-            .negative_expr_map = {
+            .tag = DY_AST_EXPR_NEGATIVE_EQUALITY_MAP,
+            .negative_equality_map = {
                 .text_range = {
                     .start = ((struct dy_range *)&left)->start,
                     .end = ((struct dy_range *)&right)->end,
@@ -1228,8 +1228,8 @@ bool combine_infix(struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr
         return true;
     case INFIX_OP_AT_STRAIGHT_ARROW:
         *expr = (struct dy_ast_expr){
-            .tag = DY_AST_EXPR_POSITIVE_EXPR_MAP,
-            .positive_expr_map = {
+            .tag = DY_AST_EXPR_POSITIVE_EQUALITY_MAP,
+            .positive_equality_map = {
                 .text_range = {
                     .start = ((struct dy_range *)&left)->start,
                     .end = ((struct dy_range *)&right)->end,
@@ -1243,8 +1243,8 @@ bool combine_infix(struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr
         return true;
     case INFIX_OP_AT_SQUIGGLY_ARROW:
         *expr = (struct dy_ast_expr){
-            .tag = DY_AST_EXPR_NEGATIVE_EXPR_MAP,
-            .negative_expr_map = {
+            .tag = DY_AST_EXPR_NEGATIVE_EQUALITY_MAP,
+            .negative_equality_map = {
                 .text_range = {
                     .start = ((struct dy_range *)&left)->start,
                     .end = ((struct dy_range *)&right)->end,

@@ -81,7 +81,7 @@ static inline void null_stream(dy_array_t *buffer, void *env);
 static inline bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, size_t *byte_offset);
 static inline void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_string_t text, dy_array_t *diagnostics);
 static inline dy_json_t compute_lsp_range(dy_string_t text, struct dy_range range);
-static inline dy_json_t error_message(struct dy_core_ctx *ctx, struct dy_core_expr_map_elim elim);
+static inline dy_json_t error_message(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim);
 static inline dy_json_t make_diagnostic(dy_json_t range, dy_json_t severity, dy_json_t message);
 static inline dy_json_t make_diagnostics_params(dy_string_t uri, dy_json_t diagnostics);
 
@@ -908,25 +908,25 @@ bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, 
 void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_string_t text, dy_array_t *diagnostics)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EXPR_MAP:
-        produce_diagnostics(ctx, *expr.expr_map.e1, text, diagnostics);
-        produce_diagnostics(ctx, *expr.expr_map.e2, text, diagnostics);
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        produce_diagnostics(ctx, *expr.equality_map.e1, text, diagnostics);
+        produce_diagnostics(ctx, *expr.equality_map.e2, text, diagnostics);
         return;
     case DY_CORE_EXPR_TYPE_MAP:
         produce_diagnostics(ctx, *expr.type_map.binding.type, text, diagnostics);
         produce_diagnostics(ctx, *expr.type_map.expr, text, diagnostics);
         return;
-    case DY_CORE_EXPR_EXPR_MAP_ELIM:
-        produce_diagnostics(ctx, *expr.expr_map_elim.expr, text, diagnostics);
-        produce_diagnostics(ctx, *expr.expr_map_elim.map.e1, text, diagnostics);
-        produce_diagnostics(ctx, *expr.expr_map_elim.map.e2, text, diagnostics);
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        produce_diagnostics(ctx, *expr.equality_map_elim.expr, text, diagnostics);
+        produce_diagnostics(ctx, *expr.equality_map_elim.map.e1, text, diagnostics);
+        produce_diagnostics(ctx, *expr.equality_map_elim.map.e2, text, diagnostics);
 
-        if (expr.expr_map_elim.check_result != DY_YES && expr.expr_map_elim.has_text_range) {
-            dy_json_t range = compute_lsp_range(text, expr.expr_map_elim.text_range);
+        if (expr.equality_map_elim.check_result != DY_YES && expr.equality_map_elim.has_text_range) {
+            dy_json_t range = compute_lsp_range(text, expr.equality_map_elim.text_range);
 
-            dy_json_t msg = error_message(ctx, expr.expr_map_elim);
+            dy_json_t msg = error_message(ctx, expr.equality_map_elim);
 
-            long severity = expr.expr_map_elim.check_result == DY_NO ? 1 : 2;
+            long severity = expr.equality_map_elim.check_result == DY_NO ? 1 : 2;
 
             dy_json_t diagnostic = make_diagnostic(range, dy_json_integer(severity), msg);
 
@@ -944,7 +944,7 @@ void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_s
 
             dy_json_t msg = error_message(ctx, expr.type_map_elim);
 
-            long severity = expr.expr_map_elim.check_result == DY_NO ? 1 : 2;
+            long severity = expr.equality_map_elim.check_result == DY_NO ? 1 : 2;
 
             dy_json_t diagnostic = make_diagnostic(range, dy_json_integer(severity), msg);
 
@@ -1011,7 +1011,7 @@ dy_json_t compute_lsp_range(dy_string_t text, struct dy_range range)
     return make_range(make_position(line_start, character_start), make_position(line_end, character_end));
 }
 
-dy_json_t error_message(struct dy_core_ctx *ctx, struct dy_core_expr_map_elim elim)
+dy_json_t error_message(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim)
 {
     if (elim.check_result == DY_NO) {
         return dy_json_string(DY_STR_LIT("Error message placeholder."));

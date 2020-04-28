@@ -38,13 +38,13 @@ static inline struct dy_core_expr dy_ast_choice_to_core(struct dy_ast_to_core_ct
 
 static inline struct dy_core_expr dy_ast_try_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_list try_block);
 
-static inline struct dy_core_expr dy_ast_positive_expr_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map expr_map);
+static inline struct dy_core_expr dy_ast_positive_equality_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_equality_map equality_map);
 
-static inline struct dy_core_expr dy_ast_negative_expr_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map expr_map);
+static inline struct dy_core_expr dy_ast_negative_equality_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_equality_map equality_map);
 
 static inline struct dy_core_expr dy_ast_do_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block do_block);
 
-static inline struct dy_core_expr dy_ast_expr_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map_elim elim);
+static inline struct dy_core_expr dy_ast_equality_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_equality_map_elim elim);
 
 static inline struct dy_core_expr dy_ast_type_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map_elim elim);
 
@@ -58,7 +58,7 @@ static inline struct dy_core_expr dy_ast_negative_recursion_to_core(struct dy_as
 
 static inline struct dy_core_expr ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map type_map, enum dy_core_polarity polarity);
 
-static inline struct dy_core_expr ast_expr_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map expr_map, enum dy_core_polarity polarity);
+static inline struct dy_core_expr ast_equality_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_equality_map equality_map, enum dy_core_polarity polarity);
 
 static inline struct dy_core_expr ast_list_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_list_inner list, enum dy_core_polarity polarity);
 
@@ -85,18 +85,18 @@ struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct d
         return dy_ast_negative_type_map_to_core(ctx, expr.negative_type_map);
     case DY_AST_EXPR_LIST:
         return dy_ast_list_to_core(ctx, expr.list);
-    case DY_AST_EXPR_POSITIVE_EXPR_MAP:
-        return dy_ast_positive_expr_map_to_core(ctx, expr.positive_expr_map);
-    case DY_AST_EXPR_NEGATIVE_EXPR_MAP:
-        return dy_ast_negative_expr_map_to_core(ctx, expr.negative_expr_map);
+    case DY_AST_EXPR_POSITIVE_EQUALITY_MAP:
+        return dy_ast_positive_equality_map_to_core(ctx, expr.positive_equality_map);
+    case DY_AST_EXPR_NEGATIVE_EQUALITY_MAP:
+        return dy_ast_negative_equality_map_to_core(ctx, expr.negative_equality_map);
     case DY_AST_EXPR_DO_BLOCK:
         return dy_ast_do_block_to_core(ctx, expr.do_block);
     case DY_AST_EXPR_CHOICE:
         return dy_ast_choice_to_core(ctx, expr.choice);
     case DY_AST_EXPR_TRY_BLOCK:
         return dy_ast_try_block_to_core(ctx, expr.try_block);
-    case DY_AST_EXPR_EXPR_MAP_ELIM:
-        return dy_ast_expr_map_elim_to_core(ctx, expr.expr_map_elim);
+    case DY_AST_EXPR_EQUALITY_MAP_ELIM:
+        return dy_ast_equality_map_elim_to_core(ctx, expr.equality_map_elim);
     case DY_AST_EXPR_TYPE_MAP_ELIM:
         return dy_ast_type_map_elim_to_core(ctx, expr.type_map_elim);
     case DY_AST_EXPR_VARIABLE:
@@ -301,27 +301,27 @@ struct dy_core_expr dy_ast_try_block_to_core(struct dy_ast_to_core_ctx *ctx, str
     return ast_try_block_to_core(ctx, try_block.inner);
 }
 
-struct dy_core_expr ast_expr_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map expr_map, enum dy_core_polarity polarity)
+struct dy_core_expr ast_equality_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_equality_map equality_map, enum dy_core_polarity polarity)
 {
     return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_EXPR_MAP,
-        .expr_map = {
-            .e1 = dy_core_expr_new(dy_ast_expr_to_core(ctx, *expr_map.e1)),
-            .e2 = dy_core_expr_new(dy_ast_expr_to_core(ctx, *expr_map.e2)),
+        .tag = DY_CORE_EXPR_EQUALITY_MAP,
+        .equality_map = {
+            .e1 = dy_core_expr_new(dy_ast_expr_to_core(ctx, *equality_map.e1)),
+            .e2 = dy_core_expr_new(dy_ast_expr_to_core(ctx, *equality_map.e2)),
             .polarity = polarity,
-            .is_implicit = expr_map.is_implicit,
+            .is_implicit = equality_map.is_implicit,
         }
     };
 }
 
-struct dy_core_expr dy_ast_positive_expr_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map positive_expr_map)
+struct dy_core_expr dy_ast_positive_equality_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_equality_map positive_equality_map)
 {
-    return ast_expr_map_to_core(ctx, positive_expr_map, DY_CORE_POLARITY_POSITIVE);
+    return ast_equality_map_to_core(ctx, positive_equality_map, DY_CORE_POLARITY_POSITIVE);
 }
 
-struct dy_core_expr dy_ast_negative_expr_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map negative_expr_map)
+struct dy_core_expr dy_ast_negative_equality_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_equality_map negative_equality_map)
 {
-    return ast_expr_map_to_core(ctx, negative_expr_map, DY_CORE_POLARITY_NEGATIVE);
+    return ast_equality_map_to_core(ctx, negative_equality_map, DY_CORE_POLARITY_NEGATIVE);
 }
 
 struct dy_core_expr ast_do_block_body_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_body do_block)
@@ -353,9 +353,9 @@ struct dy_core_expr do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, st
 
     struct dy_core_expr rest = ast_do_block_body_to_core(ctx, *equality.rest);
 
-    struct dy_core_expr positive_expr_map = {
-        .tag = DY_CORE_EXPR_EXPR_MAP,
-        .expr_map = {
+    struct dy_core_expr positive_equality_map = {
+        .tag = DY_CORE_EXPR_EQUALITY_MAP,
+        .equality_map = {
             .e1 = dy_core_expr_new(e1),
             .e2 = dy_core_expr_new(rest),
             .polarity = DY_CORE_POLARITY_POSITIVE,
@@ -369,9 +369,9 @@ struct dy_core_expr do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, st
     };
 
     struct dy_core_expr elim = {
-        .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
-        .expr_map_elim = {
-            .expr = dy_core_expr_new(positive_expr_map),
+        .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
+        .equality_map_elim = {
+            .expr = dy_core_expr_new(positive_equality_map),
             .map = {
                 .e1 = dy_core_expr_new(e2),
                 .e2 = dy_core_expr_new(dy_core_expr_retain(result_type)),
@@ -451,8 +451,8 @@ struct dy_core_expr do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct 
     };
 
     struct dy_core_expr elim = {
-        .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
-        .expr_map_elim = {
+        .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
+        .equality_map_elim = {
             .expr = dy_core_expr_new(result_inference_type_map),
             .map = {
                 .e1 = dy_core_expr_new(e),
@@ -521,8 +521,8 @@ struct dy_core_expr do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx
     };
 
     struct dy_core_expr elim = {
-        .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
-        .expr_map_elim = {
+        .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
+        .equality_map_elim = {
             .expr = dy_core_expr_new(result_inference_type_map),
             .map = {
                 .e1 = dy_core_expr_new(e),
@@ -547,19 +547,19 @@ struct dy_core_expr do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx
     };
 }
 
-struct dy_core_expr dy_ast_expr_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr_map_elim elim)
+struct dy_core_expr dy_ast_equality_map_elim_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_equality_map_elim elim)
 {
     struct dy_core_expr e1 = dy_ast_expr_to_core(ctx, *elim.expr);
 
-    struct dy_core_expr e2 = dy_ast_negative_expr_map_to_core(ctx, elim.expr_map);
+    struct dy_core_expr e2 = dy_ast_negative_equality_map_to_core(ctx, elim.equality_map);
 
-    dy_assert(e2.tag == DY_CORE_EXPR_EXPR_MAP);
+    dy_assert(e2.tag == DY_CORE_EXPR_EQUALITY_MAP);
 
     return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
-        .expr_map_elim = {
+        .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
+        .equality_map_elim = {
             .expr = dy_core_expr_new(e1),
-            .map = e2.expr_map,
+            .map = e2.equality_map,
             .check_result = DY_MAYBE,
         }
     };
@@ -597,8 +597,8 @@ struct dy_core_expr dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx,
     };
 
     struct dy_core_expr elim = {
-        .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
-        .expr_map_elim = {
+        .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
+        .equality_map_elim = {
             .expr = dy_core_expr_new(left),
             .map = {
                 .e1 = dy_core_expr_new(right),
@@ -668,8 +668,7 @@ struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_
                     .expr = dy_core_expr_new(e),
                     .polarity = polarity,
                 },
-                .check_result = DY_MAYBE
-            }
+                .check_result = DY_MAYBE }
         };
     } else {
         struct dy_core_variable variable = create_inference_var(ctx);

@@ -39,7 +39,7 @@ struct dy_core_variable {
     const struct dy_core_expr *type;
 };
 
-struct dy_core_expr_map {
+struct dy_core_equality_map {
     const struct dy_core_expr *e1;
     const struct dy_core_expr *e2;
     enum dy_core_polarity polarity;
@@ -53,12 +53,12 @@ struct dy_core_type_map {
     bool is_implicit;
 };
 
-struct dy_core_expr_map_elim {
+struct dy_core_equality_map_elim {
     struct dy_range text_range;
     bool has_text_range;
 
     const struct dy_core_expr *expr;
-    struct dy_core_expr_map map;
+    struct dy_core_equality_map map;
     dy_ternary_t check_result;
 };
 
@@ -120,9 +120,9 @@ struct dy_core_custom {
 };
 
 enum dy_core_expr_tag {
-    DY_CORE_EXPR_EXPR_MAP,
+    DY_CORE_EXPR_EQUALITY_MAP,
     DY_CORE_EXPR_TYPE_MAP,
-    DY_CORE_EXPR_EXPR_MAP_ELIM,
+    DY_CORE_EXPR_EQUALITY_MAP_ELIM,
     DY_CORE_EXPR_TYPE_MAP_ELIM,
     DY_CORE_EXPR_BOTH,
     DY_CORE_EXPR_ONE_OF,
@@ -137,9 +137,9 @@ enum dy_core_expr_tag {
 
 struct dy_core_expr {
     union {
-        struct dy_core_expr_map expr_map;
+        struct dy_core_equality_map equality_map;
         struct dy_core_type_map type_map;
-        struct dy_core_expr_map_elim expr_map_elim;
+        struct dy_core_equality_map_elim equality_map_elim;
         struct dy_core_type_map_elim type_map_elim;
         struct dy_core_both both;
         struct dy_core_one_of one_of;
@@ -192,11 +192,11 @@ static inline int asprintf(char **ret, const char *format, ...);
 bool dy_core_expr_is_computation(struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EXPR_MAP:
-        return dy_core_expr_is_computation(*expr.expr_map.e1);
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        return dy_core_expr_is_computation(*expr.equality_map.e1);
     case DY_CORE_EXPR_TYPE_MAP:
         return dy_core_expr_is_computation(*expr.type_map.binding.type);
-    case DY_CORE_EXPR_EXPR_MAP_ELIM:
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
         return true;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         return true;
@@ -232,8 +232,8 @@ bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr)
 size_t dy_core_expr_num_ocurrences(size_t id, struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EXPR_MAP:
-        return dy_core_expr_num_ocurrences(id, *expr.expr_map.e1) + dy_core_expr_num_ocurrences(id, *expr.expr_map.e2);
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        return dy_core_expr_num_ocurrences(id, *expr.equality_map.e1) + dy_core_expr_num_ocurrences(id, *expr.equality_map.e2);
     case DY_CORE_EXPR_TYPE_MAP: {
         size_t x = dy_core_expr_num_ocurrences(id, *expr.type_map.binding.type);
 
@@ -243,8 +243,8 @@ size_t dy_core_expr_num_ocurrences(size_t id, struct dy_core_expr expr)
 
         return x + dy_core_expr_num_ocurrences(id, *expr.type_map.expr);
     }
-    case DY_CORE_EXPR_EXPR_MAP_ELIM:
-        return dy_core_expr_num_ocurrences(id, *expr.expr_map_elim.expr) + dy_core_expr_num_ocurrences(id, *expr.expr_map_elim.map.e1) + dy_core_expr_num_ocurrences(id, *expr.expr_map_elim.map.e2);
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        return dy_core_expr_num_ocurrences(id, *expr.equality_map_elim.expr) + dy_core_expr_num_ocurrences(id, *expr.equality_map_elim.map.e1) + dy_core_expr_num_ocurrences(id, *expr.equality_map_elim.map.e2);
     case DY_CORE_EXPR_TYPE_MAP_ELIM: {
         size_t x = dy_core_expr_num_ocurrences(id, *expr.type_map_elim.expr) + dy_core_expr_num_ocurrences(id, *expr.type_map_elim.map.binding.type);
 
@@ -305,9 +305,9 @@ const struct dy_core_expr *dy_core_expr_retain_ptr(const struct dy_core_expr *ex
 struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EXPR_MAP:
-        dy_core_expr_retain_ptr(expr.expr_map.e1);
-        dy_core_expr_retain_ptr(expr.expr_map.e2);
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        dy_core_expr_retain_ptr(expr.equality_map.e1);
+        dy_core_expr_retain_ptr(expr.equality_map.e2);
 
         return expr;
     case DY_CORE_EXPR_TYPE_MAP:
@@ -315,10 +315,10 @@ struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
         dy_core_expr_retain_ptr(expr.type_map.expr);
 
         return expr;
-    case DY_CORE_EXPR_EXPR_MAP_ELIM:
-        dy_core_expr_retain_ptr(expr.expr_map_elim.expr);
-        dy_core_expr_retain_ptr(expr.expr_map_elim.map.e1);
-        dy_core_expr_retain_ptr(expr.expr_map_elim.map.e2);
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        dy_core_expr_retain_ptr(expr.equality_map_elim.expr);
+        dy_core_expr_retain_ptr(expr.equality_map_elim.map.e1);
+        dy_core_expr_retain_ptr(expr.equality_map_elim.map.e2);
 
         return expr;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
@@ -378,9 +378,9 @@ void dy_core_expr_release_ptr(const struct dy_core_expr *expr)
 void dy_core_expr_release(struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EXPR_MAP:
-        dy_core_expr_release_ptr(expr.expr_map.e1);
-        dy_core_expr_release_ptr(expr.expr_map.e2);
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        dy_core_expr_release_ptr(expr.equality_map.e1);
+        dy_core_expr_release_ptr(expr.equality_map.e2);
 
         return;
     case DY_CORE_EXPR_TYPE_MAP:
@@ -388,10 +388,10 @@ void dy_core_expr_release(struct dy_core_expr expr)
         dy_core_expr_release_ptr(expr.type_map.expr);
 
         return;
-    case DY_CORE_EXPR_EXPR_MAP_ELIM:
-        dy_core_expr_release_ptr(expr.expr_map_elim.expr);
-        dy_core_expr_release_ptr(expr.expr_map_elim.map.e1);
-        dy_core_expr_release_ptr(expr.expr_map_elim.map.e2);
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        dy_core_expr_release_ptr(expr.equality_map_elim.expr);
+        dy_core_expr_release_ptr(expr.equality_map_elim.map.e1);
+        dy_core_expr_release_ptr(expr.equality_map_elim.map.e2);
 
         return;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
@@ -443,20 +443,20 @@ void dy_core_expr_release(struct dy_core_expr expr)
 void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EXPR_MAP:
+    case DY_CORE_EXPR_EQUALITY_MAP:
         add_string(string, DY_STR_LIT("("));
-        dy_core_expr_to_string(*expr.expr_map.e1, string);
-        if (expr.expr_map.is_implicit) {
+        dy_core_expr_to_string(*expr.equality_map.e1, string);
+        if (expr.equality_map.is_implicit) {
             add_string(string, DY_STR_LIT(" @"));
         } else {
             add_string(string, DY_STR_LIT(" "));
         }
-        if (expr.expr_map.polarity == DY_CORE_POLARITY_POSITIVE) {
+        if (expr.equality_map.polarity == DY_CORE_POLARITY_POSITIVE) {
             add_string(string, DY_STR_LIT("-> "));
         } else {
             add_string(string, DY_STR_LIT("~> "));
         }
-        dy_core_expr_to_string(*expr.expr_map.e2, string);
+        dy_core_expr_to_string(*expr.equality_map.e2, string);
         add_string(string, DY_STR_LIT(")"));
         return;
     case DY_CORE_EXPR_TYPE_MAP: {
@@ -504,18 +504,18 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         add_string(string, DY_STR_LIT(")"));
         return;
     }
-    case DY_CORE_EXPR_EXPR_MAP_ELIM: {
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM: {
         add_string(string, DY_STR_LIT("("));
-        dy_core_expr_to_string(*expr.expr_map_elim.expr, string);
+        dy_core_expr_to_string(*expr.equality_map_elim.expr, string);
         add_string(string, DY_STR_LIT(" ! "));
-        dy_core_expr_to_string(*expr.expr_map_elim.map.e1, string);
-        if (expr.expr_map_elim.map.is_implicit) {
+        dy_core_expr_to_string(*expr.equality_map_elim.map.e1, string);
+        if (expr.equality_map_elim.map.is_implicit) {
             add_string(string, DY_STR_LIT(" @"));
         } else {
             add_string(string, DY_STR_LIT(" "));
         }
         add_string(string, DY_STR_LIT("~> "));
-        dy_core_expr_to_string(*expr.expr_map_elim.map.e2, string);
+        dy_core_expr_to_string(*expr.equality_map_elim.map.e2, string);
         add_string(string, DY_STR_LIT(")"));
         return;
     }

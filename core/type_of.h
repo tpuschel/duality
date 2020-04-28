@@ -14,24 +14,24 @@ static inline struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_
 struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EXPR_MAP:
-        if (dy_core_expr_is_computation(*expr.expr_map.e1)) {
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        if (dy_core_expr_is_computation(*expr.equality_map.e1)) {
             return (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_TYPE_MAP,
                 .type_map = {
                     .binding = {
                         .id = ctx->running_id++,
-                        .type = dy_core_expr_new(dy_type_of(ctx, *expr.expr_map.e1)),
+                        .type = dy_core_expr_new(dy_type_of(ctx, *expr.equality_map.e1)),
                     },
-                    .expr = dy_core_expr_new(dy_type_of(ctx, *expr.expr_map.e2)),
+                    .expr = dy_core_expr_new(dy_type_of(ctx, *expr.equality_map.e2)),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
-                    .is_implicit = expr.expr_map.is_implicit,
+                    .is_implicit = expr.equality_map.is_implicit,
                 }
             };
         } else {
-            dy_core_expr_retain_ptr(expr.expr_map.e1);
-            expr.expr_map.e2 = dy_core_expr_new(dy_type_of(ctx, *expr.expr_map.e2));
-            expr.expr_map.polarity = DY_CORE_POLARITY_POSITIVE;
+            dy_core_expr_retain_ptr(expr.equality_map.e1);
+            expr.equality_map.e2 = dy_core_expr_new(dy_type_of(ctx, *expr.equality_map.e2));
+            expr.equality_map.polarity = DY_CORE_POLARITY_POSITIVE;
             return expr;
         }
     case DY_CORE_EXPR_TYPE_MAP:
@@ -39,8 +39,8 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
         expr.type_map.expr = dy_core_expr_new(dy_type_of(ctx, *expr.type_map.expr));
         expr.type_map.polarity = DY_CORE_POLARITY_POSITIVE;
         return expr;
-    case DY_CORE_EXPR_EXPR_MAP_ELIM:
-        return dy_core_expr_retain(*expr.expr_map_elim.map.e2);
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        return dy_core_expr_retain(*expr.equality_map_elim.map.e2);
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         return dy_core_expr_retain(*expr.type_map_elim.map.expr);
     case DY_CORE_EXPR_BOTH:

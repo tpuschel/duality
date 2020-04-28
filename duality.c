@@ -141,17 +141,17 @@ void read_chunk(dy_array_t *buffer, void *env)
 bool core_has_error(struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EXPR_MAP:
-        return core_has_error(*expr.expr_map.e1) || core_has_error(*expr.expr_map.e2);
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        return core_has_error(*expr.equality_map.e1) || core_has_error(*expr.equality_map.e2);
     case DY_CORE_EXPR_TYPE_MAP:
         return core_has_error(*expr.type_map.binding.type) || core_has_error(*expr.type_map.expr);
-    case DY_CORE_EXPR_EXPR_MAP_ELIM:
-        if (expr.expr_map_elim.check_result == DY_NO) {
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        if (expr.equality_map_elim.check_result == DY_NO) {
             return true;
         }
 
-        return core_has_error(*expr.expr_map_elim.expr) || core_has_error(*expr.expr_map_elim.map.e1)
-               || core_has_error(*expr.expr_map_elim.map.e2);
+        return core_has_error(*expr.equality_map_elim.expr) || core_has_error(*expr.equality_map_elim.map.e1)
+               || core_has_error(*expr.equality_map_elim.map.e2);
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         if (expr.type_map_elim.check_result == DY_NO) {
             return true;
@@ -185,26 +185,26 @@ bool core_has_error(struct dy_core_expr expr)
 void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, size_t text_size)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EXPR_MAP:
-        print_core_errors(file, *expr.expr_map.e1, text, text_size);
-        print_core_errors(file, *expr.expr_map.e2, text, text_size);
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        print_core_errors(file, *expr.equality_map.e1, text, text_size);
+        print_core_errors(file, *expr.equality_map.e2, text, text_size);
         return;
     case DY_CORE_EXPR_TYPE_MAP:
         print_core_errors(file, *expr.type_map.binding.type, text, text_size);
         print_core_errors(file, *expr.type_map.expr, text, text_size);
         return;
-    case DY_CORE_EXPR_EXPR_MAP_ELIM:
-        print_core_errors(file, *expr.expr_map_elim.expr, text, text_size);
-        print_core_errors(file, *expr.expr_map_elim.map.e1, text, text_size);
-        print_core_errors(file, *expr.expr_map_elim.map.e2, text, text_size);
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        print_core_errors(file, *expr.equality_map_elim.expr, text, text_size);
+        print_core_errors(file, *expr.equality_map_elim.map.e1, text, text_size);
+        print_core_errors(file, *expr.equality_map_elim.map.e2, text, text_size);
 
-        if (expr.expr_map_elim.check_result == DY_NO) {
-            if (!expr.expr_map_elim.has_text_range) {
+        if (expr.equality_map_elim.check_result == DY_NO) {
+            if (!expr.equality_map_elim.has_text_range) {
                 fprintf(file, "Error without source attribution.\n");
                 return;
             }
 
-            print_error_fragment(file, expr.expr_map_elim.text_range, text, text_size);
+            print_error_fragment(file, expr.equality_map_elim.text_range, text, text_size);
         }
 
         return;

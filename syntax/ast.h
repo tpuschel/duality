@@ -25,7 +25,7 @@ struct dy_ast_arg {
     bool has_type;
 };
 
-struct dy_ast_expr_map {
+struct dy_ast_equality_map {
     struct dy_range text_range;
     const struct dy_ast_expr *e1;
     const struct dy_ast_expr *e2;
@@ -92,10 +92,10 @@ struct dy_ast_list {
     struct dy_ast_list_inner inner;
 };
 
-struct dy_ast_expr_map_elim {
+struct dy_ast_equality_map_elim {
     struct dy_range text_range;
     const struct dy_ast_expr *expr;
-    struct dy_ast_expr_map expr_map;
+    struct dy_ast_equality_map equality_map;
 };
 
 struct dy_ast_type_map_elim {
@@ -121,11 +121,11 @@ enum dy_ast_expr_tag {
     DY_AST_EXPR_LIST,
     DY_AST_EXPR_CHOICE,
     DY_AST_EXPR_TRY_BLOCK,
-    DY_AST_EXPR_POSITIVE_EXPR_MAP,
-    DY_AST_EXPR_NEGATIVE_EXPR_MAP,
+    DY_AST_EXPR_POSITIVE_EQUALITY_MAP,
+    DY_AST_EXPR_NEGATIVE_EQUALITY_MAP,
     DY_AST_EXPR_POSITIVE_TYPE_MAP,
     DY_AST_EXPR_NEGATIVE_TYPE_MAP,
-    DY_AST_EXPR_EXPR_MAP_ELIM,
+    DY_AST_EXPR_EQUALITY_MAP_ELIM,
     DY_AST_EXPR_TYPE_MAP_ELIM,
     DY_AST_EXPR_DO_BLOCK,
     DY_AST_EXPR_ALL,
@@ -140,11 +140,11 @@ struct dy_ast_expr {
     union {
         struct dy_ast_literal variable;
         struct dy_ast_literal string;
-        struct dy_ast_expr_map positive_expr_map;
-        struct dy_ast_expr_map negative_expr_map;
+        struct dy_ast_equality_map positive_equality_map;
+        struct dy_ast_equality_map negative_equality_map;
         struct dy_ast_type_map positive_type_map;
         struct dy_ast_type_map negative_type_map;
-        struct dy_ast_expr_map_elim expr_map_elim;
+        struct dy_ast_equality_map_elim equality_map_elim;
         struct dy_ast_type_map_elim type_map_elim;
         struct dy_ast_do_block do_block;
         struct dy_ast_list list;
@@ -236,13 +236,13 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
     case DY_AST_EXPR_LIST:
         dy_ast_list_retain(expr.list.inner);
         return expr;
-    case DY_AST_EXPR_POSITIVE_EXPR_MAP:
-        dy_ast_expr_retain_ptr(expr.positive_expr_map.e1);
-        dy_ast_expr_retain_ptr(expr.positive_expr_map.e2);
+    case DY_AST_EXPR_POSITIVE_EQUALITY_MAP:
+        dy_ast_expr_retain_ptr(expr.positive_equality_map.e1);
+        dy_ast_expr_retain_ptr(expr.positive_equality_map.e2);
         return expr;
-    case DY_AST_EXPR_NEGATIVE_EXPR_MAP:
-        dy_ast_expr_retain_ptr(expr.negative_expr_map.e1);
-        dy_ast_expr_retain_ptr(expr.negative_expr_map.e2);
+    case DY_AST_EXPR_NEGATIVE_EQUALITY_MAP:
+        dy_ast_expr_retain_ptr(expr.negative_equality_map.e1);
+        dy_ast_expr_retain_ptr(expr.negative_equality_map.e2);
         return expr;
     case DY_AST_EXPR_DO_BLOCK:
         dy_ast_do_block_retain(expr.do_block.body);
@@ -253,10 +253,10 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
     case DY_AST_EXPR_TRY_BLOCK:
         dy_ast_list_retain(expr.try_block.inner);
         return expr;
-    case DY_AST_EXPR_EXPR_MAP_ELIM:
-        dy_ast_expr_retain_ptr(expr.expr_map_elim.expr);
-        dy_ast_expr_retain_ptr(expr.expr_map_elim.expr_map.e1);
-        dy_ast_expr_retain_ptr(expr.expr_map_elim.expr_map.e2);
+    case DY_AST_EXPR_EQUALITY_MAP_ELIM:
+        dy_ast_expr_retain_ptr(expr.equality_map_elim.expr);
+        dy_ast_expr_retain_ptr(expr.equality_map_elim.equality_map.e1);
+        dy_ast_expr_retain_ptr(expr.equality_map_elim.equality_map.e2);
         return expr;
     case DY_AST_EXPR_TYPE_MAP_ELIM:
         dy_ast_expr_retain_ptr(expr.type_map_elim.expr);
@@ -320,13 +320,13 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
     case DY_AST_EXPR_LIST:
         dy_ast_list_release(expr.list.inner);
         return;
-    case DY_AST_EXPR_POSITIVE_EXPR_MAP:
-        dy_ast_expr_release_ptr(expr.positive_expr_map.e1);
-        dy_ast_expr_release_ptr(expr.positive_expr_map.e2);
+    case DY_AST_EXPR_POSITIVE_EQUALITY_MAP:
+        dy_ast_expr_release_ptr(expr.positive_equality_map.e1);
+        dy_ast_expr_release_ptr(expr.positive_equality_map.e2);
         return;
-    case DY_AST_EXPR_NEGATIVE_EXPR_MAP:
-        dy_ast_expr_release_ptr(expr.negative_expr_map.e1);
-        dy_ast_expr_release_ptr(expr.negative_expr_map.e2);
+    case DY_AST_EXPR_NEGATIVE_EQUALITY_MAP:
+        dy_ast_expr_release_ptr(expr.negative_equality_map.e1);
+        dy_ast_expr_release_ptr(expr.negative_equality_map.e2);
         return;
     case DY_AST_EXPR_DO_BLOCK:
         dy_ast_do_block_release(expr.do_block.body);
@@ -337,10 +337,10 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
     case DY_AST_EXPR_TRY_BLOCK:
         dy_ast_list_release(expr.try_block.inner);
         return;
-    case DY_AST_EXPR_EXPR_MAP_ELIM:
-        dy_ast_expr_release_ptr(expr.expr_map_elim.expr);
-        dy_ast_expr_release_ptr(expr.expr_map_elim.expr_map.e1);
-        dy_ast_expr_release_ptr(expr.expr_map_elim.expr_map.e2);
+    case DY_AST_EXPR_EQUALITY_MAP_ELIM:
+        dy_ast_expr_release_ptr(expr.equality_map_elim.expr);
+        dy_ast_expr_release_ptr(expr.equality_map_elim.equality_map.e1);
+        dy_ast_expr_release_ptr(expr.equality_map_elim.equality_map.e2);
         return;
     case DY_AST_EXPR_TYPE_MAP_ELIM:
         dy_ast_expr_release_ptr(expr.type_map_elim.expr);

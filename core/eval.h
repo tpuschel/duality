@@ -15,11 +15,11 @@
 
 static inline struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value);
 
-static inline struct dy_core_expr dy_eval_expr_map(struct dy_core_ctx *ctx, struct dy_core_expr_map expr_map, bool *is_value);
+static inline struct dy_core_expr dy_eval_equality_map(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, bool *is_value);
 
 static inline struct dy_core_expr dy_eval_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map, bool *is_value);
 
-static inline struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_core_expr_map_elim elim, bool *is_value);
+static inline struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim, bool *is_value);
 
 static inline struct dy_core_expr dy_eval_type_map_elim(struct dy_core_ctx *ctx, struct dy_core_type_map_elim elim, bool *is_value);
 
@@ -32,12 +32,12 @@ static inline struct dy_core_expr dy_eval_recursion(struct dy_core_ctx *ctx, str
 struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EXPR_MAP:
-        return dy_eval_expr_map(ctx, expr.expr_map, is_value);
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        return dy_eval_equality_map(ctx, expr.equality_map, is_value);
     case DY_CORE_EXPR_TYPE_MAP:
         return dy_eval_type_map(ctx, expr.type_map, is_value);
-    case DY_CORE_EXPR_EXPR_MAP_ELIM:
-        return dy_eval_expr_map_elim(ctx, expr.expr_map_elim, is_value);
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        return dy_eval_equality_map_elim(ctx, expr.equality_map_elim, is_value);
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         return dy_eval_type_map_elim(ctx, expr.type_map_elim, is_value);
     case DY_CORE_EXPR_BOTH:
@@ -67,14 +67,14 @@ struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr ex
     DY_IMPOSSIBLE_ENUM();
 }
 
-struct dy_core_expr dy_eval_expr_map(struct dy_core_ctx *ctx, struct dy_core_expr_map expr_map, bool *is_value)
+struct dy_core_expr dy_eval_equality_map(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, bool *is_value)
 {
-    expr_map.e1 = dy_core_expr_new(dy_eval_expr(ctx, *expr_map.e1, is_value));
-    dy_core_expr_retain_ptr(expr_map.e2);
+    equality_map.e1 = dy_core_expr_new(dy_eval_expr(ctx, *equality_map.e1, is_value));
+    dy_core_expr_retain_ptr(equality_map.e2);
 
     return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_EXPR_MAP,
-        .expr_map = expr_map
+        .tag = DY_CORE_EXPR_EQUALITY_MAP,
+        .equality_map = equality_map
     };
 }
 
@@ -89,7 +89,7 @@ struct dy_core_expr dy_eval_type_map(struct dy_core_ctx *ctx, struct dy_core_typ
     };
 }
 
-struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_core_expr_map_elim elim, bool *is_value)
+struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim, bool *is_value)
 {
     bool left_is_value = false;
     struct dy_core_expr left = dy_eval_expr(ctx, *elim.expr, &left_is_value);
@@ -100,9 +100,9 @@ struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_cor
     bool type_is_value = false;
     struct dy_core_expr type = dy_eval_expr(ctx, *elim.map.e2, &type_is_value);
 
-    struct dy_core_expr expr_map = {
-        .tag = DY_CORE_EXPR_EXPR_MAP,
-        .expr_map = {
+    struct dy_core_expr equality_map = {
+        .tag = DY_CORE_EXPR_EQUALITY_MAP,
+        .equality_map = {
             .e1 = dy_core_expr_new(dy_core_expr_retain(right)),
             .e2 = dy_core_expr_new(dy_core_expr_retain(type)),
             .polarity = elim.map.polarity,
@@ -115,10 +115,10 @@ struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_cor
         dy_core_expr_release(type);
 
         return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
-            .expr_map_elim = {
+            .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
+            .equality_map_elim = {
                 .expr = dy_core_expr_new(left),
-                .map = expr_map.expr_map,
+                .map = equality_map.equality_map,
                 .check_result = elim.check_result,
             }
         };
@@ -131,7 +131,7 @@ struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_cor
 
         struct dy_constraint constraint;
         bool have_constraint = false;
-        elim.check_result = dy_is_subtype_no_transformation(ctx, type_of_left, expr_map, &constraint, &have_constraint);
+        elim.check_result = dy_is_subtype_no_transformation(ctx, type_of_left, equality_map, &constraint, &have_constraint);
 
         dy_assert(!have_constraint);
 
@@ -142,20 +142,20 @@ struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_cor
         dy_core_expr_release(right);
 
         return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
-            .expr_map_elim = {
+            .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
+            .equality_map_elim = {
                 .expr = dy_core_expr_new(left),
-                .map = expr_map.expr_map,
+                .map = equality_map.equality_map,
                 .check_result = elim.check_result,
             }
         };
     }
 
-    if (left.tag == DY_CORE_EXPR_EXPR_MAP) {
-        dy_core_expr_release(expr_map);
+    if (left.tag == DY_CORE_EXPR_EQUALITY_MAP) {
+        dy_core_expr_release(equality_map);
         dy_core_expr_release(right);
 
-        struct dy_core_expr new_expr = dy_eval_expr(ctx, *left.expr_map.e2, is_value);
+        struct dy_core_expr new_expr = dy_eval_expr(ctx, *left.equality_map.e2, is_value);
 
         dy_core_expr_release(left);
 
@@ -163,7 +163,7 @@ struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_cor
     }
 
     if (left.tag == DY_CORE_EXPR_TYPE_MAP) {
-        dy_core_expr_release(expr_map);
+        dy_core_expr_release(equality_map);
 
         struct dy_core_expr e = substitute(*left.type_map.expr, left.type_map.binding.id, right);
 
@@ -180,26 +180,26 @@ struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_cor
     dy_core_expr_release(right);
 
     if (left.tag == DY_CORE_EXPR_BOTH) {
-        struct dy_core_expr_map_elim new_elim = {
+        struct dy_core_equality_map_elim new_elim = {
             .expr = left.both.e1,
-            .map = expr_map.expr_map,
+            .map = equality_map.equality_map,
             .check_result = DY_MAYBE
         };
 
-        struct dy_core_expr new_expr = dy_eval_expr_map_elim(ctx, new_elim, is_value);
+        struct dy_core_expr new_expr = dy_eval_equality_map_elim(ctx, new_elim, is_value);
 
         if (*is_value) {
             dy_core_expr_release(left);
-            dy_core_expr_release(expr_map);
+            dy_core_expr_release(equality_map);
             return new_expr;
         }
 
         new_elim.expr = left.both.e2;
 
-        new_expr = dy_eval_expr_map_elim(ctx, new_elim, is_value);
+        new_expr = dy_eval_equality_map_elim(ctx, new_elim, is_value);
 
         dy_core_expr_release(left);
-        dy_core_expr_release(expr_map);
+        dy_core_expr_release(equality_map);
 
         return new_expr;
     }
@@ -209,10 +209,10 @@ struct dy_core_expr dy_eval_expr_map_elim(struct dy_core_ctx *ctx, struct dy_cor
     }
 
     return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_EXPR_MAP_ELIM,
-        .expr_map_elim = {
+        .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
+        .equality_map_elim = {
             .expr = dy_core_expr_new(left),
-            .map = expr_map.expr_map,
+            .map = equality_map.equality_map,
             .check_result = elim.check_result,
         }
     };

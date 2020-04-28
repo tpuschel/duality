@@ -12,11 +12,11 @@
 #include "type_of.h"
 #include "is_subtype.h"
 
-static inline struct dy_core_expr_map dy_check_expr_map(struct dy_core_ctx *ctx, struct dy_core_expr_map expr_map, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_equality_map dy_check_equality_map(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, struct dy_constraint *constraint, bool *did_generate_constraint);
 
 static inline struct dy_core_type_map dy_check_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-static inline struct dy_core_expr_map_elim dy_check_expr_map_elim(struct dy_core_ctx *ctx, struct dy_core_expr_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_equality_map_elim dy_check_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint);
 
 static inline struct dy_core_type_map_elim dy_check_type_map_elim(struct dy_core_ctx *ctx, struct dy_core_type_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint);
 
@@ -40,14 +40,14 @@ static inline bool is_mentioned_in_constraints(struct dy_core_ctx *ctx, size_t i
 struct dy_core_expr dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EXPR_MAP:
-        expr.expr_map = dy_check_expr_map(ctx, expr.expr_map, constraint, did_generate_constraint);
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        expr.equality_map = dy_check_equality_map(ctx, expr.equality_map, constraint, did_generate_constraint);
         return expr;
     case DY_CORE_EXPR_TYPE_MAP:
         expr.type_map = dy_check_type_map(ctx, expr.type_map, constraint, did_generate_constraint);
         return expr;
-    case DY_CORE_EXPR_EXPR_MAP_ELIM:
-        expr.expr_map_elim = dy_check_expr_map_elim(ctx, expr.expr_map_elim, constraint, did_generate_constraint);
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        expr.equality_map_elim = dy_check_equality_map_elim(ctx, expr.equality_map_elim, constraint, did_generate_constraint);
         return expr;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         expr.type_map_elim = dy_check_type_map_elim(ctx, expr.type_map_elim, constraint, did_generate_constraint);
@@ -78,17 +78,17 @@ struct dy_core_expr dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr e
     DY_IMPOSSIBLE_ENUM();
 }
 
-struct dy_core_expr_map dy_check_expr_map(struct dy_core_ctx *ctx, struct dy_core_expr_map expr_map, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_equality_map dy_check_equality_map(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
-    struct dy_core_expr e1 = dy_check_expr(ctx, *expr_map.e1, &c1, &have_c1);
-    expr_map.e1 = dy_core_expr_new(e1);
+    struct dy_core_expr e1 = dy_check_expr(ctx, *equality_map.e1, &c1, &have_c1);
+    equality_map.e1 = dy_core_expr_new(e1);
 
     struct dy_constraint c2;
     bool have_c2 = false;
-    struct dy_core_expr e2 = dy_check_expr(ctx, *expr_map.e2, &c2, &have_c2);
-    expr_map.e2 = dy_core_expr_new(e2);
+    struct dy_core_expr e2 = dy_check_expr(ctx, *equality_map.e2, &c2, &have_c2);
+    equality_map.e2 = dy_core_expr_new(e2);
 
     if (have_c1 && have_c2) {
         *constraint = (struct dy_constraint){
@@ -108,7 +108,7 @@ struct dy_core_expr_map dy_check_expr_map(struct dy_core_ctx *ctx, struct dy_cor
         *did_generate_constraint = true;
     }
 
-    return expr_map;
+    return equality_map;
 }
 
 struct dy_core_type_map dy_check_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map, struct dy_constraint *constraint, bool *did_generate_constraint)
@@ -166,7 +166,7 @@ struct dy_core_type_map dy_check_type_map(struct dy_core_ctx *ctx, struct dy_cor
     return type_map;
 }
 
-struct dy_core_expr_map_elim dy_check_expr_map_elim(struct dy_core_ctx *ctx, struct dy_core_expr_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_equality_map_elim dy_check_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
@@ -174,7 +174,7 @@ struct dy_core_expr_map_elim dy_check_expr_map_elim(struct dy_core_ctx *ctx, str
 
     struct dy_constraint c2;
     bool have_c2 = false;
-    elim.map = dy_check_expr_map(ctx, elim.map, &c2, &have_c2);
+    elim.map = dy_check_equality_map(ctx, elim.map, &c2, &have_c2);
 
     struct dy_constraint c3;
     bool have_c3 = false;
@@ -183,14 +183,14 @@ struct dy_core_expr_map_elim dy_check_expr_map_elim(struct dy_core_ctx *ctx, str
 
         struct dy_core_expr new_expr;
         if (dy_core_expr_is_computation(*elim.map.e1)) {
-            struct dy_core_expr type_of_expr_map_e1 = dy_type_of(ctx, *elim.map.e1);
+            struct dy_core_expr type_of_equality_map_e1 = dy_type_of(ctx, *elim.map.e1);
 
             struct dy_core_expr type_map_expr = {
                 .tag = DY_CORE_EXPR_TYPE_MAP,
                 .type_map = {
                     .binding = {
                         .id = ctx->running_id++,
-                        .type = dy_core_expr_new(type_of_expr_map_e1),
+                        .type = dy_core_expr_new(type_of_equality_map_e1),
                     },
                     .expr = dy_core_expr_retain_ptr(elim.map.e2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
@@ -200,14 +200,14 @@ struct dy_core_expr_map_elim dy_check_expr_map_elim(struct dy_core_ctx *ctx, str
 
             elim.check_result = dy_is_subtype(ctx, type_of_expr, type_map_expr, &c3, &have_c3, expr, &new_expr);
 
-            dy_core_expr_release(type_of_expr_map_e1);
+            dy_core_expr_release(type_of_equality_map_e1);
         } else {
-            struct dy_core_expr expr_map_expr = {
-                .tag = DY_CORE_EXPR_EXPR_MAP,
-                .expr_map = elim.map
+            struct dy_core_expr equality_map_expr = {
+                .tag = DY_CORE_EXPR_EQUALITY_MAP,
+                .equality_map = elim.map
             };
 
-            elim.check_result = dy_is_subtype(ctx, type_of_expr, expr_map_expr, &c3, &have_c3, expr, &new_expr);
+            elim.check_result = dy_is_subtype(ctx, type_of_expr, equality_map_expr, &c3, &have_c3, expr, &new_expr);
         }
 
         dy_core_expr_release(type_of_expr);
@@ -715,7 +715,6 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
                 dy_core_expr_release(type_of_expr);
             }
             break;
-
         }
 
         have_constraint = false;
