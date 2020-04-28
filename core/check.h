@@ -656,7 +656,7 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
             } else {
                 struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
-                if (dy_core_expr_num_ocurrences(id, type_of_expr) > 1) {
+                if (dy_core_expr_num_occurrences(id, type_of_expr) > 1) {
                     struct dy_core_expr new_unknown = {
                         .tag = DY_CORE_EXPR_VARIABLE,
                         .variable = {
@@ -705,7 +705,7 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
             } else {
                 struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
-                if (dy_core_expr_num_ocurrences(id, type_of_expr) > 1) {
+                if (dy_core_expr_num_occurrences(id, type_of_expr) > 1) {
                     struct dy_core_expr new_unknown = {
                         .tag = DY_CORE_EXPR_VARIABLE,
                         .variable = {
@@ -753,7 +753,7 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
     } else {
         struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
-        if (dy_core_expr_num_ocurrences(id, type_of_expr) > 1) {
+        if (dy_core_expr_num_occurrences(id, type_of_expr) > 1) {
             struct dy_core_expr new_unknown = {
                 .tag = DY_CORE_EXPR_VARIABLE,
                 .variable = {
