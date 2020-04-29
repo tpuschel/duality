@@ -15,17 +15,17 @@
  *
  * Equality is generally purely syntactical, except for the following objects:
  *   - Type maps are alpha-converted (might use De-Bruijn indices at some point).
- *   - Positive and negative 'both' act like conjunction/disjunction on their constituents.
+ *   - Positive and negative 'junction' act like conjunction/disjunction on their constituents.
  *   - Recursion is treated like its infinite unfolding instead of its finite syntactical representation.
  */
 
 static inline dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2);
 
-static inline dy_ternary_t is_equal_to_both_positive(struct dy_core_expr expr, struct dy_core_both both);
+static inline dy_ternary_t is_equal_to_junction_positive(struct dy_core_expr expr, struct dy_core_junction junction);
 
-static inline dy_ternary_t is_equal_to_both_negative(struct dy_core_expr expr, struct dy_core_both both);
+static inline dy_ternary_t is_equal_to_junction_negative(struct dy_core_expr expr, struct dy_core_junction junction);
 
-static inline dy_ternary_t both_is_equal_to_both(struct dy_core_both p1, struct dy_core_both p2);
+static inline dy_ternary_t junction_is_equal_to_junction(struct dy_core_junction p1, struct dy_core_junction p2);
 
 static inline dy_ternary_t equality_map_is_equal(struct dy_core_equality_map equality_map, struct dy_core_expr expr);
 
@@ -45,20 +45,20 @@ static inline dy_ternary_t one_of_is_equal(struct dy_core_one_of one_of, struct 
 
 dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
 {
-    if (e1.tag == DY_CORE_EXPR_BOTH && e1.both.polarity == DY_CORE_POLARITY_POSITIVE) {
-        return is_equal_to_both_positive(e2, e1.both);
+    if (e1.tag == DY_CORE_EXPR_JUNCTION && e1.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
+        return is_equal_to_junction_positive(e2, e1.junction);
     }
 
-    if (e2.tag == DY_CORE_EXPR_BOTH && e2.both.polarity == DY_CORE_POLARITY_POSITIVE) {
-        return is_equal_to_both_positive(e1, e2.both);
+    if (e2.tag == DY_CORE_EXPR_JUNCTION && e2.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
+        return is_equal_to_junction_positive(e1, e2.junction);
     }
 
-    if (e1.tag == DY_CORE_EXPR_BOTH && e1.both.polarity == DY_CORE_POLARITY_NEGATIVE) {
-        return is_equal_to_both_negative(e2, e1.both);
+    if (e1.tag == DY_CORE_EXPR_JUNCTION && e1.junction.polarity == DY_CORE_POLARITY_NEGATIVE) {
+        return is_equal_to_junction_negative(e2, e1.junction);
     }
 
-    if (e2.tag == DY_CORE_EXPR_BOTH && e2.both.polarity == DY_CORE_POLARITY_NEGATIVE) {
-        return is_equal_to_both_negative(e1, e2.both);
+    if (e2.tag == DY_CORE_EXPR_JUNCTION && e2.junction.polarity == DY_CORE_POLARITY_NEGATIVE) {
+        return is_equal_to_junction_negative(e1, e2.junction);
     }
 
     if (e2.tag == DY_CORE_EXPR_VARIABLE) {
@@ -116,7 +116,7 @@ dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
         }
     case DY_CORE_EXPR_RECURSION:
         dy_bail("Not yet implemented");
-    case DY_CORE_EXPR_BOTH:
+    case DY_CORE_EXPR_JUNCTION:
         // fallthrough
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("Should not be reachable!");
@@ -125,18 +125,18 @@ dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
     dy_bail("Impossible core object.");
 }
 
-dy_ternary_t is_equal_to_both_positive(struct dy_core_expr expr, struct dy_core_both both)
+dy_ternary_t is_equal_to_junction_positive(struct dy_core_expr expr, struct dy_core_junction junction)
 {
-    if (expr.tag == DY_CORE_EXPR_BOTH && expr.both.polarity == DY_CORE_POLARITY_POSITIVE) {
-        return both_is_equal_to_both(expr.both, both);
+    if (expr.tag == DY_CORE_EXPR_JUNCTION && expr.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
+        return junction_is_equal_to_junction(expr.junction, junction);
     }
 
-    dy_ternary_t first_res = dy_are_equal(expr, *both.e1);
+    dy_ternary_t first_res = dy_are_equal(expr, *junction.e1);
     if (first_res == DY_NO) {
         return DY_NO;
     }
 
-    dy_ternary_t second_res = dy_are_equal(expr, *both.e2);
+    dy_ternary_t second_res = dy_are_equal(expr, *junction.e2);
     if (second_res == DY_NO) {
         return DY_NO;
     }
@@ -148,18 +148,18 @@ dy_ternary_t is_equal_to_both_positive(struct dy_core_expr expr, struct dy_core_
     return DY_YES;
 }
 
-dy_ternary_t is_equal_to_both_negative(struct dy_core_expr expr, struct dy_core_both both)
+dy_ternary_t is_equal_to_junction_negative(struct dy_core_expr expr, struct dy_core_junction junction)
 {
-    if (expr.tag == DY_CORE_EXPR_BOTH && expr.both.polarity == DY_CORE_POLARITY_NEGATIVE) {
-        return both_is_equal_to_both(expr.both, both);
+    if (expr.tag == DY_CORE_EXPR_JUNCTION && expr.junction.polarity == DY_CORE_POLARITY_NEGATIVE) {
+        return junction_is_equal_to_junction(expr.junction, junction);
     }
 
-    dy_ternary_t first_res = dy_are_equal(expr, *both.e1);
+    dy_ternary_t first_res = dy_are_equal(expr, *junction.e1);
     if (first_res == DY_YES) {
         return DY_YES;
     }
 
-    dy_ternary_t second_res = dy_are_equal(expr, *both.e2);
+    dy_ternary_t second_res = dy_are_equal(expr, *junction.e2);
     if (second_res == DY_YES) {
         return DY_YES;
     }
@@ -171,7 +171,7 @@ dy_ternary_t is_equal_to_both_negative(struct dy_core_expr expr, struct dy_core_
     return DY_NO;
 }
 
-dy_ternary_t both_is_equal_to_both(struct dy_core_both p1, struct dy_core_both p2)
+dy_ternary_t junction_is_equal_to_junction(struct dy_core_junction p1, struct dy_core_junction p2)
 {
     dy_ternary_t first_res = dy_are_equal(*p1.e1, *p2.e1);
     if (first_res == DY_NO) {

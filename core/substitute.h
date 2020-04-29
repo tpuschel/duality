@@ -48,9 +48,9 @@ struct dy_core_expr substitute(struct dy_core_expr expr, size_t id, struct dy_co
             expr.inference_variable.type = dy_core_expr_new(substitute(*expr.inference_variable.type, id, sub));
             return expr;
         }
-    case DY_CORE_EXPR_BOTH:
-        expr.both.e1 = dy_core_expr_new(substitute(*expr.both.e1, id, sub));
-        expr.both.e2 = dy_core_expr_new(substitute(*expr.both.e2, id, sub));
+    case DY_CORE_EXPR_JUNCTION:
+        expr.junction.e1 = dy_core_expr_new(substitute(*expr.junction.e1, id, sub));
+        expr.junction.e2 = dy_core_expr_new(substitute(*expr.junction.e2, id, sub));
         return expr;
     case DY_CORE_EXPR_ONE_OF:
         expr.one_of.first = dy_core_expr_new(substitute(*expr.one_of.first, id, sub));

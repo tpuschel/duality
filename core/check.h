@@ -34,7 +34,7 @@ static inline struct dy_core_equality_map_elim dy_check_equality_map_elim(struct
 
 static inline struct dy_core_type_map_elim dy_check_type_map_elim(struct dy_core_ctx *ctx, struct dy_core_type_map_elim elim, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-static inline struct dy_core_both dy_check_both(struct dy_core_ctx *ctx, struct dy_core_both both, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_junction dy_check_junction(struct dy_core_ctx *ctx, struct dy_core_junction junction, struct dy_constraint *constraint, bool *did_generate_constraint);
 
 static inline struct dy_core_one_of dy_check_one_of(struct dy_core_ctx *ctx, struct dy_core_one_of one_of, struct dy_constraint *constraint, bool *did_generate_constraint);
 
@@ -81,8 +81,8 @@ struct dy_core_expr dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr e
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         expr.type_map_elim = dy_check_type_map_elim(ctx, expr.type_map_elim, constraint, did_generate_constraint);
         return expr;
-    case DY_CORE_EXPR_BOTH:
-        expr.both = dy_check_both(ctx, expr.both, constraint, did_generate_constraint);
+    case DY_CORE_EXPR_JUNCTION:
+        expr.junction = dy_check_junction(ctx, expr.junction, constraint, did_generate_constraint);
         return expr;
     case DY_CORE_EXPR_RECURSION:
         expr.recursion = dy_check_recursion(ctx, expr.recursion, constraint, did_generate_constraint);
@@ -406,17 +406,17 @@ struct dy_core_type_map_elim dy_check_type_map_elim(struct dy_core_ctx *ctx, str
     return elim;
 }
 
-struct dy_core_both dy_check_both(struct dy_core_ctx *ctx, struct dy_core_both both, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_junction dy_check_junction(struct dy_core_ctx *ctx, struct dy_core_junction junction, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
-    struct dy_core_expr e1 = dy_check_expr(ctx, *both.e1, &c1, &have_c1);
-    both.e1 = dy_core_expr_new(e1);
+    struct dy_core_expr e1 = dy_check_expr(ctx, *junction.e1, &c1, &have_c1);
+    junction.e1 = dy_core_expr_new(e1);
 
     struct dy_constraint c2;
     bool have_c2 = false;
-    struct dy_core_expr e2 = dy_check_expr(ctx, *both.e2, &c2, &have_c2);
-    both.e2 = dy_core_expr_new(e2);
+    struct dy_core_expr e2 = dy_check_expr(ctx, *junction.e2, &c2, &have_c2);
+    junction.e2 = dy_core_expr_new(e2);
 
     if (have_c1 && have_c2) {
         *constraint = (struct dy_constraint){
@@ -436,7 +436,7 @@ struct dy_core_both dy_check_both(struct dy_core_ctx *ctx, struct dy_core_both b
         *did_generate_constraint = true;
     }
 
-    return both;
+    return junction;
 }
 
 struct dy_core_one_of dy_check_one_of(struct dy_core_ctx *ctx, struct dy_core_one_of one_of, struct dy_constraint *constraint, bool *did_generate_constraint)

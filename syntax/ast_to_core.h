@@ -263,8 +263,8 @@ struct dy_core_expr ast_list_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_a
     struct dy_core_expr e2 = ast_list_to_core(ctx, *list.next_or_null, polarity);
 
     return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_BOTH,
-        .both = {
+        .tag = DY_CORE_EXPR_JUNCTION,
+        .junction = {
             .e1 = dy_core_expr_new(e1),
             .e2 = dy_core_expr_new(e2),
             .polarity = polarity,

@@ -87,7 +87,7 @@ struct dy_core_type_map_elim {
     dy_ternary_t check_result;
 };
 
-struct dy_core_both {
+struct dy_core_junction {
     const struct dy_core_expr *e1;
     const struct dy_core_expr *e2;
     enum dy_core_polarity polarity;
@@ -140,7 +140,7 @@ enum dy_core_expr_tag {
     DY_CORE_EXPR_TYPE_MAP,
     DY_CORE_EXPR_EQUALITY_MAP_ELIM,
     DY_CORE_EXPR_TYPE_MAP_ELIM,
-    DY_CORE_EXPR_BOTH,
+    DY_CORE_EXPR_JUNCTION,
     DY_CORE_EXPR_ONE_OF,
     DY_CORE_EXPR_VARIABLE,
     DY_CORE_EXPR_END,
@@ -157,7 +157,7 @@ struct dy_core_expr {
         struct dy_core_type_map type_map;
         struct dy_core_equality_map_elim equality_map_elim;
         struct dy_core_type_map_elim type_map_elim;
-        struct dy_core_both both;
+        struct dy_core_junction junction;
         struct dy_core_one_of one_of;
         struct dy_core_variable variable;
         struct dy_core_variable inference_variable;
@@ -223,8 +223,8 @@ bool dy_core_expr_is_computation(struct dy_core_expr expr)
         return true;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         return true;
-    case DY_CORE_EXPR_BOTH:
-        return dy_core_expr_is_computation(*expr.both.e1) || dy_core_expr_is_computation(*expr.both.e2);
+    case DY_CORE_EXPR_JUNCTION:
+        return dy_core_expr_is_computation(*expr.junction.e1) || dy_core_expr_is_computation(*expr.junction.e2);
     case DY_CORE_EXPR_ONE_OF:
         return dy_core_expr_is_computation(*expr.one_of.first) || dy_core_expr_is_computation(*expr.one_of.second);
     case DY_CORE_EXPR_VARIABLE:
@@ -277,8 +277,8 @@ size_t dy_core_expr_num_occurrences(size_t id, struct dy_core_expr expr)
 
         return x + dy_core_expr_num_occurrences(id, *expr.type_map_elim.map.expr);
     }
-    case DY_CORE_EXPR_BOTH:
-        return dy_core_expr_num_occurrences(id, *expr.both.e1) + dy_core_expr_num_occurrences(id, *expr.both.e2);
+    case DY_CORE_EXPR_JUNCTION:
+        return dy_core_expr_num_occurrences(id, *expr.junction.e1) + dy_core_expr_num_occurrences(id, *expr.junction.e2);
     case DY_CORE_EXPR_ONE_OF:
         return dy_core_expr_num_occurrences(id, *expr.one_of.first) + dy_core_expr_num_occurrences(id, *expr.one_of.second);
     case DY_CORE_EXPR_VARIABLE:
@@ -350,9 +350,9 @@ struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
         dy_core_expr_retain_ptr(expr.type_map_elim.map.expr);
 
         return expr;
-    case DY_CORE_EXPR_BOTH:
-        dy_core_expr_retain_ptr(expr.both.e1);
-        dy_core_expr_retain_ptr(expr.both.e2);
+    case DY_CORE_EXPR_JUNCTION:
+        dy_core_expr_retain_ptr(expr.junction.e1);
+        dy_core_expr_retain_ptr(expr.junction.e2);
 
         return expr;
     case DY_CORE_EXPR_ONE_OF:
@@ -423,9 +423,9 @@ void dy_core_expr_release(struct dy_core_expr expr)
         dy_core_expr_release_ptr(expr.type_map_elim.map.expr);
 
         return;
-    case DY_CORE_EXPR_BOTH:
-        dy_core_expr_release_ptr(expr.both.e1);
-        dy_core_expr_release_ptr(expr.both.e2);
+    case DY_CORE_EXPR_JUNCTION:
+        dy_core_expr_release_ptr(expr.junction.e1);
+        dy_core_expr_release_ptr(expr.junction.e2);
 
         return;
     case DY_CORE_EXPR_ONE_OF:
@@ -588,17 +588,17 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         }
 
         return;
-    case DY_CORE_EXPR_BOTH:
+    case DY_CORE_EXPR_JUNCTION:
         add_string(string, DY_STR_LIT("("));
-        dy_core_expr_to_string(*expr.both.e1, string);
+        dy_core_expr_to_string(*expr.junction.e1, string);
 
-        if (expr.both.polarity == DY_CORE_POLARITY_POSITIVE) {
+        if (expr.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
             add_string(string, DY_STR_LIT(" and "));
         } else {
             add_string(string, DY_STR_LIT(" or "));
         }
 
-        dy_core_expr_to_string(*expr.both.e2, string);
+        dy_core_expr_to_string(*expr.junction.e2, string);
         add_string(string, DY_STR_LIT(")"));
         return;
     case DY_CORE_EXPR_ONE_OF:

@@ -159,8 +159,8 @@ bool core_has_error(struct dy_core_expr expr)
 
         return core_has_error(*expr.type_map_elim.expr) || core_has_error(*expr.type_map_elim.map.binding.type)
                || core_has_error(*expr.type_map_elim.map.expr);
-    case DY_CORE_EXPR_BOTH:
-        return core_has_error(*expr.both.e1) || core_has_error(*expr.both.e2);
+    case DY_CORE_EXPR_JUNCTION:
+        return core_has_error(*expr.junction.e1) || core_has_error(*expr.junction.e2);
     case DY_CORE_EXPR_ONE_OF:
         return core_has_error(*expr.one_of.first) || core_has_error(*expr.one_of.second);
     case DY_CORE_EXPR_VARIABLE:
@@ -223,9 +223,9 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
         }
 
         return;
-    case DY_CORE_EXPR_BOTH:
-        print_core_errors(file, *expr.both.e1, text, text_size);
-        print_core_errors(file, *expr.both.e2, text, text_size);
+    case DY_CORE_EXPR_JUNCTION:
+        print_core_errors(file, *expr.junction.e1, text, text_size);
+        print_core_errors(file, *expr.junction.e2, text, text_size);
         return;
     case DY_CORE_EXPR_ONE_OF:
         print_core_errors(file, *expr.one_of.first, text, text_size);

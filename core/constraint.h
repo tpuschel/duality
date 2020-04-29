@@ -133,8 +133,8 @@ struct dy_constraint_range constraint_conjunction(struct dy_constraint_range ran
     bool have_supertype = false;
     if (range1.have_supertype && range2.have_supertype && dy_are_equal(range1.supertype, range2.supertype) != DY_YES) {
         supertype = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_BOTH,
-            .both = {
+            .tag = DY_CORE_EXPR_JUNCTION,
+            .junction = {
                 .e1 = dy_core_expr_new(dy_core_expr_retain(range1.supertype)),
                 .e2 = dy_core_expr_new(dy_core_expr_retain(range2.supertype)),
                 .polarity = DY_CORE_POLARITY_POSITIVE,
@@ -154,8 +154,8 @@ struct dy_constraint_range constraint_conjunction(struct dy_constraint_range ran
     bool have_subtype = false;
     if (range1.have_subtype && range2.have_subtype && dy_are_equal(range1.subtype, range2.subtype) != DY_YES) {
         subtype = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_BOTH,
-            .both = {
+            .tag = DY_CORE_EXPR_JUNCTION,
+            .junction = {
                 .e1 = dy_core_expr_new(dy_core_expr_retain(range1.subtype)),
                 .e2 = dy_core_expr_new(dy_core_expr_retain(range2.subtype)),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
@@ -203,8 +203,8 @@ struct dy_constraint_range constraint_disjunction(struct dy_constraint_range ran
             supertype = dy_core_expr_retain(range1.supertype);
         } else {
             supertype = (struct dy_core_expr){
-                .tag = DY_CORE_EXPR_BOTH,
-                .both = {
+                .tag = DY_CORE_EXPR_JUNCTION,
+                .junction = {
                     .e1 = dy_core_expr_new(dy_core_expr_retain(range1.supertype)),
                     .e2 = dy_core_expr_new(dy_core_expr_retain(range2.supertype)),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
@@ -222,8 +222,8 @@ struct dy_constraint_range constraint_disjunction(struct dy_constraint_range ran
             subtype = dy_core_expr_retain(range1.subtype);
         } else {
             subtype = (struct dy_core_expr){
-                .tag = DY_CORE_EXPR_BOTH,
-                .both = {
+                .tag = DY_CORE_EXPR_JUNCTION,
+                .junction = {
                     .e1 = dy_core_expr_new(dy_core_expr_retain(range1.subtype)),
                     .e2 = dy_core_expr_new(dy_core_expr_retain(range2.subtype)),
                     .polarity = DY_CORE_POLARITY_POSITIVE,

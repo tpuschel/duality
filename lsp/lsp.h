@@ -959,9 +959,9 @@ void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_s
         }
 
         return;
-    case DY_CORE_EXPR_BOTH:
-        produce_diagnostics(ctx, *expr.both.e1, text, diagnostics);
-        produce_diagnostics(ctx, *expr.both.e2, text, diagnostics);
+    case DY_CORE_EXPR_JUNCTION:
+        produce_diagnostics(ctx, *expr.junction.e1, text, diagnostics);
+        produce_diagnostics(ctx, *expr.junction.e2, text, diagnostics);
         return;
     case DY_CORE_EXPR_ONE_OF:
         produce_diagnostics(ctx, *expr.one_of.first, text, diagnostics);

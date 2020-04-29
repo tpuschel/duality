@@ -46,15 +46,15 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
         return dy_core_expr_retain(*expr.equality_map_elim.map.e2);
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         return dy_core_expr_retain(*expr.type_map_elim.map.expr);
-    case DY_CORE_EXPR_BOTH:
-        expr.both.e1 = dy_core_expr_new(dy_type_of(ctx, *expr.both.e1));
-        expr.both.e2 = dy_core_expr_new(dy_type_of(ctx, *expr.both.e2));
-        expr.both.polarity = DY_CORE_POLARITY_POSITIVE;
+    case DY_CORE_EXPR_JUNCTION:
+        expr.junction.e1 = dy_core_expr_new(dy_type_of(ctx, *expr.junction.e1));
+        expr.junction.e2 = dy_core_expr_new(dy_type_of(ctx, *expr.junction.e2));
+        expr.junction.polarity = DY_CORE_POLARITY_POSITIVE;
         return expr;
     case DY_CORE_EXPR_ONE_OF:
         return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_BOTH,
-            .both = {
+            .tag = DY_CORE_EXPR_JUNCTION,
+            .junction = {
                 .e1 = dy_core_expr_new(dy_type_of(ctx, *expr.one_of.first)),
                 .e2 = dy_core_expr_new(dy_type_of(ctx, *expr.one_of.second)),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,

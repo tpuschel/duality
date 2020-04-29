@@ -28,7 +28,7 @@ static inline struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *
 
 static inline struct dy_core_expr dy_eval_type_map_elim(struct dy_core_ctx *ctx, struct dy_core_type_map_elim elim, bool *is_value);
 
-static inline struct dy_core_expr dy_eval_both(struct dy_core_ctx *ctx, struct dy_core_both both, bool *is_value);
+static inline struct dy_core_expr dy_eval_junction(struct dy_core_ctx *ctx, struct dy_core_junction junction, bool *is_value);
 
 static inline struct dy_core_expr dy_eval_one_of(struct dy_core_ctx *ctx, struct dy_core_one_of one_of, bool *is_value);
 
@@ -45,8 +45,8 @@ struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr ex
         return dy_eval_equality_map_elim(ctx, expr.equality_map_elim, is_value);
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         return dy_eval_type_map_elim(ctx, expr.type_map_elim, is_value);
-    case DY_CORE_EXPR_BOTH:
-        return dy_eval_both(ctx, expr.both, is_value);
+    case DY_CORE_EXPR_JUNCTION:
+        return dy_eval_junction(ctx, expr.junction, is_value);
     case DY_CORE_EXPR_ONE_OF:
         return dy_eval_one_of(ctx, expr.one_of, is_value);
     case DY_CORE_EXPR_VARIABLE:
@@ -184,9 +184,9 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
 
     dy_core_expr_release(right);
 
-    if (left.tag == DY_CORE_EXPR_BOTH) {
+    if (left.tag == DY_CORE_EXPR_JUNCTION) {
         struct dy_core_equality_map_elim new_elim = {
-            .expr = left.both.e1,
+            .expr = left.junction.e1,
             .map = equality_map.equality_map,
             .check_result = DY_MAYBE
         };
@@ -199,7 +199,7 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
             return new_expr;
         }
 
-        new_elim.expr = left.both.e2;
+        new_elim.expr = left.junction.e2;
 
         new_expr = dy_eval_equality_map_elim(ctx, new_elim, is_value);
 
@@ -228,19 +228,19 @@ struct dy_core_expr dy_eval_type_map_elim(struct dy_core_ctx *ctx, struct dy_cor
     dy_bail("Not yet implemented.");
 }
 
-struct dy_core_expr dy_eval_both(struct dy_core_ctx *ctx, struct dy_core_both both, bool *is_value)
+struct dy_core_expr dy_eval_junction(struct dy_core_ctx *ctx, struct dy_core_junction junction, bool *is_value)
 {
     bool e1_is_value = false;
-    both.e1 = dy_core_expr_new(dy_eval_expr(ctx, *both.e1, &e1_is_value));
+    junction.e1 = dy_core_expr_new(dy_eval_expr(ctx, *junction.e1, &e1_is_value));
 
     bool e2_is_value = false;
-    both.e2 = dy_core_expr_new(dy_eval_expr(ctx, *both.e2, &e2_is_value));
+    junction.e2 = dy_core_expr_new(dy_eval_expr(ctx, *junction.e2, &e2_is_value));
 
     *is_value = e1_is_value && e2_is_value;
 
     return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_BOTH,
-        .both = both
+        .tag = DY_CORE_EXPR_JUNCTION,
+        .junction = junction
     };
 }
 
