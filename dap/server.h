@@ -21,6 +21,10 @@
 #    include <fcntl.h>
 #endif
 
+/**
+ * This file implements the JSON message infrastructure for the DAP.
+ */
+
 struct dy_dap_stream_env {
     FILE *file;
     bool is_bounded;
@@ -129,19 +133,19 @@ void send_callback(dy_json_t message, void *env)
 {
     struct send_env *send_env = env;
 
-    size_t size = dy_array_size(send_env->buffer);
+    size_t size = send_env->buffer.num_elems;
 
-    dy_json_to_utf8(message, send_env->buffer);
+    dy_json_to_utf8(message, &send_env->buffer);
 
     fprintf(send_env->file, "Content-Length:");
-    write_size_t(send_env->file, dy_array_size(send_env->buffer) - size);
+    write_size_t(send_env->file, send_env->buffer.num_elems - size);
     fprintf(send_env->file, "\r\n\r\n");
 
-    fwrite((char *)dy_array_buffer(send_env->buffer) + size, sizeof(char), dy_array_size(send_env->buffer) - size, send_env->file);
+    fwrite((char *)send_env->buffer.buffer + size, sizeof(char), send_env->buffer.num_elems - size, send_env->file);
 
     fflush(send_env->file);
 
-    dy_array_set_size(send_env->buffer, size);
+    send_env->buffer.num_elems = size;
 }
 
 void stream_callback(dy_array_t *buffer, void *env)
@@ -159,7 +163,7 @@ void stream_callback(dy_array_t *buffer, void *env)
 
         dy_array_set_excess_capacity(buffer, state->bound_size_in_bytes);
 
-        size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), state->bound_size_in_bytes, stdin);
+        size_t num_bytes_read = fread(dy_array_excess_buffer(*buffer), sizeof(char), state->bound_size_in_bytes, stdin);
 
         dy_array_add_to_size(buffer, num_bytes_read);
 
@@ -167,7 +171,7 @@ void stream_callback(dy_array_t *buffer, void *env)
     } else {
         dy_array_set_excess_capacity(buffer, 1);
 
-        size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), 1, stdin);
+        size_t num_bytes_read = fread(dy_array_excess_buffer(*buffer), sizeof(char), 1, stdin);
 
         dy_array_add_to_size(buffer, num_bytes_read);
     }
@@ -175,12 +179,12 @@ void stream_callback(dy_array_t *buffer, void *env)
 
 void write_size_t(FILE *file, size_t x)
 {
-    dy_array_t *buffer = dy_array_create(sizeof(char), 4);
+    dy_array_t buffer = dy_array_create(sizeof(char), 4);
 
     for (;;) {
         char digit = (x % 10) + '0';
 
-        dy_array_add(buffer, &digit);
+        dy_array_add(&buffer, &digit);
 
         x = x / 10;
 
@@ -189,8 +193,8 @@ void write_size_t(FILE *file, size_t x)
         }
     }
 
-    for (size_t i = dy_array_size(buffer); i-- > 0;) {
-        fprintf(file, "%c", *(char *)dy_array_get_ptr(buffer, i));
+    for (size_t i = buffer.num_elems; i-- > 0;) {
+        fprintf(file, "%c", *(char *)dy_array_pos(buffer, i));
     }
 
     dy_array_destroy(buffer);

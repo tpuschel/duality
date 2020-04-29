@@ -7,9 +7,13 @@
 #ifndef DY_ARRAY_H
 #define DY_ARRAY_H
 
-#include "assert.h"
 #include "overflow.h"
 #include "alloc.h"
+
+/**
+ * This file implements dynamically
+ * growable arrays.
+ */
 
 typedef struct dy_array {
     void *buffer;
@@ -49,10 +53,10 @@ static inline void *dy_array_last(dy_array_t array);
 
 dy_array_t dy_array_create(size_t elem_size, size_t capacity)
 {
-    dy_assert(elem_size != 0);
+    assert(elem_size != 0);
 
     size_t capacity_in_bytes;
-    dy_assert(!dy_size_t_mul_overflow(elem_size, capacity, &capacity_in_bytes));
+    assert(!dy_size_t_mul_overflow(elem_size, capacity, &capacity_in_bytes));
 
     return (dy_array_t){
         .buffer = dy_malloc(capacity_in_bytes),
@@ -88,17 +92,17 @@ void dy_array_remove_keep_order(dy_array_t *array, size_t index)
 
 void dy_array_insert_keep_order(dy_array_t *array, size_t index, const void *value)
 {
-    dy_assert(index <= array->num_elems);
+    assert(index <= array->num_elems);
 
     if (array->num_elems == array->capacity) {
         if (array->capacity == 0) {
             array->capacity = 8;
         } else {
-            dy_assert(!dy_size_t_mul_overflow(array->capacity, 2, &array->capacity));
+            assert(!dy_size_t_mul_overflow(array->capacity, 2, &array->capacity));
         }
 
         size_t capacity_in_bytes;
-        dy_assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
+        assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
 
         array->buffer = dy_realloc(array->buffer, capacity_in_bytes);
     }
@@ -128,17 +132,17 @@ void dy_array_set_excess_capacity(dy_array_t *array, size_t excess_capacity)
 
     size_t added_capacity = excess_capacity - current_excess_capacity;
 
-    dy_assert(!dy_size_t_add_overflow(array->capacity, added_capacity, &array->capacity));
+    assert(!dy_size_t_add_overflow(array->capacity, added_capacity, &array->capacity));
 
     size_t capacity_in_bytes;
-    dy_assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
+    assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
 
     array->buffer = dy_realloc(array->buffer, capacity_in_bytes);
 }
 
 void dy_array_add_to_size(dy_array_t *array, size_t added_size)
 {
-    dy_assert(!dy_size_t_add_overflow(array->num_elems, added_size, &array->num_elems));
+    assert(!dy_size_t_add_overflow(array->num_elems, added_size, &array->num_elems));
 }
 
 void *dy_array_excess_buffer(dy_array_t array)
@@ -155,7 +159,7 @@ size_t dy_array_pop(dy_array_t *array, void *value)
 
 void *dy_array_pos(dy_array_t array, size_t i)
 {
-    dy_assert(i < array.capacity + 1);
+    assert(i < array.capacity + 1);
     return (char *)array.buffer + (i * array.elem_size);
 }
 

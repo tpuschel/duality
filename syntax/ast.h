@@ -10,6 +10,11 @@
 #include "../support/string.h"
 #include "../support/range.h"
 #include "../support/rc.h"
+#include "../support/bail.h"
+
+/**
+ * The Abstract Syntax Tree (AST) of Duality.
+ */
 
 struct dy_ast_expr;
 
@@ -159,6 +164,8 @@ struct dy_ast_expr {
     enum dy_ast_expr_tag tag;
 };
 
+/** Boring ref-count stuff. */
+
 static const size_t dy_ast_expr_rc_offset = DY_RC_OFFSET_OF_TYPE(struct dy_ast_expr);
 
 static inline const struct dy_ast_expr *dy_ast_expr_new(struct dy_ast_expr expr);
@@ -291,7 +298,7 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
         return expr;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible ast type.");
 }
 
 void dy_ast_expr_release_ptr(const struct dy_ast_expr *expr)
@@ -375,7 +382,7 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
         return;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible ast type.");
 }
 
 void dy_ast_do_block_release_ptr(const struct dy_ast_do_block_body *do_block)
@@ -412,7 +419,7 @@ void dy_ast_do_block_retain(struct dy_ast_do_block_body do_block)
         return;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible ast do block type.");
 }
 
 void dy_ast_do_block_release(struct dy_ast_do_block_body do_block)
@@ -436,7 +443,7 @@ void dy_ast_do_block_release(struct dy_ast_do_block_body do_block)
         return;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible ast do block type.");
 }
 
 void dy_ast_list_retain(struct dy_ast_list_inner list)

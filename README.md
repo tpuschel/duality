@@ -30,3 +30,5 @@ Each of the subfolders in this repository has it own README detailing what's imp
 /support/ - Auxiliary data structures and functions.
 
 /syntax/ - Provides the AST, parser and transformation from AST to Core.
+
+/vscode-ext/ - Source of [the Visual Studio Code extension](https://marketplace.visualstudio.com/items?itemName=puschel.duality).

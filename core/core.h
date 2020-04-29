@@ -11,6 +11,7 @@
 #include "../support/array.h"
 #include "../support/rc.h"
 #include "../support/range.h"
+#include "../support/bail.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -242,7 +243,7 @@ bool dy_core_expr_is_computation(struct dy_core_expr expr)
         return expr.custom.is_computation(expr.custom.data);
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible object type.");
 }
 
 bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr)
@@ -311,7 +312,7 @@ size_t dy_core_expr_num_occurrences(size_t id, struct dy_core_expr expr)
         return expr.custom.num_occurrences(expr.custom.data, id);
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible object type.");
 }
 
 const struct dy_core_expr *dy_core_expr_new(struct dy_core_expr expr)
@@ -386,7 +387,7 @@ struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
         return expr;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible object type.");
 }
 
 void dy_core_expr_release_ptr(const struct dy_core_expr *expr)
@@ -459,7 +460,7 @@ void dy_core_expr_release(struct dy_core_expr expr)
         return;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible object type.");
 }
 
 void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
@@ -486,7 +487,7 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
 
         add_string(string, DY_STR_LIT("["));
         char *c;
-        dy_assert(asprintf(&c, "%zu", expr.type_map.binding.id) != -1);
+        assert(asprintf(&c, "%zu", expr.type_map.binding.id) != -1);
         add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
         free(c);
         add_string(string, DY_STR_LIT(" "));
@@ -511,7 +512,7 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
 
         add_string(string, DY_STR_LIT("?["));
         char *c;
-        dy_assert(asprintf(&c, "%zu", expr.inference_type_map.binding.id) != -1);
+        assert(asprintf(&c, "%zu", expr.inference_type_map.binding.id) != -1);
         add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
         free(c);
         add_string(string, DY_STR_LIT(" "));
@@ -547,7 +548,7 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         add_string(string, DY_STR_LIT(" ! "));
 
         char *c;
-        dy_assert(asprintf(&c, "%zu [", expr.type_map_elim.map.binding.id) != -1);
+        assert(asprintf(&c, "%zu [", expr.type_map_elim.map.binding.id) != -1);
         add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
         free(c);
 
@@ -565,14 +566,14 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
     }
     case DY_CORE_EXPR_VARIABLE: {
         char *c;
-        dy_assert(asprintf(&c, "%zu", expr.variable.id) != -1);
+        assert(asprintf(&c, "%zu", expr.variable.id) != -1);
         add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
         free(c);
         return;
     }
     case DY_CORE_EXPR_INFERENCE_VARIABLE: {
         char *c;
-        dy_assert(asprintf(&c, "?%zu", expr.inference_variable.id) != -1);
+        assert(asprintf(&c, "?%zu", expr.inference_variable.id) != -1);
         add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
         free(c);
         return;
@@ -612,7 +613,7 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
 
         add_string(string, DY_STR_LIT("["));
         char *c;
-        dy_assert(asprintf(&c, "%zu", expr.recursion.map.binding.id) != -1);
+        assert(asprintf(&c, "%zu", expr.recursion.map.binding.id) != -1);
         add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
         free(c);
         add_string(string, DY_STR_LIT(" "));
@@ -635,7 +636,7 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         return;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible object type.");
 }
 
 void add_string(dy_array_t *string, dy_string_t s)
@@ -652,13 +653,13 @@ int asprintf(char **ret, const char *format, ...)
     va_start(ap, format);
 
     int projected_len = _vscprintf(format, ap);
-    dy_assert(projected_len >= 0);
+    assert(projected_len >= 0);
 
     char *buffer = malloc((size_t)projected_len + 1 /* for '\0' */);
-    dy_assert(buffer != NULL);
+    assert(buffer != NULL);
 
     int actual_len = vsprintf(buffer, format, ap);
-    dy_assert(projected_len == actual_len);
+    assert(projected_len == actual_len);
 
     va_end(ap);
 

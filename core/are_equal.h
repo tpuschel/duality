@@ -8,6 +8,7 @@
 #define DY_ARE_EQUAL_H
 
 #include "substitute.h"
+#include "../support/bail.h"
 
 /**
  * The functions here define equality for all objects of Core.
@@ -114,14 +115,14 @@ dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
             return DY_NO;
         }
     case DY_CORE_EXPR_RECURSION:
-        dy_bail("not yet implemented");
+        dy_bail("Not yet implemented");
     case DY_CORE_EXPR_BOTH:
         // fallthrough
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        dy_bail("should not be reachable!");
+        dy_bail("Should not be reachable!");
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible core object.");
 }
 
 dy_ternary_t is_equal_to_both_positive(struct dy_core_expr expr, struct dy_core_both both)

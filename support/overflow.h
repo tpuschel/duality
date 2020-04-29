@@ -12,6 +12,12 @@
 #include <stdint.h>
 #include <limits.h>
 
+/**
+ * Signed/unsigned integer add/mul operations with overflow detection.
+ *
+ * TODO: Replace with compiler builtins where available.
+ */
+
 static inline bool dy_sadd_overflow(int a, int b, int *c);
 static inline bool dy_saddl_overflow(long a, long b, long *c);
 static inline bool dy_saddll_overflow(long long a, long long b, long long *c);

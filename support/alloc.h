@@ -10,8 +10,16 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
-#include "assert.h"
+/**
+ * This file contains wrappers around standard
+ * library memory allocation functions that
+ * assert() on NULL.
+ *
+ * Duality deliberately does not try to recover
+ * from OOM situations.
+ */
 
 static inline void *dy_malloc(size_t size);
 
@@ -24,21 +32,21 @@ static inline void dy_free(void *ptr);
 void *dy_malloc(size_t size)
 {
     void *p = malloc(size);
-    dy_assert(p);
+    assert(p);
     return p;
 }
 
 void *dy_calloc(size_t count, size_t size)
 {
     void *p = calloc(count, size);
-    dy_assert(p);
+    assert(p);
     return p;
 }
 
 void *dy_realloc(void *ptr, size_t size)
 {
     void *p = realloc(ptr, size);
-    dy_assert(p);
+    assert(p);
     return p;
 }
 

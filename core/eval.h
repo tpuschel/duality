@@ -59,7 +59,7 @@ struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr ex
         *is_value = true;
         return dy_core_expr_retain(expr);
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        dy_bail("should not happen");
+        dy_bail("Should not happen");
     case DY_CORE_EXPR_RECURSION:
         return dy_eval_recursion(ctx, expr.recursion, is_value);
     case DY_CORE_EXPR_CUSTOM:
@@ -69,7 +69,7 @@ struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr ex
         return dy_core_expr_retain(expr);
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible object type.");
 }
 
 struct dy_core_expr dy_eval_equality_map(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, bool *is_value)
@@ -138,7 +138,7 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
         bool have_constraint = false;
         elim.check_result = dy_is_subtype_no_transformation(ctx, type_of_left, equality_map, &constraint, &have_constraint);
 
-        dy_assert(!have_constraint);
+        assert(!have_constraint);
 
         dy_core_expr_release(type_of_left);
     }

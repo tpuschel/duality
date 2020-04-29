@@ -72,7 +72,7 @@ struct dy_core_expr substitute(struct dy_core_expr expr, size_t id, struct dy_co
         return expr;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible object type.");
 }
 
 static struct dy_core_equality_map substitute_equality_map(struct dy_core_equality_map equality_map, size_t id, struct dy_core_expr sub)

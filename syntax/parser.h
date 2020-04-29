@@ -11,10 +11,15 @@
 
 #include "../support/array.h"
 #include "../support/stream.h"
+#include "../support/bail.h"
+
+/**
+ * The parser, transforming a text stream into an AST.
+ */
 
 struct dy_parser_ctx {
     struct dy_stream stream;
-    dy_array_t string_arrays;
+    dy_array_t string_arrays; /** String literals are copied into this array. */
 };
 
 enum infix_op {
@@ -1272,7 +1277,7 @@ bool combine_infix(struct dy_ast_expr left, enum infix_op op, struct dy_ast_expr
         return true;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible infix op.");
 }
 
 bool left_op_is_first(enum infix_op left, enum infix_op right)
@@ -1304,10 +1309,10 @@ bool left_op_is_first(enum infix_op left, enum infix_op right)
             return false;
         }
 
-        DY_IMPOSSIBLE_ENUM();
+        dy_bail("Impossible infix op.");
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible infix op.");
 }
 
 void skip_whitespace(struct dy_parser_ctx *ctx)

@@ -198,7 +198,7 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
     case DY_CORE_EXPR_INFERENCE_VARIABLE:
         // fallthrough
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        dy_bail("should not be reached");
+        dy_bail("Should not be reached");
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
         // fallthrough
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
@@ -213,7 +213,7 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         return subtype.custom.is_subtype(subtype.custom.data, ctx, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr);
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible object type.");
 }
 
 dy_ternary_t equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
@@ -225,7 +225,7 @@ dy_ternary_t equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy_core_equ
         return negative_equality_map_is_subtype(ctx, equality_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible polarity.");
 }
 
 dy_ternary_t positive_equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
@@ -489,7 +489,7 @@ dy_ternary_t type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_core_type_ma
         return negative_type_map_is_subtype(ctx, type_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible polarity.");
 }
 
 dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_core_type_map type_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)

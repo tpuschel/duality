@@ -15,6 +15,11 @@
 #include "../support/array.h"
 #include "../support/range.h"
 
+/**
+ * Implements the tranformation from AST to Core.
+ */
+
+/** Represents a variable in the source text and its replacement id + type for Core. */
 struct dy_ast_to_core_bound_var {
     dy_string_t name;
     size_t replacement_id;
@@ -123,7 +128,7 @@ struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct d
         };
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible ast type.");
 }
 
 struct dy_core_expr dy_ast_variable_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_literal variable)
@@ -337,7 +342,7 @@ struct dy_core_expr ast_do_block_body_to_core(struct dy_ast_to_core_ctx *ctx, st
         return do_block_equality_to_core(ctx, do_block.equality);
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible do block type.");
 }
 
 struct dy_core_expr dy_ast_do_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block do_block)
@@ -553,7 +558,7 @@ struct dy_core_expr dy_ast_equality_map_elim_to_core(struct dy_ast_to_core_ctx *
 
     struct dy_core_expr e2 = dy_ast_negative_equality_map_to_core(ctx, elim.equality_map);
 
-    dy_assert(e2.tag == DY_CORE_EXPR_EQUALITY_MAP);
+    assert(e2.tag == DY_CORE_EXPR_EQUALITY_MAP);
 
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
@@ -571,7 +576,7 @@ struct dy_core_expr dy_ast_type_map_elim_to_core(struct dy_ast_to_core_ctx *ctx,
 
     struct dy_core_expr e2 = dy_ast_negative_type_map_to_core(ctx, elim.type_map);
 
-    dy_assert(e2.tag == DY_CORE_EXPR_TYPE_MAP);
+    assert(e2.tag == DY_CORE_EXPR_TYPE_MAP);
 
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_TYPE_MAP_ELIM,

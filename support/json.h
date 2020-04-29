@@ -9,6 +9,12 @@
 
 #include "string.h"
 
+/**
+ * Definition of JSON + a few helper functions.
+ *
+ * Floating point values are currently not supported.
+ */
+
 struct dy_json_element;
 
 struct dy_json_object {

@@ -15,7 +15,7 @@
 
 #include "lsp/server.h"
 
-#include "support/assert.h"
+#include "support/bail.h"
 
 static void read_chunk(dy_array_t *buffer, void *env);
 
@@ -84,7 +84,7 @@ int main(int argc, const char *argv[])
     struct dy_constraint constraint;
     bool have_constraint = false;
     struct dy_core_expr checked_program = dy_check_expr(&core_ctx, program, &constraint, &have_constraint);
-    dy_assert(!have_constraint);
+    assert(!have_constraint);
 
     if (core_has_error(checked_program)) {
         print_core_errors(stderr, checked_program, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
@@ -179,7 +179,7 @@ bool core_has_error(struct dy_core_expr expr)
         return false;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible object type.");
 }
 
 void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, size_t text_size)
@@ -249,13 +249,13 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
         return;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible object type.");
 }
 
 void print_error_fragment(FILE *file, struct dy_range range, const char *text, size_t text_size)
 {
-    dy_assert(range.start < text_size);
-    dy_assert(range.end < text_size);
+    assert(range.start < text_size);
+    assert(range.end < text_size);
 
     for (size_t i = range.start; i < range.end; ++i) {
         fprintf(file, "%c", text[i]);

@@ -2,4 +2,7 @@
 -Wno-padded
 -Wno-c++98-compat
 -Wno-unused-parameter
+-Wno-unneeded-internal-declaration
+-Wno-unused-function
+-Wno-undefined-internal
 -ferror-limit=0

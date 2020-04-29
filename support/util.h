@@ -7,6 +7,10 @@
 #ifndef DY_UTIL_H
 #define DY_UTIL_H
 
+/**
+ * Some utility macros.
+ */
+
 #ifdef _MSC_VER
 #    define DY_NORETURN __declspec(noreturn)
 #    define DY_ALIGNOF __alignof

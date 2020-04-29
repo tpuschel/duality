@@ -15,6 +15,10 @@
 #include "../syntax/parser.h"
 #include "../syntax/ast_to_core.h"
 
+/**
+ * This file implements LSP support.
+ */
+
 typedef struct dy_lsp_ctx dy_lsp_ctx_t;
 
 typedef void (*dy_lsp_send_fn)(dy_json_t message, void *env);
@@ -43,8 +47,11 @@ static inline int dy_lsp_exit_code(dy_lsp_ctx_t *ctx);
 
 static inline void dy_lsp_destroy(dy_lsp_ctx_t *ctx);
 
+/**
+ * Represents an open document.
+ */
 struct document {
-    dy_string_t uri;
+    dy_string_t uri; /** The URI is used as the identifier for a document. */
     dy_string_t text;
     size_t running_id;
     struct dy_core_expr core;
@@ -979,7 +986,7 @@ void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_s
         return;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible core type.");
 }
 
 dy_json_t compute_lsp_range(dy_string_t text, struct dy_range range)

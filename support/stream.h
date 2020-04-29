@@ -13,6 +13,13 @@
 
 #include <stdio.h>
 
+/**
+ * Implements a buffered stream.
+ *
+ * The "end" of a stream is indicated by get_chars() not
+ * adding any characters to 'buffer'.
+ */
+
 struct dy_stream {
     void (*get_chars)(dy_array_t *buffer, void *env);
     dy_array_t buffer;

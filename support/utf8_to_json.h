@@ -10,6 +10,12 @@
 #include "json.h"
 #include "stream.h"
 
+/**
+ * Implements parsing JSON from a UTF-8 character stream.
+ *
+ * Floating-point values are not currently supported.
+ */
+
 static inline bool dy_utf8_to_json(struct dy_stream *stream, dy_json_t *json);
 
 static inline void parse_whitespace(struct dy_stream *stream);
@@ -182,13 +188,11 @@ bool parse_nonempty_object(struct dy_stream *stream, struct dy_json_object *obje
 
     struct dy_json_object obj;
     if (!parse_object_members(stream, &obj)) {
-        fprintf(stderr, "Failed to parse object members.\n");
         stream->current_index = start_index;
         return false;
     }
 
     if (!dy_stream_parse_literal(stream, DY_STR_LIT("}"))) {
-        fprintf(stderr, "Missing closing brace.\n");
         stream->current_index = start_index;
         return false;
     }
@@ -220,7 +224,6 @@ bool parse_object_members_storage(struct dy_stream *stream, dy_array_t *member_s
 
     struct dy_json_member member;
     if (!parse_object_member(stream, &member)) {
-        fprintf(stderr, "Failed to parse object member\n");
         stream->current_index = start_index;
         return false;
     }
@@ -232,7 +235,6 @@ bool parse_object_members_storage(struct dy_stream *stream, dy_array_t *member_s
     }
 
     if (!parse_object_members_storage(stream, member_storage)) {
-        fprintf(stderr, "Failed to parse further.\n");
         stream->current_index = start_index;
         return false;
     }
@@ -248,7 +250,6 @@ bool parse_object_member(struct dy_stream *stream, struct dy_json_member *member
 
     dy_string_t string;
     if (!parse_string(stream, &string)) {
-        fprintf(stderr, "Not string\n");
         stream->current_index = start_index;
         return false;
     }
@@ -256,14 +257,12 @@ bool parse_object_member(struct dy_stream *stream, struct dy_json_member *member
     parse_whitespace(stream);
 
     if (!dy_stream_parse_literal(stream, DY_STR_LIT(":"))) {
-        fprintf(stderr, "Missing colon\n");
         stream->current_index = start_index;
         return false;
     }
 
     struct dy_json_value value;
     if (!dy_utf8_to_json(stream, &value)) {
-        fprintf(stderr, "Failed json member parse.\n");
         stream->current_index = start_index;
         return false;
     }
@@ -287,13 +286,11 @@ bool parse_string(struct dy_stream *stream, dy_string_t *string)
 
     dy_string_t characters;
     if (!parse_characters(stream, &characters)) {
-        fprintf(stderr, "Not characters\n");
         stream->current_index = start_index;
         return false;
     }
 
     if (!dy_stream_parse_literal(stream, DY_STR_LIT("\""))) {
-        fprintf(stderr, "Missing closing quote\n");
         stream->current_index = start_index;
         return false;
     }
@@ -407,6 +404,8 @@ bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
                     return false;
                 }
 
+                // Gnarly utf8 bit shifting stuff.
+
                 uint16_t hex = (uint16_t)((hex1 << 12) | (hex2 << 8) | (hex3 << 4) | hex4);
 
                 if (!(hex & 0xff80)) {
@@ -484,13 +483,11 @@ bool parse_nonempty_array(struct dy_stream *stream, struct dy_json_array *array)
 
     struct dy_json_array arr;
     if (!parse_array_elements(stream, &arr)) {
-        fprintf(stderr, "Failed array element parse.\n");
         stream->current_index = start_index;
         return false;
     }
 
     if (!dy_stream_parse_literal(stream, DY_STR_LIT("]"))) {
-        fprintf(stderr, "Missing closing bracket.\n");
         stream->current_index = start_index;
         return false;
     }

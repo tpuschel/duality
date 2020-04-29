@@ -10,6 +10,14 @@
 #include "json.h"
 #include "array.h"
 
+#include "../support/bail.h"
+
+/**
+ * Implements functions that append
+ * a UTF-8 representation of the
+ * given JSON to a dynamic array.
+ */
+
 static inline void dy_json_to_utf8(dy_json_t json, dy_array_t *utf8);
 
 static inline void dy_utf8_literal(dy_string_t s, dy_array_t *utf8);
@@ -44,7 +52,7 @@ void dy_json_to_utf8(dy_json_t json, dy_array_t *utf8)
         return;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Invalid enum tag.");
 }
 
 void dy_utf8_literal(dy_string_t s, dy_array_t *utf8)

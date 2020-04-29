@@ -67,7 +67,7 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
     case DY_CORE_EXPR_CUSTOM:
         return expr.custom.type_of(expr.custom.data, ctx);
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        dy_bail("should not happen\n");
+        dy_bail("Should not happen\n");
     case DY_CORE_EXPR_RECURSION: {
         struct dy_core_expr type = dy_type_of(ctx, *expr.recursion.map.expr);
 
@@ -98,7 +98,7 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
         };
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible object type.");
 }
 
 #endif // DY_TYPE_OF_H

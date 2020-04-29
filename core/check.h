@@ -12,6 +12,8 @@
 #include "type_of.h"
 #include "is_subtype.h"
 
+#include "../support/bail.h"
+
 /**
  * The functions here define the 'check' procedure for each object of Core.
  *
@@ -102,7 +104,7 @@ struct dy_core_expr dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr e
         return dy_core_expr_retain(expr);
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible object type.");
 }
 
 struct dy_core_equality_map dy_check_equality_map(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, struct dy_constraint *constraint, bool *did_generate_constraint)
@@ -168,7 +170,7 @@ struct dy_core_type_map dy_check_type_map(struct dy_core_ctx *ctx, struct dy_cor
         // Check to see if we're bound in one of the constraints.
         // If that's the case, error out for now.
         if (is_mentioned_in_constraints(ctx, type_map.binding.id, c2)) {
-            dy_bail("shit");
+            dy_bail("Not yet implemented.");
         }
     }
 
@@ -635,7 +637,7 @@ void dy_binding_contraints(struct dy_core_ctx *ctx, size_t id, struct dy_constra
         return;
     }
 
-    DY_IMPOSSIBLE_ENUM();
+    dy_bail("Impossible constraint type.");
 }
 
 struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr type, enum dy_core_polarity polarity, struct dy_constraint constraint, bool have_constraint, struct dy_constraint *new_constraint, bool *have_new_constraint, struct dy_core_expr expr)
@@ -650,7 +652,7 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
             }
 
             if (solution.have_subtype) {
-                dy_assert(!dy_core_expr_is_bound(id, solution.subtype));
+                assert(!dy_core_expr_is_bound(id, solution.subtype));
 
                 expr = substitute(expr, id, solution.subtype);
             } else {
@@ -699,7 +701,7 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
             }
 
             if (solution.have_supertype) {
-                dy_assert(!dy_core_expr_is_bound(id, solution.supertype));
+                assert(!dy_core_expr_is_bound(id, solution.supertype));
 
                 expr = substitute(expr, id, solution.supertype);
             } else {

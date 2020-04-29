@@ -10,6 +10,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+/**
+ * Implements the perennial string type that knows its own size :).
+ */
+
 typedef struct dy_string {
     const char *ptr;
     size_t size;
