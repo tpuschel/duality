@@ -15,6 +15,7 @@
 #include "../support/utf8_to_json.h"
 
 #include <stdio.h>
+#include <assert.h>
 
 #ifdef _WIN32
 #    include <io.h>
@@ -203,7 +204,7 @@ void write_size_t(FILE *file, size_t x)
 void set_file_to_binary(FILE *file)
 {
 #ifdef _WIN32
-    dy_assert(_setmode(_fileno(file), _O_BINARY) != -1);
+    assert(_setmode(_fileno(file), _O_BINARY) != -1);
 #else
     (void)file;
 #endif
