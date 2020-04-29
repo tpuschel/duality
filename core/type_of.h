@@ -51,12 +51,12 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
         expr.junction.e2 = dy_core_expr_new(dy_type_of(ctx, *expr.junction.e2));
         expr.junction.polarity = DY_CORE_POLARITY_POSITIVE;
         return expr;
-    case DY_CORE_EXPR_ONE_OF:
+    case DY_CORE_EXPR_ALTERNATIVE:
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_JUNCTION,
             .junction = {
-                .e1 = dy_core_expr_new(dy_type_of(ctx, *expr.one_of.first)),
-                .e2 = dy_core_expr_new(dy_type_of(ctx, *expr.one_of.second)),
+                .e1 = dy_core_expr_new(dy_type_of(ctx, *expr.alternative.first)),
+                .e2 = dy_core_expr_new(dy_type_of(ctx, *expr.alternative.second)),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };

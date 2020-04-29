@@ -293,8 +293,8 @@ struct dy_core_expr ast_try_block_to_core(struct dy_ast_to_core_ctx *ctx, struct
     struct dy_core_expr e2 = ast_try_block_to_core(ctx, *try_block.next_or_null);
 
     return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_ONE_OF,
-        .one_of = {
+        .tag = DY_CORE_EXPR_ALTERNATIVE,
+        .alternative = {
             .first = dy_core_expr_new(e1),
             .second = dy_core_expr_new(e2),
         }

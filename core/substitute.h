@@ -52,9 +52,9 @@ struct dy_core_expr substitute(struct dy_core_expr expr, size_t id, struct dy_co
         expr.junction.e1 = dy_core_expr_new(substitute(*expr.junction.e1, id, sub));
         expr.junction.e2 = dy_core_expr_new(substitute(*expr.junction.e2, id, sub));
         return expr;
-    case DY_CORE_EXPR_ONE_OF:
-        expr.one_of.first = dy_core_expr_new(substitute(*expr.one_of.first, id, sub));
-        expr.one_of.second = dy_core_expr_new(substitute(*expr.one_of.second, id, sub));
+    case DY_CORE_EXPR_ALTERNATIVE:
+        expr.alternative.first = dy_core_expr_new(substitute(*expr.alternative.first, id, sub));
+        expr.alternative.second = dy_core_expr_new(substitute(*expr.alternative.second, id, sub));
         return expr;
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
         expr.equality_map_elim.expr = dy_core_expr_new(substitute(*expr.equality_map_elim.expr, id, sub));

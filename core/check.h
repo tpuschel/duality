@@ -36,7 +36,7 @@ static inline struct dy_core_type_map_elim dy_check_type_map_elim(struct dy_core
 
 static inline struct dy_core_junction dy_check_junction(struct dy_core_ctx *ctx, struct dy_core_junction junction, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-static inline struct dy_core_one_of dy_check_one_of(struct dy_core_ctx *ctx, struct dy_core_one_of one_of, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_alternative dy_check_alternative(struct dy_core_ctx *ctx, struct dy_core_alternative alternative, struct dy_constraint *constraint, bool *did_generate_constraint);
 
 static inline struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map inference_type_map, struct dy_constraint *constraint, bool *did_generate_constraint);
 
@@ -87,8 +87,8 @@ struct dy_core_expr dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr e
     case DY_CORE_EXPR_RECURSION:
         expr.recursion = dy_check_recursion(ctx, expr.recursion, constraint, did_generate_constraint);
         return expr;
-    case DY_CORE_EXPR_ONE_OF:
-        expr.one_of = dy_check_one_of(ctx, expr.one_of, constraint, did_generate_constraint);
+    case DY_CORE_EXPR_ALTERNATIVE:
+        expr.alternative = dy_check_alternative(ctx, expr.alternative, constraint, did_generate_constraint);
         return expr;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         return dy_check_inference_type_map(ctx, expr.inference_type_map, constraint, did_generate_constraint);
@@ -439,17 +439,17 @@ struct dy_core_junction dy_check_junction(struct dy_core_ctx *ctx, struct dy_cor
     return junction;
 }
 
-struct dy_core_one_of dy_check_one_of(struct dy_core_ctx *ctx, struct dy_core_one_of one_of, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_alternative dy_check_alternative(struct dy_core_ctx *ctx, struct dy_core_alternative alternative, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
-    struct dy_core_expr first = dy_check_expr(ctx, *one_of.first, &c1, &have_c1);
-    one_of.first = dy_core_expr_new(first);
+    struct dy_core_expr first = dy_check_expr(ctx, *alternative.first, &c1, &have_c1);
+    alternative.first = dy_core_expr_new(first);
 
     struct dy_constraint c2;
     bool have_c2 = false;
-    struct dy_core_expr second = dy_check_expr(ctx, *one_of.second, &c2, &have_c2);
-    one_of.second = dy_core_expr_new(second);
+    struct dy_core_expr second = dy_check_expr(ctx, *alternative.second, &c2, &have_c2);
+    alternative.second = dy_core_expr_new(second);
 
     if (have_c1 && have_c2) {
         *constraint = (struct dy_constraint){
@@ -463,7 +463,7 @@ struct dy_core_one_of dy_check_one_of(struct dy_core_ctx *ctx, struct dy_core_on
         *did_generate_constraint = true;
     }
 
-    return one_of;
+    return alternative;
 }
 
 struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, struct dy_constraint *constraint, bool *did_generate_constraint)

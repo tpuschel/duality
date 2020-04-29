@@ -30,7 +30,7 @@ static inline struct dy_core_expr dy_eval_type_map_elim(struct dy_core_ctx *ctx,
 
 static inline struct dy_core_expr dy_eval_junction(struct dy_core_ctx *ctx, struct dy_core_junction junction, bool *is_value);
 
-static inline struct dy_core_expr dy_eval_one_of(struct dy_core_ctx *ctx, struct dy_core_one_of one_of, bool *is_value);
+static inline struct dy_core_expr dy_eval_alternative(struct dy_core_ctx *ctx, struct dy_core_alternative alternative, bool *is_value);
 
 static inline struct dy_core_expr dy_eval_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion rec, bool *is_value);
 
@@ -47,8 +47,8 @@ struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr ex
         return dy_eval_type_map_elim(ctx, expr.type_map_elim, is_value);
     case DY_CORE_EXPR_JUNCTION:
         return dy_eval_junction(ctx, expr.junction, is_value);
-    case DY_CORE_EXPR_ONE_OF:
-        return dy_eval_one_of(ctx, expr.one_of, is_value);
+    case DY_CORE_EXPR_ALTERNATIVE:
+        return dy_eval_alternative(ctx, expr.alternative, is_value);
     case DY_CORE_EXPR_VARIABLE:
         *is_value = true;
         return dy_core_expr_retain(expr);
@@ -244,29 +244,29 @@ struct dy_core_expr dy_eval_junction(struct dy_core_ctx *ctx, struct dy_core_jun
     };
 }
 
-struct dy_core_expr dy_eval_one_of(struct dy_core_ctx *ctx, struct dy_core_one_of one_of, bool *is_value)
+struct dy_core_expr dy_eval_alternative(struct dy_core_ctx *ctx, struct dy_core_alternative alternative, bool *is_value)
 {
     bool first_is_value = false;
-    struct dy_core_expr first = dy_eval_expr(ctx, *one_of.first, &first_is_value);
+    struct dy_core_expr first = dy_eval_expr(ctx, *alternative.first, &first_is_value);
     if (first_is_value) {
         *is_value = true;
         return first;
     }
 
     bool second_is_value = false;
-    struct dy_core_expr second = dy_eval_expr(ctx, *one_of.second, &second_is_value);
+    struct dy_core_expr second = dy_eval_expr(ctx, *alternative.second, &second_is_value);
     if (second_is_value) {
         dy_core_expr_release(first);
         *is_value = true;
         return second;
     }
 
-    one_of.first = dy_core_expr_new(first);
-    one_of.second = dy_core_expr_new(second);
+    alternative.first = dy_core_expr_new(first);
+    alternative.second = dy_core_expr_new(second);
 
     return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_ONE_OF,
-        .one_of = one_of
+        .tag = DY_CORE_EXPR_ALTERNATIVE,
+        .alternative = alternative
     };
 }
 

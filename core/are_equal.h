@@ -41,7 +41,7 @@ static inline dy_ternary_t equality_map_elim_is_equal(struct dy_core_equality_ma
 
 static inline dy_ternary_t type_map_elim_is_equal(struct dy_core_type_map_elim elim, struct dy_core_expr expr);
 
-static inline dy_ternary_t one_of_is_equal(struct dy_core_one_of one_of, struct dy_core_expr expr);
+static inline dy_ternary_t alternative_is_equal(struct dy_core_alternative alternative, struct dy_core_expr expr);
 
 dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
 {
@@ -77,8 +77,8 @@ dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
         return type_map_elim_is_equal(e2.type_map_elim, e1);
     }
 
-    if (e2.tag == DY_CORE_EXPR_ONE_OF) {
-        return one_of_is_equal(e2.one_of, e1);
+    if (e2.tag == DY_CORE_EXPR_ALTERNATIVE) {
+        return alternative_is_equal(e2.alternative, e1);
     }
 
     if (e2.tag == DY_CORE_EXPR_CUSTOM) {
@@ -98,8 +98,8 @@ dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
         return variable_is_equal(e1.variable, e2);
     case DY_CORE_EXPR_INFERENCE_VARIABLE:
         return variable_is_equal(e1.inference_variable, e2);
-    case DY_CORE_EXPR_ONE_OF:
-        return one_of_is_equal(e1.one_of, e2);
+    case DY_CORE_EXPR_ALTERNATIVE:
+        return alternative_is_equal(e1.alternative, e2);
     case DY_CORE_EXPR_END:
         if (e2.tag == DY_CORE_EXPR_END && e1.end_polarity == e2.end_polarity) {
             return DY_YES;
@@ -251,18 +251,18 @@ dy_ternary_t type_map_is_equal_to_type_map(struct dy_core_type_map type_map1, st
     return result;
 }
 
-dy_ternary_t one_of_is_equal(struct dy_core_one_of one_of, struct dy_core_expr expr)
+dy_ternary_t alternative_is_equal(struct dy_core_alternative alternative, struct dy_core_expr expr)
 {
-    if (expr.tag != DY_CORE_EXPR_ONE_OF) {
+    if (expr.tag != DY_CORE_EXPR_ALTERNATIVE) {
         return DY_MAYBE;
     }
 
-    dy_ternary_t first_res = dy_are_equal(*one_of.first, *expr.one_of.first);
+    dy_ternary_t first_res = dy_are_equal(*alternative.first, *expr.alternative.first);
     if (first_res == DY_NO) {
         return DY_NO;
     }
 
-    dy_ternary_t second_res = dy_are_equal(*one_of.second, *expr.one_of.second);
+    dy_ternary_t second_res = dy_are_equal(*alternative.second, *expr.alternative.second);
     if (second_res == DY_NO) {
         return DY_NO;
     }

@@ -176,7 +176,7 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         return is_subtype_of_negative_junction(ctx, subtype, supertype.junction, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
 
-    if (supertype.tag == DY_CORE_EXPR_EQUALITY_MAP_ELIM || supertype.tag == DY_CORE_EXPR_TYPE_MAP_ELIM || supertype.tag == DY_CORE_EXPR_VARIABLE || supertype.tag == DY_CORE_EXPR_ONE_OF) {
+    if (supertype.tag == DY_CORE_EXPR_EQUALITY_MAP_ELIM || supertype.tag == DY_CORE_EXPR_TYPE_MAP_ELIM || supertype.tag == DY_CORE_EXPR_VARIABLE || supertype.tag == DY_CORE_EXPR_ALTERNATIVE) {
         return dy_are_equal(subtype, supertype);
     }
 
@@ -203,7 +203,7 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         // fallthrough
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         // fallthrough
-    case DY_CORE_EXPR_ONE_OF:
+    case DY_CORE_EXPR_ALTERNATIVE:
         // fallthrough
     case DY_CORE_EXPR_VARIABLE:
         // fallthrough
@@ -907,8 +907,8 @@ dy_ternary_t negative_junction_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
 
     if (did_transform_e1 || did_transform_e2) {
         *new_subtype_expr = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_ONE_OF,
-            .one_of = {
+            .tag = DY_CORE_EXPR_ALTERNATIVE,
+            .alternative = {
                 .first = dy_core_expr_new(e1),
                 .second = dy_core_expr_new(e2),
             }
