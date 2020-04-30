@@ -1,8 +1,8 @@
 :root {
-    --bg-color: rgb(255, 255, 255);
-    --text-color: rgb(0, 0, 0);
-    --border-color: black;
-    --code-bg-color: rgb(245, 245, 245);
+    --bg-color: rgb(245, 245, 245);
+    --text-color: rgb(25, 25, 25);
+    --border-color: rgb(25, 25, 25);
+    --code-bg-color: rgb(240, 240, 240);
 }
 
 body {
