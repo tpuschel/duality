@@ -310,11 +310,25 @@ Expression :=
 - (T-Map Elim) &nbsp;&nbsp; `e1 ! λ (v : e2) ~> e3`
 - (Var) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v : e`
 
-Sadly, it's possible to construct a chain of subtype checks like this:
+## All or ~~nothing~~ at least one
+
+It is helpful to imagine a negative type map to be a shorthand notation for the *disjunction* of all equality maps satisfying the type map's relationship between 'input' and 'output'.
+
+As a (very simple) example, one could view &nbsp; `λ (_ : Int) ~> Int` &nbsp; as a shorthand for &nbsp; `(0 -> Int) or (1 -> Int) or (2 -> Int) ...`&nbsp;. An instance of such a type would be any of `0 -> 0`, &nbsp; `0 -> 1`, &nbsp; `11 -> 42` &nbsp; etc.
+
+In other words, a negative type map represents **at least one** equality map satisfying the type map's relationship.
+
+Analogously, a positive type map could be viewed as a shorthand for the *conjunction* of all equality maps satsfying its relationship; it represents *all* of those maps.
+
+This dichotomy of 'all' and 'at least one' is reminiscent of quantification in logic with its 'for all' and 'there exists' quantifiers. And indeed, **positive type maps correspond directly to universal quantification**, and **negative type maps corrrespond directly to existential quantification**.
+
+## Polarity strikes again
+
+In our current system, it's possible to construct a chain of subtype checks like this:
 
 `(λ (_ : Int) -> Int) <: (1 -> Int) <: (λ (_ : Int) ~> Int)`
 
-Each individual subtype check makes sense, but taken together they mean one can take a positive type map and treat it like a negative one, something we explicitly try to avoid.
+Each individual subtype check makes sense, but taken together it means that a situation can arise where one can take a positive type map and treat it like a negative one, something we explicitly try to avoid.
 
 The solution to this is splitting (E-Map) into positive and negative versions, mirroring the (T-Map) split.
 
