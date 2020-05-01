@@ -318,7 +318,7 @@ As a (very simple) example, one could view &nbsp; `λ (_ : Int) ~> Int` &nbsp; a
 
 In other words, a negative type map represents **at least one** equality map satisfying the type map's relationship.
 
-Analogously, a positive type map could be viewed as a shorthand for the *conjunction* of all equality maps satsfying its relationship; it represents *all* of those maps.
+Analogously, a positive type map could be viewed as a shorthand for the *conjunction* of all equality maps satisfying its relationship; it represents *all* of those maps.
 
 This dichotomy of 'all' and 'at least one' is reminiscent of quantification in logic with its 'for all' and 'there exists' quantifiers. And indeed, **positive type maps correspond directly to universal quantification**, and **negative type maps corrrespond directly to existential quantification**.
 
