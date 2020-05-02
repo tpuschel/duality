@@ -9,6 +9,8 @@ the actual syntax of Duality is implemented and described in the 'syntax' folder
 DCC is a typed lambda calculus featuring, among other things, dependent types, subtyping, gradual typing,
 unrestricted recursion and full type inference.
 
+Novel language features include the axiomatization of syntactical equality as a form of mapping, and the reformulation of traditional branching constructs as ones acting upon the inherent, ternary information of eliminations.
+
 To fully understand the whys and hows of DCC, it's best to follow the design evolution
 of a simple base calculus, eventually culminating in DCC.
 
