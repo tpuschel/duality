@@ -302,6 +302,8 @@ What is needed is a type map that is practically the same as the existing one ex
 
 They are pretty much infinite ways to syntactically mark and name this new kind of type map; here it's called **Negative Type Map** (Neg T-Map), written `λ (v : e1) ~> e2`.
 
+Crucially, we define `(λ (v : e1) -> e2) <: λ (v2 : e3) ~> e4` to be always false, regardless of e1, e2, e3 and e4.
+
 The existing (T-Map) gets renamed appropriately, resulting in yet another new calculus:
 
 Expression :=
@@ -314,7 +316,7 @@ Expression :=
 
 ## All or ~~nothing~~ at least one
 
-It is helpful to imagine a negative type map to be a shorthand notation for the *disjunction* of all equality maps satisfying the type map's relationship between 'input' and 'output'.
+To gain some intuition for the meaning of negative type maps as types, it is helpful to imagine a negative type map to be a shorthand notation for the *disjunction* of all equality maps satisfying the type map's relationship between 'input' and 'output'.
 
 As a (very simple) example, one could view &nbsp; `λ (_ : Int) ~> Int` &nbsp; as a shorthand for &nbsp; `(0 -> Int) or (1 -> Int) or (2 -> Int) ...`&nbsp;. An instance of such a type would be any of `0 -> 0`, &nbsp; `0 -> 1`, &nbsp; `11 -> 42` &nbsp; etc.
 
@@ -324,6 +326,12 @@ Analogously, a positive type map could be viewed as a shorthand for the *conjunc
 
 This dichotomy of 'all' and 'at least one' is reminiscent of quantification in logic with its 'for all' and 'there exists' quantifiers. And indeed, **positive type maps correspond directly to universal quantification**, and **negative type maps corrrespond directly to existential quantification**.
 
+What remains now is defining what a negative type map means as a *value*, or in other words, figuring out what type a negative type map should have.
+
+(T-Map) split into two polarized versions as a result of its interpretation as a type. However, on the value level there is no reason for any bifurcation. **Both positive and negative type maps can be used interchangeably as values**, and thus have the same type.
+That type is a positive type map.
+
+
 ## Polarity strikes again
 
 In our current system, it's possible to construct a chain of subtype checks like this:
@@ -332,7 +340,11 @@ In our current system, it's possible to construct a chain of subtype checks like
 
 Each individual subtype check makes sense, but taken together it means that a situation can arise where one can take a positive type map and treat it like a negative one, something we explicitly try to avoid.
 
-The solution to this is splitting (E-Map) into positive and negative versions, mirroring the (T-Map) split.
+Mirroring the approach to the (T-Map) problem above, we split (E-Map) into positive and negative versions.
+
+And just like (T-Map Elim) features a negative type map, (E-Map Elim) changes to feature the negative equality map.
+
+This combined with making `(Pos T-Map) <: (Pos E-Map)` always false ensures that the above conundrum cannot appear.
 
 New calculus:
 
