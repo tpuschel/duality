@@ -12,7 +12,7 @@ jobs:
       shell: cmd
       run: |
         call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-        cl duality.c /O2
+        cl duality.c /O2 /MT
     - name: Upload artifact
       uses: actions/upload-artifact@v1
       with:
@@ -25,7 +25,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Build for Ubuntu
-      run: gcc duality.c -O2 -o duality
+      run: gcc duality.c -O2 -static -o duality
     - name: Upload artifact
       uses: actions/upload-artifact@v1
       with:
