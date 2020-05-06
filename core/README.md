@@ -338,7 +338,7 @@ In our current system, it's possible to construct a chain of subtype checks like
 
 `(λ (_ : Int) -> Int) <: (1 -> Int) <: (λ (_ : Int) ~> Int)`
 
-Each individual subtype check makes sense, but taken together it means that a situation can arise where one can take a positive type map and treat it like a negative one, something we explicitly try to avoid.
+Each individual subtype check makes sense, but taken together mean that a situation can arise where one can take a positive type map and treat it like a negative one, something we explicitly try to avoid.
 
 Mirroring the approach to the (T-Map) problem above, we split (E-Map) into positive and negative versions.
 
@@ -346,7 +346,9 @@ And just like (T-Map Elim) features a negative type map, (E-Map Elim) changes to
 
 This combined with making `(Pos T-Map) <: (Pos E-Map)` always false ensures that the above conundrum cannot appear.
 
-New calculus:
+## So far, so good
+
+Let's take a look at the calculus so far:
 
 Expression :=
 - (Pos E-Map) &nbsp;&nbsp; `e1 -> e2`
@@ -357,4 +359,83 @@ Expression :=
 - (T-Map Elim) &nbsp;&nbsp; `e1 ! λ (v : e2) ~> e3`
 - (Var) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v : e`
 
-{ Further content is coming soon. }
+
+Type-of :=
+- `e1 -> e2` &nbsp; => &nbsp; `e1 -> type-of e2`
+- `e1 ~> e2` &nbsp; => &nbsp; `e1 -> type-of e2`
+- `λ (v : e1) -> e2` &nbsp; => &nbsp; `λ (v : e1) -> type-of e2`
+- `λ (v : e1) ~> e2` &nbsp; => &nbsp; `λ (v : e1) -> type-of e2`
+- `e1 ! e2 ~> e3` &nbsp; => &nbsp; `e3`
+- `e1 ! λ (v : e2) ~> e3` &nbsp; => &nbsp; `e3`
+- `v : e` &nbsp; => &nbsp; `e`
+
+
+Is-subtype (<:) :=
+
+(Pos E-Map) as subtype:
+- `e1 -> e2 <: e3 -> e4` &nbsp; => &nbsp; `e1 = e3` &nbsp; & &nbsp; `e2 <: e4`
+- `e1 -> e2 <: e3 ~> e4` &nbsp; => &nbsp; `e1 = e3` &nbsp; & &nbsp; `e2 <: e4`
+- `_ <: (Pos T-Map)` &nbsp; => &nbsp; No
+- `e1 -> e2 <: λ (v : e3) ~> e4` &nbsp; => &nbsp; `(type-of e1) <: e3` &nbsp; & &nbsp; `e2 <: e4[v := e1]`
+- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
+- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
+- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+
+(Neg E-Map) as subtype:
+- `_ <: (Pos E-Map)` &nbsp; => &nbsp; No
+- `e1 ~> e2 <: e3 ~> e4` &nbsp; => &nbsp; `e1 = e3` &nbsp; & &nbsp; `e2 <: e4`
+- `_ <: (Pos T-Map)` &nbsp; => &nbsp; No
+- `_ <: (Neg T-Map)` &nbsp; => &nbsp; No
+- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
+- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
+- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+
+(Pos T-Map) as subtype:
+- `_ <: (Pos E-Map)` &nbsp; => &nbsp; No
+- `λ (v : e1) -> e2 <: e3 ~> e4` &nbsp; => &nbsp; `(type-of e3) <: e1` &nbsp; & &nbsp; `e2[v := e3] <: e4`
+- `λ (v : e1) -> e2 <: λ (v2 : e3) -> e4` &nbsp; => &nbsp; `e3 <: e1` &nbsp; & &nbsp; `e2[v := v2] <: e4`
+- `_ <: (Neg T-Map)` &nbsp; => &nbsp; No
+- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
+- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
+- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+
+(Neg T-Map) as subtype:
+- `_ <: (Pos E-Map)` &nbsp; => &nbsp; No
+- `_ <: (Neg E-Map)` &nbsp; => &nbsp; No
+- `_ <: (Pos T-Map)` &nbsp; => &nbsp; No
+- `λ (v : e1) ~> e2 <: λ (v2 : e3) ~> e4` &nbsp; => &nbsp; `e1 <: e3` &nbsp; & &nbsp; `e2[v := v2] <: e4`
+- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
+- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
+- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+
+(E-Map Elim) as subtype:
+- `_ <: (Pos E-Map)` &nbsp; => &nbsp; Maybe
+- `_ <: (Neg E-Map)` &nbsp; => &nbsp; Maybe
+- `_ <: (Pos T-Map)` &nbsp; => &nbsp; Maybe
+- `_ <: (Neg T-Map)` &nbsp; => &nbsp; Maybe
+- `e1 ! e2 ~> e3 <: e1 ! e2 ~> e3` &nbsp; => &nbsp; Yes
+- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
+- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
+- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+
+(T-Map Elim) as subtype:
+- `_ <: (Pos E-Map)` &nbsp; => &nbsp; Maybe
+- `_ <: (Neg E-Map)` &nbsp; => &nbsp; Maybe
+- `_ <: (Pos T-Map)` &nbsp; => &nbsp; Maybe
+- `_ <: (Neg T-Map)` &nbsp; => &nbsp; Maybe
+- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
+- `e1 ! λ (v : e2) ~> e3 <: e1 ! λ (v : e2) ~> e3` &nbsp; => &nbsp; Yes
+- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
+- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+
+(Var) as subtype:
+- `_ <: (Pos E-Map)` &nbsp; => &nbsp; Maybe
+- `_ <: (Neg E-Map)` &nbsp; => &nbsp; Maybe
+- `_ <: (Pos T-Map)` &nbsp; => &nbsp; Maybe
+- `_ <: (Neg T-Map)` &nbsp; => &nbsp; Maybe
+- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
+- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
+- `v <: v` &nbsp; => &nbsp; Yes
+- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+
+{ Further content coming soon. }
