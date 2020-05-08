@@ -146,7 +146,7 @@ bool dy_parse_variable(struct dy_parser_ctx *ctx, struct dy_ast_literal *var)
                 || dy_string_are_equal(final_var, DY_STR_LIT("let"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("choice"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("All"))
-                || dy_string_are_equal(final_var, DY_STR_LIT("Nothing"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("Any"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("rec"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("Symbol"))) {
                 ctx->stream.current_index = start_index;
