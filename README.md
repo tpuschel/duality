@@ -12,7 +12,7 @@ Thus, all that is needed to build Duality is a C99<sup>*</sup> compiler; no buil
 Your system's equivalent of ```cc duality.c -o duality``` will do the trick. Of course, add any
 flags you want for optimizations etc.
 
-In the root of the project is a compile_flags.txt and .clang-format for use with [clangd](https://clangd.llvm.org/installation.html).
+At the root of the project is a compile_flags.txt and .clang-format for use with [clangd](https://clangd.llvm.org/installation.html).
 
 <sup>*</sup>Also required is support for anonymous unions, technically a C11 feature, but
 available in pretty much all C99 compilers.
