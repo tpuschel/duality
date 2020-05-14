@@ -135,7 +135,7 @@ With (E-Map), `app-is-valid` now looks like this:
 App-is-valid :=
 - `e1 ! e2 -> e3` &nbsp; => &nbsp; `(type-of e1) = e2 -> e3`
 
-Sadly, this doesn't quite work. While e2 is now reflected at the type level, enabling dependent typing, then notion of equality is not anymore appropriate in this case.
+Sadly, this doesn't quite work. While e2 is now reflected at the type level, enabling dependent typing, the notion of equality is not anymore appropriate in this case.
 
 `type-of e1` is supposed to be an abstraction, yet an abstraction is clearly not equal to any equality map.
 
@@ -224,7 +224,7 @@ To illustrate, assume there are two distinct types Int and String and the follow
 
 (1) is obviously False: A value of type Int can *never* be treated like a String.
 
-(2) is obviously True, A value of type Int can *always* be treated like an Int.
+(2) is obviously True: A value of type Int can *always* be treated like an Int.
 
 (3) is actually neither True or False.
 
@@ -437,5 +437,96 @@ Is-subtype (<:) :=
 - `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
 - `v <: v` &nbsp; => &nbsp; Yes
 - `_ <: (Var)` &nbsp; => &nbsp; Maybe
+
+This is already a pretty neat calculus. We can construct individual mappings (E-Maps) and families of mappings based on the relationship of the output to the input (T-Map).
+
+As we've seen with the explanation of positive and negative type maps however, there is a need to be able to represent the conjunction and disjunction of objects in our calculus.
+
+## Better together (except during a pandemic)
+
+Representing con- and disjunction is pretty easy: We use a binary infix '&' for conjunctions, and a binary infix '|' for disjunctions.
+
+Defining their role in subtyping helps to understand their behavior as a type:
+
+Conjunction:
+  - `A & B <: X` &nbsp; => &nbsp; `A <: X` &nbsp; | &nbsp; `B <: X`
+
+    Intuition: I want X and you've given me A and B. I'm satisfied if at least one of A or B is compatible with X.
+
+  - `X <: A & B` &nbsp; => &nbsp; `X <: A` &nbsp; & &nbsp; `X <: B`
+
+    Intuition: I want both A and B and you've given me X. I'm satisfied if X is compatible with both A and B.
+
+Disjunction:
+  - `A | B <: X` &nbsp; => &nbsp; `A <: X` &nbsp; & &nbsp; `B <: X`
+
+    Intuition: I want X and you've given me A or B. I'm satisfied if both of A or B is compatible with X.
+
+  - `X <: A | B` &nbsp; => &nbsp; `X <: A` &nbsp; | &nbsp; `X <: B`
+
+    Intuition: I want either A or B and you've given me X. I'm satisfied if X is compatible with at least one of A or B.
+
+Just like equality maps and type maps, conjunction and disjunction are essentially the same construct, differing only in their behavior as a type and are distinguised by only 1 bit of information.
+
+Going forward, conjunction will be named `positive junction` (Pos Jun) and disjunction `negative junction` (Neg Jun).
+
+Their interpretation as a value follows the pattern too, in that both can be used interchangeably on the value level. Therefore, they both have the same type; positive junction:
+
+`type-of (e1 & e2)` &nbsp; => &nbsp; `(type-of e1) & (type-of e2)`
+
+`type-of (e1 | e2)` &nbsp; => &nbsp; `(type-of e1) & (type-of e2)`
+
+These type-of rules makes it easy to see how to construct an object of type (Pos Jun); just form either positive or negative junctions.
+
+As an example, assume that string literals and integers are part of the calculus:
+
+`(("name" -> "Simon") & ("age" -> 62)) ! "age" ~> Int`
+
+This would lead to the check:
+
+`("name" -> String) & ("age" -> Int) <: "age" ~> Int`
+
+decomposing into:
+
+`"name" -> String <: "age" ~> Int`
+
+which fails, and
+
+`"age" -> Int <: "age" ~> Int`
+
+which succeeds, making the whole check succeed.
+
+On the operational side, the process is very similar: First try the first part of the conjunction, then if it failed, the second.
+
+The result of this particular expression is, unsuprisingly, `62`.
+
+This example should be reminiscent of an existing construct present in most programming languages: records. Only in this calculus, **records are not a primitive construct**, but instead the emergent behavior of completely orthogonal constructs.
+
+This is an example of a wider pattern with DCC: Exisiting constructs present in other programming languages get reformulated in more fundamental terms, resulting in a simpler, easier to understand yet equally if not more powerful language.
+
+Also, note how eliminating a conjunction is the same as indirect branching.
+
+## Do. Or do not. There is no try. (He's lying, there totally is.)
+
+How do negative junctions come about, however? While their existence is already necessitated by positive junctions alone, there is also a very interesting new construct whose type is best characterized by negative junctions.
+
+Remember that every elimination in DCC at any given time is either known to succeed or fail, or be indeterminate. It would be neat if there was a construct that could act upon that information, behaving one way if the elimination is ultimately successful, and behaving another if it is not.
+
+That construct is called &nbsp; `else` &nbsp;, and acts as a binary infix operator, like the junctions above.
+
+In contrast to the junctions however, 'else' only has meaning on the value level. As a type it is more similar to eliminations and variables; being present in expressions evaluation hasn't reached yet.
+
+Its behavior is relatively straightforward:
+
+Evaluating &nbsp; `e1 else e2` &nbsp;:
+- Evaluate e1: if it succeeds, yield e1.
+- If it fails, evaluate e2 and yield the result of that.
+- If the result is indeterminate, yield `e1 else e2`.
+
+In this way, 'else' implements direct branching without needing an if-like construct; Instead of formulating Boolean expressions and acting on that, DCC uses the ternary status inherent in all of its objects.
+
+'Else' is an expression that is either one or the other of its constituents, and its type reflects that:
+
+`type-of (e1 else e2)` &nbsp; => &nbsp; `(type-of e1) | (type-of e2)`
 
 { Further content coming soon. }
