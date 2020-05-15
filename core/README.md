@@ -512,7 +512,7 @@ How do negative junctions come about, however? While their existence is already 
 
 Remember that every elimination in DCC at any given time is either known to succeed or fail, or be indeterminate. It would be neat if there was a construct that could act upon that information, behaving one way if the elimination is ultimately successful, and behaving another if it is not.
 
-That construct is called &nbsp; `else` &nbsp;, and acts as a binary infix operator, like the junctions above.
+That construct is called Alternative (Alt), written as &nbsp; `else` &nbsp;, and acts as a binary infix operator, like the junctions above.
 
 In contrast to the junctions however, 'else' only has meaning on the value level. As a type it is more similar to eliminations and variables; being present in expressions evaluation hasn't reached yet.
 
