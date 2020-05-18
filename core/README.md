@@ -19,9 +19,9 @@ of a simple base calculus, eventually culminating in DCC.
 Our starting calculus is a very simple lambda calculus with type annotations on bindings:
 
 Expression :=
-- (Abstraction) &nbsp; `λ (v : e1) -> e2`
-- (Application) &nbsp; `e1 e2`
-- (Variable) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v`
+- (Abstraction) `λ (v : e1) -> e2`
+- (Application) `e1 e2`
+- (Variable) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v`
 
 E1 and e2 are expressions.
 
@@ -35,9 +35,9 @@ would work in this calculus:
 
 Type-of :=
 
-- (Abs) &nbsp; `λ (v : e1) -> e2` &nbsp; => &nbsp; `λ (v : e1) -> type-of e2`
+- (Abs) `λ (v : e1) -> e2` => `λ (v : e1) -> type-of e2`
 
-- (App) &nbsp; `e1 e2` &nbsp; =>
+- (App) `e1 e2` =>
 ```
 let type-e1 = type-of e1.
 let type-e2 = type-of e2.
@@ -49,7 +49,7 @@ Ensure type-e2 = e3.
 Return e4 with e1 substituted for v.
 ```
 
-- (Var) &nbsp; `v` &nbsp; => &nbsp; `Ctx[v]`
+- (Var) `v` => `Ctx[v]`
 
 
 There are a couple things to note here:
@@ -76,15 +76,15 @@ Similarly, the `Ctx` in (Var) can be eliminated by demanding every variable occu
 As a result, this is our new calculus and its corresponding `type-of` function:
 
 Expression :=
-- (Abs) &nbsp; `λ (v : e1) -> e2`
-- (App) &nbsp; `e1 e2 : e3`
-- (Var) &nbsp; `v : e`
+- (Abs) `λ (v : e1) -> e2`
+- (App) `e1 e2 : e3`
+- (Var) `v : e`
 
 Type-of :=
 
-- (Abs) &nbsp; `λ (v : e1) -> e2` &nbsp; => &nbsp; `λ (v : e1) -> type-of e2`
-- (App) &nbsp; `e1 e2 : e3` &nbsp; => &nbsp; `e3`
-- (Var) &nbsp; `v : e` &nbsp; => &nbsp; `e`
+- (Abs) `λ (v : e1) -> e2` => `λ (v : e1) -> type-of e2`
+- (App) `e1 e2 : e3` => `e3`
+- (Var) `v : e` => `e`
 
 **The type of every object is determined either trivially, or recursively without doing any substitution or equality check.**
 
@@ -98,7 +98,7 @@ This (App) validity testing could look like this:
 
 App-is-valid :=
 
-- `e1 e2 : e3` &nbsp; => &nbsp; `(type-of e1) = λ (v : type-of e2) -> e3`
+- `e1 e2 : e3` => `(type-of e1) = λ (v : type-of e2) -> e3`
 
 However, this loses the ability of dependent typing; the "result type" of e1 cannot depend on e2.
 
@@ -113,27 +113,27 @@ The idea is to reify the `e2 : e3` part of (App) as its own construct, written `
 This results in another new version of the calculus:
 
 Expression :=
-- (Abs) &nbsp;&nbsp;&nbsp;&nbsp; `λ (v : e1) -> e2`
-- (App) &nbsp;&nbsp;&nbsp;&nbsp; `e1 ! e2 -> e3`
-- (Var) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v : e`
-- (E-Map) &nbsp; `e1 -> e2`
+- (Abs) &nbsp;&nbsp;&nbsp; `λ (v : e1) -> e2`
+- (App) &nbsp;&nbsp;&nbsp; `e1 ! e2 -> e3`
+- (Var) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v : e`
+- (E-Map) `e1 -> e2`
 
 The syntax of (App) changed to make the role of (E-Map) in it obvious.
 
 With the addition of (E-Map), `type-of` now looks like this:
 
 Type-of :=
-- (Abs) &nbsp; `λ (v : e1) -> e2` &nbsp; => &nbsp; `λ (v : e1) -> type-of e2`
-- (App) &nbsp; `e1 ! e2 -> e3` &nbsp; => &nbsp; `e3`
-- (Var) &nbsp; `v : e` &nbsp; => &nbsp; `e`
-- (E-Map) &nbsp; `e1 -> e2` &nbsp; => &nbsp; `e1 -> type-of e2`
+- (Abs) `λ (v : e1) -> e2` => `λ (v : e1) -> type-of e2`
+- (App) `e1 ! e2 -> e3` => `e3`
+- (Var) `v : e` => `e`
+- (E-Map) `e1 -> e2` => `e1 -> type-of e2`
 
 The reason why the (E-Map) case looks the way it does will be made clear after `app-is-valid` is revisited.
 
 With (E-Map), `app-is-valid` now looks like this:
 
 App-is-valid :=
-- `e1 ! e2 -> e3` &nbsp; => &nbsp; `(type-of e1) = e2 -> e3`
+- `e1 ! e2 -> e3` => `(type-of e1) = e2 -> e3`
 
 Sadly, this doesn't quite work. While e2 is now reflected at the type level, enabling dependent typing, the notion of equality is not anymore appropriate in this case.
 
@@ -146,7 +146,7 @@ Thus, a new notion is needed, one that makes clear the exact relationship betwee
 Using the relation `e1 <: e2` to mean "e1 is a subtype of e2", `app-is-valid` looks like this:
 
 App-is-valid :=
-- `e1 ! e2 -> e3` &nbsp; => &nbsp; `(type-of e1) <: e2 -> e3`
+- `e1 ! e2 -> e3` => `(type-of e1) <: e2 -> e3`
 
 As a perhaps surprising result, **subtyping is necessary for dependent typing**.
 
@@ -173,10 +173,10 @@ So it makes sense to align their naming. Abstractions will now be called **Type 
 The new calculus:
 
 Expression :=
-- (E-Map) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `e1 -> e2`
-- (T-Map) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `λ (v : e1) -> e2`
-- (E-Map Elim) &nbsp; `e1 ! e2 -> e3`
-- (Var) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v : e`
+- (E-Map) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `e1 -> e2`
+- (T-Map) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `λ (v : e1) -> e2`
+- (E-Map Elim) `e1 ! e2 -> e3`
+- (Var) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v : e`
 
 ## He loves me, he loves me not... he loves me *maybe*?
 
@@ -187,30 +187,30 @@ Its definition is given by listing all possible cases exhaustively.
 Is-subtype (<:) :=
 
 (E-Map) as subtype:
-- `e1 -> e2 <: e3 -> e4` &nbsp; => &nbsp; `e1 = e3` &nbsp; & &nbsp; `e2 <: e4`
-- `_ <: (T-Map)` &nbsp; => &nbsp; No
-- `_ <: (Var)` &nbsp; => &nbsp; ?
-- `_ <: (E-Map Elim)` &nbsp; => &nbsp; ?
+- `e1 -> e2 <: e3 -> e4` => `e1 = e3` & `e2 <: e4`
+- `_ <: (T-Map)` No
+- `_ <: (Var)` ?
+- `_ <: (E-Map Elim)` ?
 
 (T-Map) as subtype:
-- `λ (v : e1) -> e2 <: e3 -> e4` &nbsp; => &nbsp; `(type-of e3) <: e1` &nbsp; & &nbsp; `e2[v := e3] <: e4`
-- `λ (v : e1) -> e2 <: λ (v2 : e3) -> e4` &nbsp; => &nbsp; `e3 <: e1` &nbsp; & &nbsp; `e2[v := v2] <: e4`
-- `_ <: (E-Map Elim)` &nbsp; => &nbsp; ?
-- `_ <: (Var)` &nbsp; => &nbsp; ?
+- `λ (v : e1) -> e2 <: e3 -> e4` `(type-of e3) <: e1` & `e2[v := e3] <: e4`
+- `λ (v : e1) -> e2 <: λ (v2 : e3) -> e4` `e3 <: e1` & `e2[v := v2] <: e4`
+- `_ <: (E-Map Elim)` ?
+- `_ <: (Var)` ?
 
 (E-Map Elim) as subtype:
-- `_ <: (E-Map)` &nbsp; => &nbsp; ?
-- `_ <: (T-Map)` &nbsp; => &nbsp; ?
-- `e1 ! e2 -> e3 <: e1 ! e2 -> e3` &nbsp; => &nbsp; Yes
-- `_ <: (E-Map Elim)` &nbsp; => &nbsp; ?
-- `_ <: (Var)` &nbsp; => &nbsp; ?
+- `_ <: (E-Map)` ?
+- `_ <: (T-Map)` ?
+- `e1 ! e2 -> e3 <: e1 ! e2 -> e3` Yes
+- `_ <: (E-Map Elim)` ?
+- `_ <: (Var)` ?
 
 (Var) as subtype:
-- `_ <: (E-Map)` &nbsp; => &nbsp; ?
-- `_ <: (T-Map)` &nbsp; => &nbsp; ?
-- `_ <: (E-Map Elim)` &nbsp; => &nbsp; ?
-- `v <: v` &nbsp; => &nbsp; Yes
-- `_ <: (Var)` &nbsp; => &nbsp; ?
+- `_ <: (E-Map)` ?
+- `_ <: (T-Map)` ?
+- `_ <: (E-Map Elim)` ?
+- `v <: v` Yes
+- `_ <: (Var)` ?
 
 Up until now, it was implictly assumed that tests for equality or subtyping relationship were of Boolean nature; either things are equal/a subtype or not.
 
@@ -261,16 +261,16 @@ The key takeaway here is that dynamic errors are *not* a different kind of const
 Let's look at our calculus again:
 
 Expression :=
-- (E-Map) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `e1 -> e2`
-- (T-Map) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `λ (v : e1) -> e2`
-- (E-Map Elim) &nbsp; `e1 ! e2 -> e3`
-- (Var) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v : e`
+- (E-Map) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `e1 -> e2`
+- (T-Map) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `λ (v : e1) -> e2`
+- (E-Map Elim) `e1 ! e2 -> e3`
+- (Var) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v : e`
 
 There are two different kinds of maps, and an elimination which uses one of those. It is reasonable to ask if there could be something like a (T-Map Elim), too.
 
 It's not hard to imagine what that would look like syntactically:
 
-- (T-Map Elim) &nbsp; `e1 ! λ (v : e2) -> e3`
+- (T-Map Elim) `e1 ! λ (v : e2) -> e3`
 
 To understand what this actually could do, it helps to analyze the cases where e1 is an (E-Map) and a (T-Map):
 
@@ -307,18 +307,18 @@ Crucially, we define `(λ (v : e1) -> e2) <: λ (v2 : e3) ~> e4` to be always fa
 The existing (T-Map) gets renamed appropriately, resulting in yet another new calculus:
 
 Expression :=
-- (E-Map) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `e1 -> e2`
-- (Pos T-Map) &nbsp;&nbsp;&nbsp; `λ (v : e1) -> e2`
-- (Neg T-Map) &nbsp;&nbsp;&nbsp; `λ (v : e1) ~> e2`
-- (E-Map Elim) &nbsp;&nbsp; `e1 ! e2 -> e3`
-- (T-Map Elim) &nbsp;&nbsp; `e1 ! λ (v : e2) ~> e3`
-- (Var) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v : e`
+- (E-Map) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `e1 -> e2`
+- (Pos T-Map) &nbsp; `λ (v : e1) -> e2`
+- (Neg T-Map) &nbsp; `λ (v : e1) ~> e2`
+- (E-Map Elim) `e1 ! e2 -> e3`
+- (T-Map Elim) `e1 ! λ (v : e2) ~> e3`
+- (Var) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v : e`
 
 ## All or ~~nothing~~ at least one
 
 To gain some intuition for the meaning of negative type maps as types, it is helpful to imagine a negative type map to be a shorthand notation for the *disjunction* of all equality maps satisfying the type map's relationship between 'input' and 'output'.
 
-As a (very simple) example, one could view &nbsp; `λ (_ : Int) ~> Int` &nbsp; as a shorthand for &nbsp; `(0 -> Int) or (1 -> Int) or (2 -> Int) ...`&nbsp;. An instance of such a type would be any of `0 -> 0`, &nbsp; `0 -> 1`, &nbsp; `11 -> 42` &nbsp; etc.
+As a (very simple) example, one could view `λ (_ : Int) ~> Int` as a shorthand for `(0 -> Int) or (1 -> Int) or (2 -> Int) ...`. An instance of such a type would be any of `0 -> 0`, `0 -> 1`, `11 -> 42` etc.
 
 In other words, a negative type map represents **at least one** equality map satisfying the type map's relationship.
 
@@ -351,92 +351,92 @@ This combined with making `(Pos T-Map) <: (Pos E-Map)` always false ensures that
 Let's take a look at the calculus so far:
 
 Expression :=
-- (Pos E-Map) &nbsp;&nbsp; `e1 -> e2`
-- (Neg E-Map) &nbsp;&nbsp; `e1 ~> e2`
-- (Pos T-Map) &nbsp;&nbsp;&nbsp; `λ (v : e1) -> e2`
-- (Neg T-Map) &nbsp;&nbsp;&nbsp; `λ (v : e1) ~> e2`
-- (E-Map Elim) &nbsp;&nbsp; `e1 ! e2 ~> e3`
-- (T-Map Elim) &nbsp;&nbsp; `e1 ! λ (v : e2) ~> e3`
-- (Var) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v : e`
+- (Pos E-Map) `e1 -> e2`
+- (Neg E-Map) `e1 ~> e2`
+- (Pos T-Map) &nbsp; `λ (v : e1) -> e2`
+- (Neg T-Map) &nbsp; `λ (v : e1) ~> e2`
+- (E-Map Elim) `e1 ! e2 ~> e3`
+- (T-Map Elim) `e1 ! λ (v : e2) ~> e3`
+- (Var) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `v : e`
 
 
 Type-of :=
-- `e1 -> e2` &nbsp; => &nbsp; `e1 -> type-of e2`
-- `e1 ~> e2` &nbsp; => &nbsp; `e1 -> type-of e2`
-- `λ (v : e1) -> e2` &nbsp; => &nbsp; `λ (v : e1) -> type-of e2`
-- `λ (v : e1) ~> e2` &nbsp; => &nbsp; `λ (v : e1) -> type-of e2`
-- `e1 ! e2 ~> e3` &nbsp; => &nbsp; `e3`
-- `e1 ! λ (v : e2) ~> e3` &nbsp; => &nbsp; `e3`
-- `v : e` &nbsp; => &nbsp; `e`
+- `e1 -> e2` `e1 -> type-of e2`
+- `e1 ~> e2` `e1 -> type-of e2`
+- `λ (v : e1) -> e2` `λ (v : e1) -> type-of e2`
+- `λ (v : e1) ~> e2` `λ (v : e1) -> type-of e2`
+- `e1 ! e2 ~> e3` `e3`
+- `e1 ! λ (v : e2) ~> e3` `e3`
+- `v : e` `e`
 
 
 Is-subtype (<:) :=
 
 (Pos E-Map) as subtype:
-- `e1 -> e2 <: e3 -> e4` &nbsp; => &nbsp; `e1 = e3` &nbsp; & &nbsp; `e2 <: e4`
-- `e1 -> e2 <: e3 ~> e4` &nbsp; => &nbsp; `e1 = e3` &nbsp; & &nbsp; `e2 <: e4`
-- `_ <: (Pos T-Map)` &nbsp; => &nbsp; No
-- `e1 -> e2 <: λ (v : e3) ~> e4` &nbsp; => &nbsp; `(type-of e1) <: e3` &nbsp; & &nbsp; `e2 <: e4[v := e1]`
-- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
-- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
-- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+- `e1 -> e2 <: e3 -> e4` `e1 = e3` & `e2 <: e4`
+- `e1 -> e2 <: e3 ~> e4` `e1 = e3` & `e2 <: e4`
+- `_ <: (Pos T-Map)` No
+- `e1 -> e2 <: λ (v : e3) ~> e4` `(type-of e1) <: e3` & `e2 <: e4[v := e1]`
+- `_ <: (E-Map Elim)` Maybe
+- `_ <: (T-Map Elim)` Maybe
+- `_ <: (Var)` Maybe
 
 (Neg E-Map) as subtype:
-- `_ <: (Pos E-Map)` &nbsp; => &nbsp; No
-- `e1 ~> e2 <: e3 ~> e4` &nbsp; => &nbsp; `e1 = e3` &nbsp; & &nbsp; `e2 <: e4`
-- `_ <: (Pos T-Map)` &nbsp; => &nbsp; No
-- `_ <: (Neg T-Map)` &nbsp; => &nbsp; No
-- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
-- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
-- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+- `_ <: (Pos E-Map)` No
+- `e1 ~> e2 <: e3 ~> e4` `e1 = e3` & `e2 <: e4`
+- `_ <: (Pos T-Map)` No
+- `_ <: (Neg T-Map)` No
+- `_ <: (E-Map Elim)` Maybe
+- `_ <: (T-Map Elim)` Maybe
+- `_ <: (Var)` Maybe
 
 (Pos T-Map) as subtype:
-- `_ <: (Pos E-Map)` &nbsp; => &nbsp; No
-- `λ (v : e1) -> e2 <: e3 ~> e4` &nbsp; => &nbsp; `(type-of e3) <: e1` &nbsp; & &nbsp; `e2[v := e3] <: e4`
-- `λ (v : e1) -> e2 <: λ (v2 : e3) -> e4` &nbsp; => &nbsp; `e3 <: e1` &nbsp; & &nbsp; `e2[v := v2] <: e4`
-- `_ <: (Neg T-Map)` &nbsp; => &nbsp; No
-- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
-- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
-- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+- `_ <: (Pos E-Map)` No
+- `λ (v : e1) -> e2 <: e3 ~> e4` `(type-of e3) <: e1` & `e2[v := e3] <: e4`
+- `λ (v : e1) -> e2 <: λ (v2 : e3) -> e4` `e3 <: e1` & `e2[v := v2] <: e4`
+- `_ <: (Neg T-Map)` No
+- `_ <: (E-Map Elim)` Maybe
+- `_ <: (T-Map Elim)` Maybe
+- `_ <: (Var)` Maybe
 
 (Neg T-Map) as subtype:
-- `_ <: (Pos E-Map)` &nbsp; => &nbsp; No
-- `_ <: (Neg E-Map)` &nbsp; => &nbsp; No
-- `_ <: (Pos T-Map)` &nbsp; => &nbsp; No
-- `λ (v : e1) ~> e2 <: λ (v2 : e3) ~> e4` &nbsp; => &nbsp; `e1 <: e3` &nbsp; & &nbsp; `e2[v := v2] <: e4`
-- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
-- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
-- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+- `_ <: (Pos E-Map)` No
+- `_ <: (Neg E-Map)` No
+- `_ <: (Pos T-Map)` No
+- `λ (v : e1) ~> e2 <: λ (v2 : e3) ~> e4` `e1 <: e3` & `e2[v := v2] <: e4`
+- `_ <: (E-Map Elim)` Maybe
+- `_ <: (T-Map Elim)` Maybe
+- `_ <: (Var)` Maybe
 
 (E-Map Elim) as subtype:
-- `_ <: (Pos E-Map)` &nbsp; => &nbsp; Maybe
-- `_ <: (Neg E-Map)` &nbsp; => &nbsp; Maybe
-- `_ <: (Pos T-Map)` &nbsp; => &nbsp; Maybe
-- `_ <: (Neg T-Map)` &nbsp; => &nbsp; Maybe
-- `e1 ! e2 ~> e3 <: e1 ! e2 ~> e3` &nbsp; => &nbsp; Yes
-- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
-- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
-- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+- `_ <: (Pos E-Map)` Maybe
+- `_ <: (Neg E-Map)` Maybe
+- `_ <: (Pos T-Map)` Maybe
+- `_ <: (Neg T-Map)` Maybe
+- `e1 ! e2 ~> e3 <: e1 ! e2 ~> e3` Yes
+- `_ <: (E-Map Elim)` Maybe
+- `_ <: (T-Map Elim)` Maybe
+- `_ <: (Var)` Maybe
 
 (T-Map Elim) as subtype:
-- `_ <: (Pos E-Map)` &nbsp; => &nbsp; Maybe
-- `_ <: (Neg E-Map)` &nbsp; => &nbsp; Maybe
-- `_ <: (Pos T-Map)` &nbsp; => &nbsp; Maybe
-- `_ <: (Neg T-Map)` &nbsp; => &nbsp; Maybe
-- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
-- `e1 ! λ (v : e2) ~> e3 <: e1 ! λ (v : e2) ~> e3` &nbsp; => &nbsp; Yes
-- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
-- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+- `_ <: (Pos E-Map)` Maybe
+- `_ <: (Neg E-Map)` Maybe
+- `_ <: (Pos T-Map)` Maybe
+- `_ <: (Neg T-Map)` Maybe
+- `_ <: (E-Map Elim)` Maybe
+- `e1 ! λ (v : e2) ~> e3 <: e1 ! λ (v : e2) ~> e3` Yes
+- `_ <: (T-Map Elim)` Maybe
+- `_ <: (Var)` Maybe
 
 (Var) as subtype:
-- `_ <: (Pos E-Map)` &nbsp; => &nbsp; Maybe
-- `_ <: (Neg E-Map)` &nbsp; => &nbsp; Maybe
-- `_ <: (Pos T-Map)` &nbsp; => &nbsp; Maybe
-- `_ <: (Neg T-Map)` &nbsp; => &nbsp; Maybe
-- `_ <: (E-Map Elim)` &nbsp; => &nbsp; Maybe
-- `_ <: (T-Map Elim)` &nbsp; => &nbsp; Maybe
-- `v <: v` &nbsp; => &nbsp; Yes
-- `_ <: (Var)` &nbsp; => &nbsp; Maybe
+- `_ <: (Pos E-Map)` Maybe
+- `_ <: (Neg E-Map)` Maybe
+- `_ <: (Pos T-Map)` Maybe
+- `_ <: (Neg T-Map)` Maybe
+- `_ <: (E-Map Elim)` Maybe
+- `_ <: (T-Map Elim)` Maybe
+- `v <: v` Yes
+- `_ <: (Var)` Maybe
 
 This is already a pretty neat calculus. We can construct individual mappings (E-Maps) and families of mappings based on the relationship of the output to the input (T-Map).
 
@@ -449,20 +449,20 @@ Representing con- and disjunction is pretty easy: We use a binary infix '&' for 
 Defining their role in subtyping helps to understand their behavior as a type:
 
 Conjunction:
-  - `A & B <: X` &nbsp; => &nbsp; `A <: X` &nbsp; | &nbsp; `B <: X`
+  - `A & B <: X` `A <: X` | `B <: X`
 
     Intuition: I want X and you've given me A and B. I'm satisfied if at least one of A or B is compatible with X.
 
-  - `X <: A & B` &nbsp; => &nbsp; `X <: A` &nbsp; & &nbsp; `X <: B`
+  - `X <: A & B` `X <: A` & `X <: B`
 
     Intuition: I want both A and B and you've given me X. I'm satisfied if X is compatible with both A and B.
 
 Disjunction:
-  - `A | B <: X` &nbsp; => &nbsp; `A <: X` &nbsp; & &nbsp; `B <: X`
+  - `A | B <: X` `A <: X` & `B <: X`
 
     Intuition: I want X and you've given me A or B. I'm satisfied if both of A or B is compatible with X.
 
-  - `X <: A | B` &nbsp; => &nbsp; `X <: A` &nbsp; | &nbsp; `X <: B`
+  - `X <: A | B` `X <: A` | `X <: B`
 
     Intuition: I want either A or B and you've given me X. I'm satisfied if X is compatible with at least one of A or B.
 
@@ -472,9 +472,9 @@ Going forward, conjunction will be named `positive junction` (Pos Jun) and disju
 
 Their interpretation as a value follows the pattern too, in that both can be used interchangeably on the value level. Therefore, they both have the same type; positive junction:
 
-`type-of (e1 & e2)` &nbsp; => &nbsp; `(type-of e1) & (type-of e2)`
+`type-of (e1 & e2)` `(type-of e1) & (type-of e2)`
 
-`type-of (e1 | e2)` &nbsp; => &nbsp; `(type-of e1) & (type-of e2)`
+`type-of (e1 | e2)` `(type-of e1) & (type-of e2)`
 
 These type-of rules makes it easy to see how to construct an object of type (Pos Jun); just form either positive or negative junctions.
 
@@ -512,21 +512,21 @@ How do negative junctions come about, however? While their existence is already 
 
 Remember that every elimination in DCC at any given time is either known to succeed or fail, or be indeterminate. It would be neat if there was a construct that could act upon that information, behaving one way if the elimination is ultimately successful, and behaving another if it is not.
 
-That construct is called Alternative (Alt), written as &nbsp; `else` &nbsp;, and acts as a binary infix operator, like the junctions above.
+That construct is called Alternative (Alt), written as `else`, and acts as a binary infix operator, like the junctions above.
 
-In contrast to the junctions however, 'else' only has meaning on the value level. As a type it is more similar to eliminations and variables; being present in expressions evaluation hasn't reached yet.
+In contrast to the junctions however, 'else' only has meaning on the value level. As a type it is more similar to eliminations and variables: being present in expressions evaluation hasn't reached yet.
 
 Its behavior is relatively straightforward:
 
-Evaluating &nbsp; `e1 else e2` &nbsp;:
-- Evaluate e1: if it succeeds, yield e1.
+Evaluating `e1 else e2`:
+- Evaluate e1. If it succeeds, yield e1.
 - If it fails, evaluate e2 and yield the result of that.
 - If the result is indeterminate, yield `e1 else e2`.
 
-In this way, 'else' implements direct branching without needing an if-like construct; Instead of formulating Boolean expressions and acting on that, DCC uses the ternary status inherent in all of its objects.
+In this way, 'else' implements direct branching without needing an if-like construct. Instead of formulating Boolean expressions and acting on that, DCC uses the ternary status inherent in all of its objects.
 
 'Else' is an expression that is either one or the other of its constituents, and its type reflects that:
 
-`type-of (e1 else e2)` &nbsp; => &nbsp; `(type-of e1) | (type-of e2)`
+`type-of (e1 else e2)` `(type-of e1) | (type-of e2)`
 
 { Further content coming soon. }
