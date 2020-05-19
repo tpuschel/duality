@@ -11,7 +11,7 @@ Duality OS is designed to be build with clang and lld-link.
 
 To create the PE32+ executable as required by UEFI, run:
 
-`clang -target x86_64-unknown-windows -ffreestanding -fuse-ld=lld-link -nostdlib -Wl,/subsystem:efi_application,/entry:boot os/boot.c -o BOOTx64.EFI`
+`clang -target x86_64-unknown-windows -ffreestanding -fuse-ld=lld-link -nostdlib -O2 -mno-red-zone -Wl,/subsystem:efi_application,/entry:boot os/boot.c -o BOOTx64.EFI`
 
 ## Creating an image
 
