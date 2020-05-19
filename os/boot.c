@@ -9,7 +9,7 @@
 /**
  * Both gcc and clang emit calls to memcpy even in freestanding mode.
  */
-void memcpy(void *restrict dst, void *restrict src, size_t size);
+void *memcpy(void *restrict dst, const void *restrict src, size_t size);
 
 /**
  * Entry point into the OS from UEFI.
@@ -53,11 +53,14 @@ EFIAPI size_t boot(void *image_handle, struct efi_sys_tab *sys_tab)
     return EFI_SUCCESS;
 }
 
-void memcpy(void *restrict dst, void *restrict src, size_t size)
+void *memcpy(void *dst, const void *src, size_t size)
 {
-    char *p = dst, *p2 = src;
+    char *p = dst;
+    const char *p2 = src;
 
     for (size_t i = 0; i < size; ++i) {
         p[i] = p2[i];
     }
+
+    return dst;
 }
