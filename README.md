@@ -27,6 +27,8 @@ Each of the subfolders in this repository has it own README detailing what's imp
 
 /lsp/ - Support for the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
 
+/os/ - Duality OS. Experimental operating system to run Duality on bare-bones hardware.
+
 /support/ - Auxiliary data structures and functions.
 
 /syntax/ - Provides the AST, parser and transformation from AST to Core.
