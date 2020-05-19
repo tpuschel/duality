@@ -181,7 +181,7 @@ static void efi_free(void *image, struct efi_boot_services *boot_services, void 
 
 /**
  * Utility function to get the memory map.
- * Needed because we need to allocate space to whold the map,
+ * Needed because we need to allocate space to hold the map,
  * and that allocation changes the map itself.
  */
 static size_t get_memory_map(void *image, struct efi_boot_services *boot_services, struct efi_memory_descriptor *map, size_t *map_size, size_t *descriptor_size);
