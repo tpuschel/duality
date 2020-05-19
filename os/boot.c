@@ -19,9 +19,15 @@
 
 #define EFIAPI __attribute((ms_abi))
 
+#define STR_LIT(x) x, sizeof(x)
+
+#define HIGH_BIT(type) (~(~(type)0 >> 1))
+
+#define EFI_ERROR(x) (HIGH_BIT(size_t) + x)
+
 static const size_t EFI_SUCCESS = 0;
-static const size_t EFI_BUFFER_TOO_SMALL = 5;
-static const size_t EFI_NOT_FOUND = 14;
+static const size_t EFI_BUFFER_TOO_SMALL = EFI_ERROR(5);
+static const size_t EFI_NOT_FOUND = EFI_ERROR(14);
 
 struct efi_guid {
     uint32_t data1;
@@ -179,6 +185,8 @@ void memcpy(void *restrict dst, void *restrict src, size_t size);
 static void *efi_alloc(void *image, struct efi_boot_services *boot_services, size_t size);
 static void efi_free(void *image, struct efi_boot_services *boot_services, void *ptr);
 
+static uint16_t *efi_string(void *image, struct efi_boot_services *boot_services, const char *s, size_t byte_size, size_t *utf16_size);
+
 /**
  * Utility function to get the memory map.
  * Needed because we need to allocate space to hold the map,
@@ -202,7 +210,9 @@ EFIAPI size_t boot(void *image_handle, struct efi_sys_tab *sys_tab)
     struct efi_gfx_out_prot *gop;
     size_t status = sys_tab->boot_services->locate_protocol(&gop_guid, NULL, (void *)&gop);
     if (status != EFI_SUCCESS) {
-        return status;
+        size_t size;
+        uint16_t *s = efi_string(image_handle, sys_tab->boot_services, STR_LIT("Unable to locate GOP."), &size);
+        sys_tab->boot_services->exit(image_handle, status, size, s);
     }
 
     struct efi_gfx_out_mode_info mode_info;
@@ -216,7 +226,9 @@ EFIAPI size_t boot(void *image_handle, struct efi_sys_tab *sys_tab)
 
     status = sys_tab->boot_services->exit_boot_services(image_handle, memory_map_key);
     if (status != EFI_SUCCESS) {
-        return status;
+        size_t size;
+        uint16_t *s = efi_string(image_handle, sys_tab->boot_services, STR_LIT("Unable to exit boot services."), &size);
+        sys_tab->boot_services->exit(image_handle, status, size, s);
     }
 
     for (size_t i = 0; i < frame_buffer_size / 4; ++i) {
@@ -245,7 +257,9 @@ size_t get_memory_map(void *image, struct efi_boot_services *boot_services, stru
         }
 
         if (status != EFI_SUCCESS) {
-            boot_services->exit(image, status, 0, NULL);
+            size_t size;
+            uint16_t *s = efi_string(image, boot_services, STR_LIT("Unable to get memory map."), &size);
+            boot_services->exit(image, status, size, s);
         }
 
         return map_key;
@@ -263,7 +277,9 @@ uint32_t *set_gfx_mode(void *image, struct efi_boot_services *boot_services, str
         struct efi_gfx_out_mode_info *new_mode_info_ptr = NULL;
         size_t status = gop->query_mode(gop, i, &mode_size, &new_mode_info_ptr);
         if (status != EFI_SUCCESS) {
-            boot_services->exit(image, status, 0, NULL);
+            size_t size;
+            uint16_t *s = efi_string(image, boot_services, STR_LIT("Unable to query GOP mode."), &size);
+            boot_services->exit(image, status, size, s);
         }
 
         if (new_mode_info_ptr->pix_fmt != EFI_PIXEL_BGRR_8BIT) {
@@ -280,12 +296,16 @@ uint32_t *set_gfx_mode(void *image, struct efi_boot_services *boot_services, str
     }
 
     if (mode_info_ptr == NULL) {
-        boot_services->exit(image, EFI_NOT_FOUND, 0, NULL);
+        size_t size;
+        uint16_t *s = efi_string(image, boot_services, STR_LIT("No suitable GOP mode found."), &size);
+        boot_services->exit(image, EFI_NOT_FOUND, size, s);
     }
 
     size_t status = gop->set_mode(gop, mode);
     if (status != EFI_SUCCESS) {
-        boot_services->exit(image, status, 0, NULL);
+        size_t size;
+        uint16_t *s = efi_string(image, boot_services, STR_LIT("Unable to set GOP mode."), &size);
+        boot_services->exit(image, status, size, s);
     }
 
     *mode_info = *gop->mode->info;
@@ -298,7 +318,9 @@ void *efi_alloc(void *image, struct efi_boot_services *boot_services, size_t siz
     void *ptr;
     size_t status = boot_services->allocate_pool(EFI_LOADER_DATA, size, &ptr);
     if (status != EFI_SUCCESS) {
-        boot_services->exit(image, status, 0, NULL);
+        size_t s_size;
+        uint16_t *s = efi_string(image, boot_services, STR_LIT("Unable to allocate memory."), &s_size);
+        boot_services->exit(image, status, s_size, s);
     }
     return ptr;
 }
@@ -307,8 +329,27 @@ void efi_free(void *image, struct efi_boot_services *boot_services, void *ptr)
 {
     size_t status = boot_services->free_pool(ptr);
     if (status != EFI_SUCCESS) {
-        boot_services->exit(image, status, 0, NULL);
+        size_t size;
+        uint16_t *s = efi_string(image, boot_services, STR_LIT("Unable to free memory."), &size);
+        boot_services->exit(image, status, size, s);
     }
+}
+
+static uint16_t *efi_string(void *image, struct efi_boot_services *boot_services, const char *s, size_t byte_size, size_t *utf16_size)
+{
+    // This will only work if 's' isn't multibyte encoded.
+
+    size_t new_size = byte_size * 2;
+
+    uint16_t *ret_s = efi_alloc(image, boot_services, new_size);
+
+    for (size_t i = 0; i < byte_size; ++i) {
+        ret_s[i] = (uint16_t)s[i];
+    }
+
+    *utf16_size = new_size;
+
+    return ret_s;
 }
 
 void memcpy(void *restrict dst, void *restrict src, size_t size)
