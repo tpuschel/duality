@@ -240,6 +240,8 @@ size_t get_memory_map(void *image, struct efi_boot_services *boot_services, stru
             *map_size += 64; // Little bit extra to account for the bookkeeping of the next allocation.
 
             map = efi_alloc(image, boot_services, *map_size);
+
+            continue;
         }
 
         if (status != EFI_SUCCESS) {
