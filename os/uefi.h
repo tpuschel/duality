@@ -137,8 +137,8 @@ struct efi_boot_services {
 };
 
 enum efi_gfx_pix_fmt {
-    EFI_PIXEL_RGBR_8BIT,
-    EFI_PIXEL_BGRR_8BIT
+    EFI_PIXEL_RGBReserved_8BIT,
+    EFI_PIXEL_BGRReserved_8BIT
 };
 
 struct efi_gfx_pix_bitmask {
@@ -240,7 +240,7 @@ uint32_t *set_gfx_mode(void *image, struct efi_boot_services *boot_services, str
             boot_services->exit(image, status, size, s);
         }
 
-        if (new_mode_info_ptr->pix_fmt != EFI_PIXEL_BGRR_8BIT) {
+        if (new_mode_info_ptr->pix_fmt != EFI_PIXEL_BGRReserved_8BIT) {
             continue;
         }
 
