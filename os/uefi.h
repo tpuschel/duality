@@ -207,23 +207,23 @@ struct efi_gfx_out_prot {
  * Malloc/Free using UEFI's pool allocation functions.
  * Everything's allocated from LoaderData type memory.
  */
-static void *efi_alloc(void *image, struct efi_boot_services *boot_services, size_t size);
-static void efi_free(void *image, struct efi_boot_services *boot_services, void *ptr);
+static inline void *efi_alloc(void *image, struct efi_boot_services *boot_services, size_t size);
+static inline void efi_free(void *image, struct efi_boot_services *boot_services, void *ptr);
 
-static uint16_t *efi_string(void *image, struct efi_boot_services *boot_services, const char *s, size_t byte_size, size_t *utf16_size);
+static inline uint16_t *efi_string(void *image, struct efi_boot_services *boot_services, const char *s, size_t byte_size, size_t *utf16_size);
 
 /**
  * Utility function to get the memory map.
  * Needed because we need to allocate space to hold the map,
  * and that allocation changes the map itself.
  */
-static size_t get_memory_map(void *image, struct efi_boot_services *boot_services, char *map, size_t *map_size, size_t *descriptor_size);
+static inline size_t get_memory_map(void *image, struct efi_boot_services *boot_services, char *map, size_t *map_size, size_t *descriptor_size);
 
 /**
  * Set's the highest resolution mode that supports 32-bit BGR color.
  * Returns frame buffer and mode info.
  */
-static uint32_t *set_gfx_mode(void *image, struct efi_boot_services *boot_services, struct efi_gfx_out_prot *gop, size_t *frame_buffer_size, struct efi_gfx_out_mode_info *mode_info);
+static inline uint32_t *set_gfx_mode(void *image, struct efi_boot_services *boot_services, struct efi_gfx_out_prot *gop, size_t *frame_buffer_size, struct efi_gfx_out_mode_info *mode_info);
 
 size_t get_memory_map(void *image, struct efi_boot_services *boot_services, char *map, size_t *map_size, size_t *descriptor_size)
 {
@@ -320,7 +320,7 @@ void efi_free(void *image, struct efi_boot_services *boot_services, void *ptr)
     }
 }
 
-static uint16_t *efi_string(void *image, struct efi_boot_services *boot_services, const char *s, size_t byte_size, size_t *utf16_size)
+uint16_t *efi_string(void *image, struct efi_boot_services *boot_services, const char *s, size_t byte_size, size_t *utf16_size)
 {
     // This will only work if 's' isn't multibyte encoded.
 

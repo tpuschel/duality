@@ -30,11 +30,11 @@ struct mem_node {
 
 static struct mem_node *mem_head = NULL;
 
-static void mem_init(char *map, size_t map_size, size_t descriptor_size);
+static inline void mem_init(char *map, size_t map_size, size_t descriptor_size);
 
-static void *mem_alloc(size_t size);
+static inline void *mem_alloc(size_t size);
 
-static void mem_free(void *ptr, size_t size);
+static inline void mem_free(void *ptr, size_t size);
 
 void mem_init(char *map, size_t map_size, size_t descriptor_size)
 {
