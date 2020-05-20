@@ -5,6 +5,7 @@
  */
 
 #include "uefi.h"
+#include "memory.h"
 
 /**
  * Both gcc and clang emit calls to memcpy even in freestanding mode.
@@ -30,7 +31,7 @@ EFIAPI size_t boot(void *image_handle, struct efi_sys_tab *sys_tab)
     size_t frame_buffer_size;
     uint32_t *frame_buffer = set_gfx_mode(image_handle, sys_tab->boot_services, gop, &frame_buffer_size, &mode_info);
 
-    struct efi_memory_descriptor *memory_map = efi_alloc(image_handle, sys_tab->boot_services, 0);
+    char *memory_map = efi_alloc(image_handle, sys_tab->boot_services, 0);
     size_t memory_map_size;
     size_t memory_descriptor_size;
     size_t memory_map_key = get_memory_map(image_handle, sys_tab->boot_services, memory_map, &memory_map_size, &memory_descriptor_size);
@@ -42,11 +43,12 @@ EFIAPI size_t boot(void *image_handle, struct efi_sys_tab *sys_tab)
         sys_tab->boot_services->exit(image_handle, status, size, s);
     }
 
+    mem_init(memory_map, memory_map_size, memory_descriptor_size);
+
+    // If the whole screen's white after booting, we know it's working :).
     for (size_t i = 0; i < frame_buffer_size / 4; ++i) {
         frame_buffer[i] = 0x00ffffff;
     }
-
-
 
     __asm__("hlt");
 

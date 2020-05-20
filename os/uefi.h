@@ -32,6 +32,21 @@ static const size_t EFI_SUCCESS = 0;
 static const size_t EFI_BUFFER_TOO_SMALL = EFI_ERROR(5);
 static const size_t EFI_NOT_FOUND = EFI_ERROR(14);
 
+static const uint64_t EFI_MEMORY_UC = 0x1;
+static const uint64_t EFI_MEMORY_WC = 0x2;
+static const uint64_t EFI_MEMORY_WT = 0x4;
+static const uint64_t EFI_MEMORY_WB = 0x8;
+static const uint64_t EFI_MEMORY_UCE = 0x10;
+static const uint64_t EFI_MEMORY_WP = 0x1000;
+static const uint64_t EFI_MEMORY_RP = 0x2000;
+static const uint64_t EFI_MEMORY_XP = 0x4000;
+static const uint64_t EFI_MEMORY_NV = 0x8000;
+static const uint64_t EFI_MEMORY_MORE_RELIABLE = 0x10000;
+static const uint64_t EFI_MEMORY_RO = 0x20000;
+static const uint64_t EFI_MEMORY_SP = 0x40000;
+static const uint64_t EFI_MEMORY_CPU_CRYPTO = 0x80000;
+static const uint64_t EFI_MEMORY_RUNTIME = HIGH_BIT(uint64_t);
+
 struct efi_guid {
     uint32_t data1;
     uint16_t data2;
@@ -74,7 +89,19 @@ struct efi_memory_descriptor {
 enum efi_memory_type {
     EFI_RESERVED,
     EFI_LOADER_CODE,
-    EFI_LOADER_DATA
+    EFI_LOADER_DATA,
+    EFI_BOOT_SERVICES_CODE,
+    EFI_BOOT_SERVICES_DATA,
+    EFI_RUNTIME_SERVICES_CODE,
+    EFU_RUNTIME_SERVICES_DATA,
+    EFI_CONVENTIONAL_MEMORY,
+    EFI_UNUSABLE_MEMORY,
+    EFI_ACPI_RECLAIM_MEMORY,
+    EFI_ACPI_MEMORY_NVS,
+    EFI_MEMORY_MAPPED_IO,
+    EFI_MEMORY_MAPPED_IO_PORT_SPACE,
+    EFI_PAL_CODE,
+    EFI_PERSISTENT_MEMORY
 };
 
 struct efi_boot_services {
@@ -190,7 +217,7 @@ static uint16_t *efi_string(void *image, struct efi_boot_services *boot_services
  * Needed because we need to allocate space to hold the map,
  * and that allocation changes the map itself.
  */
-static size_t get_memory_map(void *image, struct efi_boot_services *boot_services, struct efi_memory_descriptor *map, size_t *map_size, size_t *descriptor_size);
+static size_t get_memory_map(void *image, struct efi_boot_services *boot_services, char *map, size_t *map_size, size_t *descriptor_size);
 
 /**
  * Set's the highest resolution mode that supports 32-bit BGR color.
@@ -198,7 +225,7 @@ static size_t get_memory_map(void *image, struct efi_boot_services *boot_service
  */
 static uint32_t *set_gfx_mode(void *image, struct efi_boot_services *boot_services, struct efi_gfx_out_prot *gop, size_t *frame_buffer_size, struct efi_gfx_out_mode_info *mode_info);
 
-size_t get_memory_map(void *image, struct efi_boot_services *boot_services, struct efi_memory_descriptor *map, size_t *map_size, size_t *descriptor_size)
+size_t get_memory_map(void *image, struct efi_boot_services *boot_services, char *map, size_t *map_size, size_t *descriptor_size)
 {
     uint32_t descriptor_version;
     size_t map_key;
