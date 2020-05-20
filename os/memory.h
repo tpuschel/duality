@@ -94,7 +94,7 @@ void mem_free(void *ptr, size_t size)
     node->free_space = size;
 
     // Coalesce with the left neighbor if free.
-    if ((char *)node->prev->data + node->prev->free_space == (char *)node) {
+    if (node->prev && (char *)node->prev->data + node->prev->free_space == (char *)node) {
         node->prev->next = node->next;
         node->next->prev = node->prev;
         node->prev->free_space += sizeof *node + node->free_space;
