@@ -35,6 +35,7 @@ EFIAPI size_t boot(void *image_handle, struct efi_sys_tab *sys_tab)
         struct efi_config_tab tab = sys_tab->configuration_table[i];
         if (memcmp(&tab.vendor_guid, &acpi_guid, sizeof(struct efi_guid)) == 0) {
             acpi_tab = tab.vendor_table;
+            break;
         }
     }
 
