@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DUALITY_OS_DUALITY_H
-#define DUALITY_OS_DUALITY_H
+#pragma once
 
 #include "memory.h"
 #include "freestanding.h"
@@ -82,5 +81,3 @@ void *dy_rc_realloc(void *ptr, size_t new_size, size_t pre_padding, size_t post_
 
     return p;
 }
-
-#endif // DUALITY_OS_DUALITY_H

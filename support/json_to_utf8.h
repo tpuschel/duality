@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_JSON_TO_UTF8_H
-#define DY_JSON_TO_UTF8_H
+#pragma once
 
 #include "json.h"
 #include "array.h"
@@ -142,6 +141,3 @@ void dy_string_to_utf8(dy_string_t string, dy_array_t *utf8)
     dy_utf8_literal(string, utf8);
     dy_array_add(utf8, &(char){ '\"' });
 }
-
-
-#endif // DY_JSON_TO_UTF8_H

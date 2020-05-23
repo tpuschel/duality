@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_EVAL_H
-#define DY_EVAL_H
+#pragma once
 
 #include "core.h"
 #include "substitute.h"
@@ -285,5 +284,3 @@ struct dy_core_expr dy_eval_recursion(struct dy_core_ctx *ctx, struct dy_core_re
 
     return new_e;
 }
-
-#endif // DY_EVAL_H

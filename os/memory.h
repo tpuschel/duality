@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DUALITY_OS_MEMORY_H
-#define DUALITY_OS_MEMORY_H
+#pragma once
 
 #include "uefi.h"
 
@@ -237,5 +236,3 @@ bool mem_change(void *ptr, size_t new_size, size_t pre_padding, size_t post_padd
     // Staying the same!
     return true;
 }
-
-#endif // DUALITY_OS_MEMORY_H

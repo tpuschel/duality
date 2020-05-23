@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_OVERFLOW_H
-#define DY_OVERFLOW_H
+#pragma once
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -299,5 +298,3 @@ bool dy_size_t_mul_overflow(size_t a, size_t b, size_t *c)
     *c = a * b;
     return false;
 }
-
-#endif // DY_OVERFLOW_H

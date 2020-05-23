@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_CHECK_H
-#define DY_CHECK_H
+#pragma once
 
 #include "constraint.h"
 #include "core.h"
@@ -870,5 +869,3 @@ const struct dy_constraint *alloc_constraint(struct dy_constraint constraint)
     static const size_t post_padding = DY_RC_POST_PADDING(struct dy_constraint);
     return dy_rc_new(&constraint, sizeof constraint, pre_padding, post_padding);
 }
-
-#endif // DY_CHECK_H

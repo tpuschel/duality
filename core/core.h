@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_CORE_H
-#define DY_CORE_H
+#pragma once
 
 #include "../support/string.h"
 #include "../support/array.h"
@@ -646,5 +645,3 @@ void add_size_t_decimal(dy_array_t *string, size_t x)
         dy_array_set(*string, k, &c);
     }
 }
-
-#endif // DY_CORE_H

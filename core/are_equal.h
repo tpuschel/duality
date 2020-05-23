@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_ARE_EQUAL_H
-#define DY_ARE_EQUAL_H
+#pragma once
 
 #include "substitute.h"
 #include "../support/bail.h"
@@ -332,5 +331,3 @@ dy_ternary_t type_map_elim_is_equal(struct dy_core_type_map_elim elim, struct dy
 
     return DY_YES;
 }
-
-#endif // DY_ARE_EQUAL_H

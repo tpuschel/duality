@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_UTF8_TO_JSON_H
-#define DY_UTF8_TO_JSON_H
+#pragma once
 
 #include "json.h"
 #include "stream.h"
@@ -626,5 +625,3 @@ bool hex_char(char c, uint8_t *hex)
 
     return false;
 }
-
-#endif // DY_UTF8_TO_JSON_H

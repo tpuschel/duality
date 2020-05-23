@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_STREAM_H
-#define DY_STREAM_H
+#pragma once
 
 #include "array.h"
 #include "overflow.h"
@@ -126,5 +125,3 @@ bool dy_stream_parse_size_t_decimal(struct dy_stream *stream, size_t *number)
 
     return true;
 }
-
-#endif // DY_STREAM_H

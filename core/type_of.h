@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_TYPE_OF_H
-#define DY_TYPE_OF_H
+#pragma once
 
 #include "core.h"
 
@@ -100,5 +99,3 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
 
     dy_bail("Impossible object type.");
 }
-
-#endif // DY_TYPE_OF_H

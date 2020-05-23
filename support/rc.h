@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_RC_H
-#define DY_RC_H
+#pragma once
 
 #include <stddef.h>
 
@@ -117,5 +116,3 @@ void *dy_rc_realloc(void *ptr, size_t new_size, size_t pre_padding, size_t post_
 }
 
 #endif // !DY_FREESTANDING
-
-#endif // DY_RC_H

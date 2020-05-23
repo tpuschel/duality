@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_DAP_SERVER_H
-#define DY_DAP_SERVER_H
+#pragma once
 
 #include "dap.h"
 
@@ -209,5 +208,3 @@ void set_file_to_binary(FILE *file)
     (void)file;
 #endif
 }
-
-#endif // DY_LSP_SERVER_H

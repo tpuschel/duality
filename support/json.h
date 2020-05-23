@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_JSON_H
-#define DY_JSON_H
+#pragma once
 
 #include "string.h"
 
@@ -101,5 +100,3 @@ static inline dy_json_t dy_json_null(void)
         .tag = DY_JSON_VALUE_NULL
     };
 }
-
-#endif // DY_JSON_H

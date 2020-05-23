@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_CONSTRAINT_H
-#define DY_CONSTRAINT_H
+#pragma once
 
 #include "core.h"
 #include "are_equal.h"
@@ -265,5 +264,3 @@ void release_range(struct dy_constraint_range range)
         dy_core_expr_release(range.supertype);
     }
 }
-
-#endif // DY_CONSTRAINT_H

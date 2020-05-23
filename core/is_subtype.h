@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_IS_SUBTYPE_H
-#define DY_IS_SUBTYPE_H
+#pragma once
 
 #include "core.h"
 #include "constraint.h"
@@ -1174,5 +1173,3 @@ dy_ternary_t is_subtype_of_negative_recursion(struct dy_core_ctx *ctx, struct dy
 {
     dy_bail("not yet implemented");
 }
-
-#endif // DY_IS_SUBTYPE_H

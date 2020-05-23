@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_PARSER_H
-#define DY_PARSER_H
+#pragma once
 
 #include "ast.h"
 
@@ -1391,5 +1390,3 @@ bool get_char(struct dy_parser_ctx *ctx, char *c)
 {
     return dy_stream_get_char(&ctx->stream, c);
 }
-
-#endif // DY_PARSER_H

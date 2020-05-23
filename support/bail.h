@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_BAIL_H
-#define DY_BAIL_H
+#pragma once
 
 #include "util.h"
 
@@ -20,5 +19,3 @@
         } while (0)
 
 #endif // !DY_FREESTANDING
-
-#endif // DY_BAIL_H

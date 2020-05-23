@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_STRING_H
-#define DY_STRING_H
+#pragma once
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -100,5 +99,3 @@ bool dy_string_matches_one_of(char c, dy_string_t s)
 
     return false;
 }
-
-#endif // DY_STRING_H

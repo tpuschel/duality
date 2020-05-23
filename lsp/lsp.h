@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_LSP_H
-#define DY_LSP_H
+#pragma once
 
 #include "../support/json.h"
 #include "../support/array.h"
@@ -1187,5 +1186,3 @@ bool json_force_integer(dy_json_t json, long *value)
     *value = json.number.integer;
     return true;
 }
-
-#endif // DY_LSP_H

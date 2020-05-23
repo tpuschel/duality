@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DUALITY_FREESTANDING_H
-#define DUALITY_FREESTANDING_H
+#pragma once
 
 #include <stddef.h>
 
@@ -57,5 +56,3 @@ int memcmp(const void *s1, const void *s2, size_t n)
 
     return 0;
 }
-
-#endif // DUALITY_FREESTANDING_H

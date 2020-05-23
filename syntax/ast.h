@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_AST_H
-#define DY_AST_H
+#pragma once
 
 #include "../support/string.h"
 #include "../support/range.h"
@@ -477,5 +476,3 @@ void dy_ast_list_release_ptr(const struct dy_ast_list_inner *list)
         dy_ast_list_release(l);
     }
 }
-
-#endif // DY_AST_H

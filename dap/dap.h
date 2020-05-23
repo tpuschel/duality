@@ -4,12 +4,9 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_DAP_H
-#define DY_DAP_H
+#pragma once
 
 /**
  * Just a stub for now.
  * TODO: Actually implement things :).
  */
-
-#endif // DY_DAP_H

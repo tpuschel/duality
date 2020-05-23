@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_SUBSTITUTE_H
-#define DY_SUBSTITUTE_H
+#pragma once
 
 #include "core.h"
 
@@ -92,5 +91,3 @@ static struct dy_core_type_map substitute_type_map(struct dy_core_type_map type_
     }
     return type_map;
 }
-
-#endif // DY_SUBSTITUTE_H

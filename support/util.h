@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_UTIL_H
-#define DY_UTIL_H
+#pragma once
 
 /**
  * Some utility macros.
@@ -26,5 +25,3 @@
     ((size) % (alignment)                          \
             ? (alignment) - ((size) % (alignment)) \
             : 0)
-
-#endif // DY_UTIL_H

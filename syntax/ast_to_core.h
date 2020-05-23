@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_AST_TO_CORE_H
-#define DY_AST_TO_CORE_H
+#pragma once
 
 #include "ast.h"
 #include "parser.h"
@@ -743,5 +742,3 @@ struct dy_core_variable create_inference_var(struct dy_ast_to_core_ctx *ctx)
         .type = dy_core_expr_new(any)
     };
 }
-
-#endif // DY_AST_TO_CORE_H

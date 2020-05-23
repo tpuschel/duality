@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DUALITY_OS_UEFI_H
-#define DUALITY_OS_UEFI_H
+#pragma once
 
 #include <stdint.h>
 #include <stddef.h>
@@ -341,5 +340,3 @@ uint16_t *efi_string(void *image, struct efi_boot_services *boot_services, const
 
     return ret_s;
 }
-
-#endif // DUALITY_OS_UEFI_H

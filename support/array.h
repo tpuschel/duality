@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef DY_ARRAY_H
-#define DY_ARRAY_H
+#pragma once
 
 #include "overflow.h"
 #include "rc.h"
@@ -179,5 +178,3 @@ void dy_array_destroy(dy_array_t array)
 {
     dy_rc_release(array.buffer, array.pre_padding, array.post_padding);
 }
-
-#endif // DY_ARRAY_H
