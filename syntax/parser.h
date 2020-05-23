@@ -123,7 +123,7 @@ bool dy_parse_variable(struct dy_parser_ctx *ctx, struct dy_ast_literal *var)
 {
     size_t start_index = ctx->stream.current_index;
 
-    dy_array_t var_name = dy_array_create(sizeof(char), 8);
+    dy_array_t var_name = dy_array_create(sizeof(char), DY_ALIGNOF(char), 8);
     dy_array_add(&ctx->string_arrays, &var_name);
 
     char c;

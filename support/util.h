@@ -19,8 +19,12 @@
 #    define DY_ALIGNOF __alignof__
 #endif
 
-#define DY_MAX(x, y) (x) < (y) ? (y) : (x)
+#define DY_MAX(x, y) ((x) < (y) ? (y) : (x))
+#define DY_MIN(x, y) ((x) < (y) ? (x) : (y))
 
-#define DY_MAX_ALIGNMENT DY_MAX(DY_ALIGNOF(intmax_t), DY_MAX(DY_ALIGNOF(void *), DY_ALIGNOF(long double)))
+#define DY_COMPUTE_PADDING(size, alignment)        \
+    ((size) % (alignment)                          \
+            ? (alignment) - ((size) % (alignment)) \
+            : 0)
 
 #endif // DY_UTIL_H

@@ -68,6 +68,9 @@ struct dy_lsp_ctx {
     dy_array_t documents;
 };
 
+static const size_t dy_lsp_ctx_pre_padding = DY_RC_PRE_PADDING(struct dy_lsp_ctx);
+static const size_t dy_lsp_ctx_post_padding = DY_RC_POST_PADDING(struct dy_lsp_ctx);
+
 static inline dy_json_t invalid_request(dy_string_t message);
 static inline dy_json_t server_capabilities(void);
 static inline dy_json_t server_info(void);
@@ -100,14 +103,14 @@ static inline bool json_force_integer(dy_json_t json, long *value);
 
 dy_lsp_ctx_t *dy_lsp_create(dy_lsp_send_fn send, void *env)
 {
-    struct dy_lsp_ctx *ctx = dy_malloc(sizeof *ctx);
+    struct dy_lsp_ctx *ctx = dy_rc_alloc(sizeof *ctx, dy_lsp_ctx_pre_padding, dy_lsp_ctx_post_padding);
     *ctx = (struct dy_lsp_ctx){
         .send = send,
         .env = env,
         .is_initialized = false,
         .received_shutdown_request = false,
         .exit_code = 1, // Error by default.
-        .documents = dy_array_create(sizeof(struct document), 8)
+        .documents = dy_array_create(sizeof(struct document), DY_ALIGNOF(struct document), 8)
     };
 
     return ctx;
@@ -116,7 +119,7 @@ dy_lsp_ctx_t *dy_lsp_create(dy_lsp_send_fn send, void *env)
 void dy_lsp_destroy(dy_lsp_ctx_t *ctx)
 {
     dy_array_destroy(ctx->documents);
-    dy_free(ctx);
+    dy_rc_release(ctx, dy_lsp_ctx_pre_padding, dy_lsp_ctx_post_padding);
 }
 
 bool dy_lsp_handle_message(dy_lsp_ctx_t *ctx, dy_json_t message)
@@ -554,7 +557,7 @@ dy_json_t initialize_response()
         .value = server_info()
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
     dy_array_add(&members, &capabilities);
     dy_array_add(&members, &m_server_info);
 
@@ -589,7 +592,7 @@ dy_json_t response_error(long code, dy_string_t message)
         .value = dy_json_string(message)
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
     dy_array_add(&members, &m_code);
     dy_array_add(&members, &m_message);
 
@@ -614,7 +617,7 @@ dy_json_t server_capabilities()
         .value = dy_json_true()
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
     dy_array_add(&members, &text_document_sync);
     dy_array_add(&members, &hover_provider);
 
@@ -639,7 +642,7 @@ dy_json_t server_info(void)
         .value = dy_json_string(DY_STR_LIT("0.0.1"))
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
     dy_array_add(&members, &name);
     dy_array_add(&members, &version);
 
@@ -664,7 +667,7 @@ dy_json_t text_document_sync_options(void)
         .value = dy_json_integer(1)
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
     dy_array_add(&members, &open_close);
     dy_array_add(&members, &change);
 
@@ -694,7 +697,7 @@ dy_json_t error_response(dy_json_t id, dy_json_t error)
         .value = error
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 3);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 3);
     dy_array_add(&members, &jsonrpc);
     dy_array_add(&members, &m_id);
     dy_array_add(&members, &m_error);
@@ -725,7 +728,7 @@ dy_json_t success_response(dy_json_t id, dy_json_t result)
         .value = result
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 3);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 3);
     dy_array_add(&members, &jsonrpc);
     dy_array_add(&members, &m_id);
     dy_array_add(&members, &m_result);
@@ -746,7 +749,7 @@ dy_json_t hover_result(dy_string_t contents)
         .value = dy_json_string(contents)
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 1);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 1);
     dy_array_add(&members, &m_contents);
 
     return (dy_json_t){
@@ -775,7 +778,7 @@ dy_json_t make_notification(dy_string_t method, dy_json_t params)
         .value = params
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 3);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 3);
     dy_array_add(&members, &jsonrpc_member);
     dy_array_add(&members, &method_member);
     dy_array_add(&members, &params_member);
@@ -798,7 +801,7 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
 
     struct dy_parser_ctx parser_ctx = {
         .stream = stream_from_string(doc->text),
-        .string_arrays = dy_array_create(sizeof(dy_array_t *), 32)
+        .string_arrays = dy_array_create(sizeof(dy_array_t *), DY_ALIGNOF(dy_array_t *), 32)
     };
 
     struct dy_ast_do_block ast;
@@ -812,7 +815,7 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
 
     struct dy_ast_to_core_ctx ast_to_core_ctx = {
         .running_id = 0,
-        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), 64)
+        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), DY_ALIGNOF(struct dy_ast_to_core_bound_var), 64)
     };
 
     struct dy_core_expr core = dy_ast_do_block_to_core(&ast_to_core_ctx, ast);
@@ -821,7 +824,7 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
 
     struct dy_core_ctx core_ctx = {
         .running_id = ast_to_core_ctx.running_id,
-        .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), 1)
+        .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), DY_ALIGNOF(struct dy_bound_constraint), 1)
     };
 
     struct dy_constraint c;
@@ -833,7 +836,7 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
     doc->core_is_present = true;
     doc->core = new_core;
 
-    dy_array_t diagnostics = dy_array_create(sizeof(dy_json_t), 8);
+    dy_array_t diagnostics = dy_array_create(sizeof(dy_json_t), DY_ALIGNOF(dy_json_t), 8);
     produce_diagnostics(&core_ctx, new_core, doc->text, &diagnostics);
 
     dy_json_t diag_json = {
@@ -851,7 +854,7 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
 
 struct dy_stream stream_from_string(dy_string_t s)
 {
-    dy_array_t buffer = dy_array_create(sizeof(char), s.size);
+    dy_array_t buffer = dy_array_create(sizeof(char), DY_ALIGNOF(char), s.size);
     for (size_t i = 0; i < s.size; ++i) {
         dy_array_add(&buffer, s.ptr + i);
     }
@@ -1044,7 +1047,7 @@ dy_json_t make_diagnostic(dy_json_t range, dy_json_t severity, dy_json_t message
         .value = message
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 3);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 3);
     dy_array_add(&members, &range_member);
     dy_array_add(&members, &severity_member);
     dy_array_add(&members, &message_member);
@@ -1070,7 +1073,7 @@ dy_json_t make_diagnostics_params(dy_string_t uri, dy_json_t diagnostics)
         .value = diagnostics
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 3);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 3);
     dy_array_add(&members, &uri_member);
     dy_array_add(&members, &diagnostics_member);
 
@@ -1095,7 +1098,7 @@ dy_json_t make_position(long line, long character)
         .value = dy_json_integer(character)
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
     dy_array_add(&members, &line_member);
     dy_array_add(&members, &character_member);
 
@@ -1120,7 +1123,7 @@ dy_json_t make_range(dy_json_t start, dy_json_t end)
         .value = end
     };
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), 2);
+    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
     dy_array_add(&members, &start_member);
     dy_array_add(&members, &end_member);
 

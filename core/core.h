@@ -13,9 +13,6 @@
 #include "../support/range.h"
 #include "../support/bail.h"
 
-#include <stdio.h>
-#include <stdarg.h>
-
 /**
  * This file implements the data structure that represents Core,
  * and any associated auxiliary functions.
@@ -192,7 +189,8 @@ static inline void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *
 
 
 /** Boring ref-count stuff. */
-static const size_t dy_core_expr_rc_offset = DY_RC_OFFSET_OF_TYPE(struct dy_core_expr);
+static const size_t dy_core_expr_pre_padding = DY_RC_PRE_PADDING(struct dy_core_expr);
+static const size_t dy_core_expr_post_padding = DY_RC_POST_PADDING(struct dy_core_expr);
 
 static inline const struct dy_core_expr *dy_core_expr_new(struct dy_core_expr expr);
 
@@ -207,10 +205,7 @@ static inline void dy_core_expr_release_ptr(const struct dy_core_expr *expr);
 /** Helper to add a string literal to a dynamic char array. */
 static inline void add_string(dy_array_t *string, dy_string_t s);
 
-#ifdef _WIN32
-/** asprintf() implementation since Windows doesn't have one. */
-static inline int asprintf(char **ret, const char *format, ...);
-#endif
+static inline void add_size_t_decimal(dy_array_t *string, size_t x);
 
 bool dy_core_expr_is_computation(struct dy_core_expr expr)
 {
@@ -317,12 +312,12 @@ size_t dy_core_expr_num_occurrences(size_t id, struct dy_core_expr expr)
 
 const struct dy_core_expr *dy_core_expr_new(struct dy_core_expr expr)
 {
-    return dy_rc_new(&expr, sizeof expr, dy_core_expr_rc_offset);
+    return dy_rc_new(&expr, sizeof expr, dy_core_expr_pre_padding, dy_core_expr_post_padding);
 }
 
 const struct dy_core_expr *dy_core_expr_retain_ptr(const struct dy_core_expr *expr)
 {
-    return dy_rc_retain(expr, dy_core_expr_rc_offset);
+    return dy_rc_retain(expr, dy_core_expr_pre_padding, dy_core_expr_post_padding);
 }
 
 struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
@@ -393,7 +388,7 @@ struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
 void dy_core_expr_release_ptr(const struct dy_core_expr *expr)
 {
     struct dy_core_expr shallow_copy = *expr;
-    if (dy_rc_release(expr, dy_core_expr_rc_offset) == 0) {
+    if (dy_rc_release(expr, dy_core_expr_pre_padding, dy_core_expr_post_padding) == 0) {
         dy_core_expr_release(shallow_copy);
     }
 }
@@ -482,14 +477,11 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         dy_core_expr_to_string(*expr.equality_map.e2, string);
         add_string(string, DY_STR_LIT(")"));
         return;
-    case DY_CORE_EXPR_TYPE_MAP: {
+    case DY_CORE_EXPR_TYPE_MAP:
         add_string(string, DY_STR_LIT("("));
 
         add_string(string, DY_STR_LIT("["));
-        char *c;
-        assert(asprintf(&c, "%zu", expr.type_map.binding.id) != -1);
-        add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
-        free(c);
+        add_size_t_decimal(string, expr.type_map.binding.id);
         add_string(string, DY_STR_LIT(" "));
         dy_core_expr_to_string(*expr.type_map.binding.type, string);
         add_string(string, DY_STR_LIT("]"));
@@ -506,15 +498,11 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         dy_core_expr_to_string(*expr.type_map.expr, string);
         add_string(string, DY_STR_LIT(")"));
         return;
-    }
-    case DY_CORE_EXPR_INFERENCE_TYPE_MAP: {
+    case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         add_string(string, DY_STR_LIT("("));
 
         add_string(string, DY_STR_LIT("?["));
-        char *c;
-        assert(asprintf(&c, "%zu", expr.inference_type_map.binding.id) != -1);
-        add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
-        free(c);
+        add_size_t_decimal(string, expr.inference_type_map.binding.id);
         add_string(string, DY_STR_LIT(" "));
         dy_core_expr_to_string(*expr.inference_type_map.binding.type, string);
         add_string(string, DY_STR_LIT("]"));
@@ -526,8 +514,7 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         dy_core_expr_to_string(*expr.inference_type_map.expr, string);
         add_string(string, DY_STR_LIT(")"));
         return;
-    }
-    case DY_CORE_EXPR_EQUALITY_MAP_ELIM: {
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
         add_string(string, DY_STR_LIT("("));
         dy_core_expr_to_string(*expr.equality_map_elim.expr, string);
         add_string(string, DY_STR_LIT(" ! "));
@@ -541,17 +528,12 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         dy_core_expr_to_string(*expr.equality_map_elim.map.e2, string);
         add_string(string, DY_STR_LIT(")"));
         return;
-    }
-    case DY_CORE_EXPR_TYPE_MAP_ELIM: {
+    case DY_CORE_EXPR_TYPE_MAP_ELIM:
         add_string(string, DY_STR_LIT("("));
         dy_core_expr_to_string(*expr.type_map_elim.expr, string);
-        add_string(string, DY_STR_LIT(" ! "));
-
-        char *c;
-        assert(asprintf(&c, "%zu [", expr.type_map_elim.map.binding.id) != -1);
-        add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
-        free(c);
-
+        add_string(string, DY_STR_LIT(" ! ["));
+        add_size_t_decimal(string, expr.type_map_elim.map.binding.id);
+        add_string(string, DY_STR_LIT(" "));
         dy_core_expr_to_string(*expr.type_map_elim.map.binding.type, string);
         add_string(string, DY_STR_LIT("]"));
         if (expr.type_map_elim.map.is_implicit) {
@@ -563,21 +545,12 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         dy_core_expr_to_string(*expr.type_map_elim.map.expr, string);
         add_string(string, DY_STR_LIT(")"));
         return;
-    }
-    case DY_CORE_EXPR_VARIABLE: {
-        char *c;
-        assert(asprintf(&c, "%zu", expr.variable.id) != -1);
-        add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
-        free(c);
+    case DY_CORE_EXPR_VARIABLE:
+        add_size_t_decimal(string, expr.variable.id);
         return;
-    }
-    case DY_CORE_EXPR_INFERENCE_VARIABLE: {
-        char *c;
-        assert(asprintf(&c, "?%zu", expr.inference_variable.id) != -1);
-        add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
-        free(c);
+    case DY_CORE_EXPR_INFERENCE_VARIABLE:
+        add_size_t_decimal(string, expr.inference_variable.id);
         return;
-    }
     case DY_CORE_EXPR_END:
         if (expr.end_polarity == DY_CORE_POLARITY_POSITIVE) {
             add_string(string, DY_STR_LIT("All"));
@@ -608,14 +581,11 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         dy_core_expr_to_string(*expr.alternative.second, string);
         add_string(string, DY_STR_LIT(")"));
         return;
-    case DY_CORE_EXPR_RECURSION: {
+    case DY_CORE_EXPR_RECURSION:
         add_string(string, DY_STR_LIT("(rec "));
 
         add_string(string, DY_STR_LIT("["));
-        char *c;
-        assert(asprintf(&c, "%zu", expr.recursion.map.binding.id) != -1);
-        add_string(string, (dy_string_t){ .ptr = c, .size = strlen(c) });
-        free(c);
+        add_size_t_decimal(string, expr.recursion.map.binding.id);
         add_string(string, DY_STR_LIT(" "));
         dy_core_expr_to_string(*expr.recursion.map.binding.type, string);
         add_string(string, DY_STR_LIT("]"));
@@ -627,7 +597,6 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         dy_core_expr_to_string(*expr.recursion.map.expr, string);
         add_string(string, DY_STR_LIT(")"));
         return;
-    }
     case DY_CORE_EXPR_SYMBOL:
         add_string(string, DY_STR_LIT("Symbol"));
         return;
@@ -646,27 +615,36 @@ void add_string(dy_array_t *string, dy_string_t s)
     }
 }
 
-#ifdef _WIN32
-int asprintf(char **ret, const char *format, ...)
+void add_size_t_decimal(dy_array_t *string, size_t x)
 {
-    va_list ap;
-    va_start(ap, format);
+    size_t start_size = string->num_elems;
 
-    int projected_len = _vscprintf(format, ap);
-    assert(projected_len >= 0);
+    // Add digits in reverse order.
+    for (;;) {
+        char digit = x % 10 + '0';
 
-    char *buffer = malloc((size_t)projected_len + 1 /* for '\0' */);
-    assert(buffer != NULL);
+        dy_array_add(string, &digit);
 
-    int actual_len = vsprintf(buffer, format, ap);
-    assert(projected_len == actual_len);
+        x /= 10;
 
-    va_end(ap);
+        if (x == 0) {
+            break;
+        }
+    }
 
-    *ret = buffer;
+    // Reverse digits in buffer.
+    for (;;) {
+        size_t i = start_size, k = string->num_elems - 1;
+        char c;
 
-    return actual_len;
+        if (k >= i) {
+            break;
+        }
+
+        dy_array_get(*string, i, &c);
+        dy_array_set(*string, i, dy_array_pos(*string, k));
+        dy_array_set(*string, k, &c);
+    }
 }
-#endif
 
 #endif // DY_CORE_H

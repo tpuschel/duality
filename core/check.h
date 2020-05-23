@@ -530,7 +530,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct 
 
     dy_core_expr_release(inner_expr);
 
-    dy_array_t ids = dy_array_create(sizeof(size_t), 4);
+    dy_array_t ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 4);
     dy_binding_contraints(ctx, inference_type_map.binding.id, c2, have_c2, &ids);
 
     if (ids.num_elems == 0) {
@@ -866,8 +866,9 @@ bool is_mentioned_in_constraints(struct dy_core_ctx *ctx, size_t id, struct dy_c
 
 const struct dy_constraint *alloc_constraint(struct dy_constraint constraint)
 {
-    static const size_t offset = DY_RC_OFFSET_OF_TYPE(struct dy_constraint);
-    return dy_rc_new(&constraint, sizeof constraint, offset);
+    static const size_t pre_padding = DY_RC_PRE_PADDING(struct dy_constraint);
+    static const size_t post_padding = DY_RC_POST_PADDING(struct dy_constraint);
+    return dy_rc_new(&constraint, sizeof constraint, pre_padding, post_padding);
 }
 
 #endif // DY_CHECK_H

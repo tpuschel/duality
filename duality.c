@@ -17,6 +17,8 @@
 
 #include "support/bail.h"
 
+#include <string.h>
+
 static void read_chunk(dy_array_t *buffer, void *env);
 
 static const size_t CHUNK_SIZE = 1024;
@@ -54,11 +56,11 @@ int main(int argc, const char *argv[])
     struct dy_parser_ctx parser_ctx = {
         .stream = {
             .get_chars = read_chunk,
-            .buffer = dy_array_create(sizeof(char), CHUNK_SIZE),
+            .buffer = dy_array_create(sizeof(char), DY_ALIGNOF(char), CHUNK_SIZE),
             .env = stream,
             .current_index = 0,
         },
-        .string_arrays = dy_array_create(sizeof(dy_array_t *), 32)
+        .string_arrays = dy_array_create(sizeof(dy_array_t *), DY_ALIGNOF(dy_array_t *), 32)
     };
 
     struct dy_ast_do_block program_ast;
@@ -69,7 +71,7 @@ int main(int argc, const char *argv[])
 
     struct dy_ast_to_core_ctx ast_to_core_ctx = {
         .running_id = 0,
-        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), 64)
+        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), DY_ALIGNOF(struct dy_ast_to_core_bound_var), 64)
     };
 
     struct dy_core_expr program = dy_ast_do_block_to_core(&ast_to_core_ctx, program_ast);
@@ -78,7 +80,7 @@ int main(int argc, const char *argv[])
 
     struct dy_core_ctx core_ctx = {
         .running_id = ast_to_core_ctx.running_id,
-        .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), 64)
+        .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), DY_ALIGNOF(struct dy_bound_constraint), 64)
     };
 
     struct dy_constraint constraint;
@@ -111,7 +113,7 @@ int main(int argc, const char *argv[])
 
 void print_core_expr(FILE *file, struct dy_core_expr expr)
 {
-    dy_array_t s = dy_array_create(1, 64);
+    dy_array_t s = dy_array_create(sizeof(char), DY_ALIGNOF(char), 64);
     dy_core_expr_to_string(expr, &s);
 
     for (size_t i = 0; i < s.num_elems; ++i) {

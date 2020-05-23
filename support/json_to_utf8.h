@@ -116,7 +116,7 @@ void dy_number_to_utf8(struct dy_json_number number, dy_array_t *utf8)
 
     long absolute = labs(number.integer);
 
-    dy_array_t local = dy_array_create(sizeof(char), 4);
+    dy_array_t local = dy_array_create(sizeof(char), DY_ALIGNOF(char), 4);
     for (;;) {
         char digit = (absolute % 10) + '0';
 

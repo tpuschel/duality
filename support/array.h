@@ -8,7 +8,7 @@
 #define DY_ARRAY_H
 
 #include "overflow.h"
-#include "alloc.h"
+#include "rc.h"
 
 /**
  * This file implements dynamically
@@ -20,9 +20,11 @@ typedef struct dy_array {
     size_t elem_size;
     size_t num_elems;
     size_t capacity;
+    size_t pre_padding;
+    size_t post_padding;
 } dy_array_t;
 
-static inline dy_array_t dy_array_create(size_t elem_size, size_t capacity);
+static inline dy_array_t dy_array_create(size_t elem_size, size_t alignment, size_t capacity);
 
 static inline size_t dy_array_add(dy_array_t *array, const void *value);
 
@@ -51,18 +53,23 @@ static inline void dy_array_destroy(dy_array_t array);
 static inline void *dy_array_pos(dy_array_t array, size_t i);
 static inline void *dy_array_last(dy_array_t array);
 
-dy_array_t dy_array_create(size_t elem_size, size_t capacity)
+dy_array_t dy_array_create(size_t elem_size, size_t alignment, size_t capacity)
 {
     assert(elem_size != 0);
 
     size_t capacity_in_bytes;
     assert(!dy_size_t_mul_overflow(elem_size, capacity, &capacity_in_bytes));
 
+    size_t pre_padding = DY_COMPUTE_PADDING(sizeof(size_t), alignment);
+    size_t post_padding = DY_COMPUTE_PADDING(sizeof(size_t) + pre_padding + elem_size, DY_ALIGNOF(size_t));
+
     return (dy_array_t){
-        .buffer = dy_malloc(capacity_in_bytes),
+        .buffer = dy_rc_alloc(capacity_in_bytes, pre_padding, post_padding),
         .elem_size = elem_size,
         .num_elems = 0,
-        .capacity = capacity
+        .capacity = capacity,
+        .pre_padding = pre_padding,
+        .post_padding = post_padding
     };
 }
 
@@ -104,7 +111,7 @@ void dy_array_insert_keep_order(dy_array_t *array, size_t index, const void *val
         size_t capacity_in_bytes;
         assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
 
-        array->buffer = dy_realloc(array->buffer, capacity_in_bytes);
+        array->buffer = dy_rc_realloc(array->buffer, capacity_in_bytes, array->pre_padding, array->post_padding);
     }
 
     memmove(dy_array_pos(*array, index + 1), dy_array_pos(*array, index), array->elem_size * (array->num_elems - index));
@@ -137,7 +144,7 @@ void dy_array_set_excess_capacity(dy_array_t *array, size_t excess_capacity)
     size_t capacity_in_bytes;
     assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
 
-    array->buffer = dy_realloc(array->buffer, capacity_in_bytes);
+    array->buffer = dy_rc_realloc(array->buffer, capacity_in_bytes, array->pre_padding, array->post_padding);
 }
 
 void dy_array_add_to_size(dy_array_t *array, size_t added_size)
@@ -170,7 +177,7 @@ void *dy_array_last(dy_array_t array)
 
 void dy_array_destroy(dy_array_t array)
 {
-    dy_free(array.buffer);
+    dy_rc_release(array.buffer, array.pre_padding, array.post_padding);
 }
 
 #endif // DY_ARRAY_H

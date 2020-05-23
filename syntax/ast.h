@@ -166,7 +166,8 @@ struct dy_ast_expr {
 
 /** Boring ref-count stuff. */
 
-static const size_t dy_ast_expr_rc_offset = DY_RC_OFFSET_OF_TYPE(struct dy_ast_expr);
+static const size_t dy_ast_expr_pre_padding = DY_RC_PRE_PADDING(struct dy_ast_expr);
+static const size_t dy_ast_expr_post_padding = DY_RC_POST_PADDING(struct dy_ast_expr);
 
 static inline const struct dy_ast_expr *dy_ast_expr_new(struct dy_ast_expr expr);
 
@@ -179,7 +180,8 @@ static inline void dy_ast_expr_release(struct dy_ast_expr expr);
 static inline void dy_ast_expr_release_ptr(const struct dy_ast_expr *expr);
 
 
-static const size_t dy_ast_do_block_rc_offset = DY_RC_OFFSET_OF_TYPE(struct dy_ast_do_block_body);
+static const size_t dy_ast_do_block_pre_padding = DY_RC_PRE_PADDING(struct dy_ast_do_block_body);
+static const size_t dy_ast_do_block_post_padding = DY_RC_POST_PADDING(struct dy_ast_do_block_body);
 
 static inline const struct dy_ast_do_block_body *dy_ast_do_block_new(struct dy_ast_do_block_body do_block);
 
@@ -192,7 +194,8 @@ static inline void dy_ast_do_block_release(struct dy_ast_do_block_body do_block)
 static inline void dy_ast_do_block_release_ptr(const struct dy_ast_do_block_body *do_block);
 
 
-static const size_t dy_ast_list_rc_offset = DY_RC_OFFSET_OF_TYPE(struct dy_ast_list_inner);
+static const size_t dy_ast_list_pre_padding = DY_RC_PRE_PADDING(struct dy_ast_list_inner);
+static const size_t dy_ast_list_post_padding = DY_RC_POST_PADDING(struct dy_ast_list_inner);
 
 static inline const struct dy_ast_list_inner *dy_ast_list_new(struct dy_ast_list_inner list);
 
@@ -207,22 +210,22 @@ static inline void dy_ast_list_release_ptr(const struct dy_ast_list_inner *list)
 
 const struct dy_ast_expr *dy_ast_expr_new(struct dy_ast_expr expr)
 {
-    return dy_rc_new(&expr, sizeof expr, dy_ast_expr_rc_offset);
+    return dy_rc_new(&expr, sizeof expr, dy_ast_expr_pre_padding, dy_ast_expr_post_padding);
 }
 
 const struct dy_ast_do_block_body *dy_ast_do_block_new(struct dy_ast_do_block_body do_block)
 {
-    return dy_rc_new(&do_block, sizeof do_block, dy_ast_do_block_rc_offset);
+    return dy_rc_new(&do_block, sizeof do_block, dy_ast_do_block_pre_padding, dy_ast_do_block_post_padding);
 }
 
 const struct dy_ast_list_inner *dy_ast_list_new(struct dy_ast_list_inner list)
 {
-    return dy_rc_new(&list, sizeof list, dy_ast_list_rc_offset);
+    return dy_rc_new(&list, sizeof list, dy_ast_list_pre_padding, dy_ast_list_post_padding);
 }
 
 const struct dy_ast_expr *dy_ast_expr_retain_ptr(const struct dy_ast_expr *expr)
 {
-    return dy_rc_retain(expr, dy_ast_expr_rc_offset);
+    return dy_rc_retain(expr, dy_ast_expr_pre_padding, dy_ast_expr_post_padding);
 }
 
 struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
@@ -304,7 +307,7 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
 void dy_ast_expr_release_ptr(const struct dy_ast_expr *expr)
 {
     struct dy_ast_expr e = *expr;
-    if (dy_rc_release(expr, dy_ast_expr_rc_offset) == 0) {
+    if (dy_rc_release(expr, dy_ast_expr_pre_padding, dy_ast_expr_post_padding) == 0) {
         dy_ast_expr_release(e);
     }
 }
@@ -388,14 +391,14 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
 void dy_ast_do_block_release_ptr(const struct dy_ast_do_block_body *do_block)
 {
     struct dy_ast_do_block_body d = *do_block;
-    if (dy_rc_release(do_block, dy_ast_do_block_rc_offset) == 0) {
+    if (dy_rc_release(do_block, dy_ast_do_block_pre_padding, dy_ast_do_block_post_padding) == 0) {
         dy_ast_do_block_release(d);
     }
 }
 
 void dy_ast_do_block_retain_ptr(const struct dy_ast_do_block_body *do_block)
 {
-    dy_rc_retain(do_block, dy_ast_do_block_rc_offset);
+    dy_rc_retain(do_block, dy_ast_do_block_pre_padding, dy_ast_do_block_post_padding);
 }
 
 void dy_ast_do_block_retain(struct dy_ast_do_block_body do_block)
@@ -456,7 +459,7 @@ void dy_ast_list_retain(struct dy_ast_list_inner list)
 
 void dy_ast_list_retain_ptr(const struct dy_ast_list_inner *list)
 {
-    dy_rc_retain(list, dy_ast_list_rc_offset);
+    dy_rc_retain(list, dy_ast_list_pre_padding, dy_ast_list_post_padding);
 }
 
 void dy_ast_list_release(struct dy_ast_list_inner list)
@@ -470,7 +473,7 @@ void dy_ast_list_release(struct dy_ast_list_inner list)
 void dy_ast_list_release_ptr(const struct dy_ast_list_inner *list)
 {
     struct dy_ast_list_inner l = *list;
-    if (dy_rc_release(list, dy_ast_list_rc_offset) == 0) {
+    if (dy_rc_release(list, dy_ast_list_pre_padding, dy_ast_list_post_padding) == 0) {
         dy_ast_list_release(l);
     }
 }

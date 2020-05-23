@@ -11,8 +11,6 @@
 #include "overflow.h"
 #include "string.h"
 
-#include <stdio.h>
-
 /**
  * Implements a buffered stream.
  *
@@ -37,8 +35,6 @@ static inline void dy_stream_reset(struct dy_stream *stream);
 static inline bool dy_stream_parse_literal(struct dy_stream *stream, dy_string_t literal);
 
 static inline bool dy_stream_parse_size_t_decimal(struct dy_stream *stream, size_t *number);
-
-static inline void dy_stream_dump(struct dy_stream *stream, FILE *file);
 
 bool dy_stream_get_char(struct dy_stream *stream, char *c)
 {
@@ -129,26 +125,6 @@ bool dy_stream_parse_size_t_decimal(struct dy_stream *stream, size_t *number)
     *number = n;
 
     return true;
-}
-
-void dy_stream_dump(struct dy_stream *stream, FILE *file)
-{
-    fprintf(file, "[Stream dump - begin]\n");
-
-    for (size_t i = stream->current_index; i < stream->buffer.num_elems; ++i) {
-        char c = *(char *)dy_array_pos(stream->buffer, i);
-        if (c == '\n') {
-            fprintf(file, "\\n");
-        } else if (c == '\t') {
-            fprintf(file, "\\t");
-        } else if (c == '\r') {
-            fprintf(file, "\\r");
-        } else {
-            fprintf(file, "%c", c);
-        }
-    }
-
-    fprintf(file, "\n[Stream dump - end]\n");
 }
 
 #endif // DY_STREAM_H

@@ -75,7 +75,12 @@ struct efi_sys_tab {
     void *runtime_services;
     struct efi_boot_services *boot_services;
     size_t number_of_table_entries;
-    void *configuration_table;
+    struct efi_config_tab *configuration_table;
+};
+
+struct efi_config_tab {
+    struct efi_guid vendor_guid;
+    void *vendor_table;
 };
 
 struct efi_memory_descriptor {

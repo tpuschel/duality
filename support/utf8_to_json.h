@@ -204,7 +204,7 @@ bool parse_nonempty_object(struct dy_stream *stream, struct dy_json_object *obje
 
 bool parse_object_members(struct dy_stream *stream, struct dy_json_object *object)
 {
-    dy_array_t member_storage = dy_array_create(sizeof(struct dy_json_member), 4);
+    dy_array_t member_storage = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 4);
 
     if (!parse_object_members_storage(stream, &member_storage)) {
         return false;
@@ -304,7 +304,7 @@ bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
 {
     size_t start_index = stream->current_index;
 
-    dy_array_t characters_storage = dy_array_create(sizeof(char), 8);
+    dy_array_t characters_storage = dy_array_create(sizeof(char), DY_ALIGNOF(char), 8);
 
     for (;;) {
         char c;
@@ -499,7 +499,7 @@ bool parse_nonempty_array(struct dy_stream *stream, struct dy_json_array *array)
 
 bool parse_array_elements(struct dy_stream *stream, struct dy_json_array *array)
 {
-    dy_array_t element_storage = dy_array_create(sizeof(struct dy_json_value), 4);
+    dy_array_t element_storage = dy_array_create(sizeof(struct dy_json_value), DY_ALIGNOF(struct dy_json_value), 4);
 
     if (!parse_array_elements_storage(stream, &element_storage)) {
         return false;
