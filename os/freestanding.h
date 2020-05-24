@@ -48,7 +48,7 @@ int memcmp(const void *s1, const void *s2, size_t n)
     const unsigned char *p1 = s1, *p2 = s2;
 
     for (size_t i = 0; i < n; ++i) {
-        int diff = (int)p1[n] - (int)p2[n];
+        int diff = (int)p1[i] - (int)p2[i];
         if (diff != 0) {
             return diff;
         }
