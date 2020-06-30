@@ -63,7 +63,7 @@ struct mem_blk {
 /** The global start of the blocks of memory. */
 static struct mem_blk *mem_first_block = NULL;
 
-static inline void mem_init(char *map, size_t map_size, size_t descriptor_size);
+static inline void mem_init(char *map, size_t map_size, size_t descriptor_size, void **first_mib_region, size_t first_mib_region_min_size);
 
 static inline void *mem_alloc(size_t size, size_t pre_padding, size_t post_padding);
 
@@ -73,21 +73,36 @@ static inline size_t mem_release(const void *ptr, size_t pre_padding, size_t pos
 
 static inline bool mem_change(void *ptr, size_t new_size, size_t pre_padding, size_t post_padding);
 
-void mem_init(char *map, size_t map_size, size_t descriptor_size)
+void mem_init(char *map, size_t map_size, size_t descriptor_size, void **first_mib_region, size_t first_mib_region_min_size)
 {
     struct mem_blk **prev_blocks_next_ptr = &mem_first_block;
+    bool found_first_mib_region = false;
+    size_t four_kib_aligned_size = first_mib_region_min_size + DY_COMPUTE_PADDING(first_mib_region_min_size, 0x1000);
 
     while (map_size >= descriptor_size) {
         struct efi_memory_descriptor *desc = map;
-
-        size_t blk_size = desc->number_of_pages * 0x1000;
 
         /**
          * Memory of type EFI_BOOT_SERVICES_CODE/DATA should also be usable,
          * but QEMU hangs when writing to the end of one of these type of blocks :/.
          */
         if (desc->type == EFI_CONVENTIONAL_MEMORY) {
-            struct mem_blk *blk = desc->physical_start; // Always suitably (4 KiB) aligned.
+            struct mem_blk *blk = (void *)desc->physical_start; // Always suitably (4 KiB) aligned.
+            size_t blk_size = desc->number_of_pages * 0x1000;
+
+            if (!found_first_mib_region && desc->physical_start < 0x100000 && blk_size >= four_kib_aligned_size) {
+                found_first_mib_region = true;
+                *first_mib_region = (void *)desc->physical_start;
+
+                // Check to see if we still have space left for a regular block.
+                if (blk_size > four_kib_aligned_size) {
+                    blk = (char *)blk + four_kib_aligned_size;
+                    blk_size -= four_kib_aligned_size;
+                } else {
+                    // The reserved region spans the entire block.
+                    goto cont;
+                }
+            }
 
             blk->next_block = NULL;
 
@@ -104,7 +119,7 @@ void mem_init(char *map, size_t map_size, size_t descriptor_size)
             *prev_blocks_next_ptr = blk;
             prev_blocks_next_ptr = &blk->next_block;
         }
-
+    cont:;
         map += descriptor_size;
         map_size -= descriptor_size;
     }

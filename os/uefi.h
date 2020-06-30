@@ -51,7 +51,7 @@ struct efi_guid {
     uint16_t data2;
     uint16_t data3;
     uint8_t data4[8];
-};
+} __attribute__((aligned(_Alignof(uint64_t))));
 
 struct efi_tab_hdr {
     uint64_t signature;
@@ -84,8 +84,8 @@ struct efi_config_tab {
 
 struct efi_memory_descriptor {
     uint32_t type;
-    void *physical_start;
-    void *virtual_start;
+    uint64_t physical_start;
+    uint64_t virtual_start;
     uint64_t number_of_pages;
     uint64_t attribute;
 };
