@@ -148,7 +148,7 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
     }
 
     if (supertype.tag == DY_CORE_EXPR_RECURSION && supertype.recursion.map.polarity == DY_CORE_POLARITY_NEGATIVE) {
-        return is_subtype_of_positive_recursion(ctx, subtype, supertype.recursion, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        return is_subtype_of_negative_recursion(ctx, subtype, supertype.recursion, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
 
     if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
@@ -1156,20 +1156,160 @@ dy_ternary_t junction_is_subtype_of_junction(struct dy_core_ctx *ctx, struct dy_
 
 dy_ternary_t positive_recursion_is_subtype(struct dy_core_ctx *ctx, struct dy_core_recursion rec, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
-    dy_bail("not yet implemented");
+    for (size_t i = 0; i < ctx->supertype_assumption_cache.num_elems; ++i) {
+        struct dy_subtype_assumption assumption;
+        dy_array_get(ctx->supertype_assumption_cache, i, &assumption);
+
+        if (rec.map.binding.id == assumption.rec_binding_id && dy_are_equal(supertype, assumption.type) == DY_YES) {
+            // Treat as Any <: X
+            struct dy_core_expr any = {
+                .tag = DY_CORE_EXPR_END,
+                .end_polarity = DY_CORE_POLARITY_NEGATIVE
+            };
+
+            return dy_is_subtype_sub(ctx, any, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        }
+    }
+
+    struct dy_subtype_assumption assumption = {
+        .type = supertype,
+        .rec_binding_id = rec.map.binding.id
+    };
+
+    size_t old_size = dy_array_add(&ctx->supertype_assumption_cache, &assumption);
+
+    struct dy_core_expr rec_expr = {
+        .tag = DY_CORE_EXPR_RECURSION,
+        .recursion = rec
+    };
+
+    struct dy_core_expr new_subtype = substitute(*rec.map.expr, rec.map.binding.id, rec_expr);
+
+    dy_ternary_t result = dy_is_subtype_sub(ctx, new_subtype, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+
+    dy_core_expr_release(new_subtype);
+
+    ctx->supertype_assumption_cache.num_elems = old_size;
+
+    return result;
 }
 
 dy_ternary_t negative_recursion_is_subtype(struct dy_core_ctx *ctx, struct dy_core_recursion rec, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
-    dy_bail("not yet implemented");
+    for (size_t i = 0; i < ctx->supertype_assumption_cache.num_elems; ++i) {
+        struct dy_subtype_assumption assumption;
+        dy_array_get(ctx->supertype_assumption_cache, i, &assumption);
+
+        if (rec.map.binding.id == assumption.rec_binding_id && dy_are_equal(supertype, assumption.type) == DY_YES) {
+            // Treat as All <: X
+            struct dy_core_expr all = {
+                .tag = DY_CORE_EXPR_END,
+                .end_polarity = DY_CORE_POLARITY_POSITIVE
+            };
+
+            return dy_is_subtype_sub(ctx, all, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        }
+    }
+
+    struct dy_subtype_assumption assumption = {
+        .type = supertype,
+        .rec_binding_id = rec.map.binding.id
+    };
+
+    size_t old_size = dy_array_add(&ctx->supertype_assumption_cache, &assumption);
+
+    struct dy_core_expr rec_expr = {
+        .tag = DY_CORE_EXPR_RECURSION,
+        .recursion = rec
+    };
+
+    struct dy_core_expr new_expr = substitute(*rec.map.expr, rec.map.binding.id, rec_expr);
+
+    dy_ternary_t result = dy_is_subtype_sub(ctx, new_expr, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+
+    dy_core_expr_release(new_expr);
+
+    ctx->supertype_assumption_cache.num_elems = old_size;
+
+    return result;
 }
 
 dy_ternary_t is_subtype_of_positive_recursion(struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_core_recursion rec, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
-    dy_bail("not yet implemented");
+    for (size_t i = 0; i < ctx->subtype_assumption_cache.num_elems; ++i) {
+        struct dy_subtype_assumption assumption;
+        dy_array_get(ctx->subtype_assumption_cache, i, &assumption);
+
+        if (rec.map.binding.id == assumption.rec_binding_id && dy_are_equal(subtype, assumption.type) == DY_YES) {
+            // Treat as X <: Any
+            struct dy_core_expr any = {
+                .tag = DY_CORE_EXPR_END,
+                .end_polarity = DY_CORE_POLARITY_NEGATIVE
+            };
+
+            return dy_is_subtype_sub(ctx, subtype, any, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        }
+    }
+
+    struct dy_subtype_assumption assumption = {
+        .type = subtype,
+        .rec_binding_id = rec.map.binding.id
+    };
+
+    size_t old_size = dy_array_add(&ctx->subtype_assumption_cache, &assumption);
+
+    struct dy_core_expr rec_expr = {
+        .tag = DY_CORE_EXPR_RECURSION,
+        .recursion = rec
+    };
+
+    struct dy_core_expr new_expr = substitute(*rec.map.expr, rec.map.binding.id, rec_expr);
+
+    dy_ternary_t result = dy_is_subtype_sub(ctx, subtype, new_expr, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+
+    dy_core_expr_release(new_expr);
+
+    ctx->subtype_assumption_cache.num_elems = old_size;
+
+    return result;
 }
 
 dy_ternary_t is_subtype_of_negative_recursion(struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_core_recursion rec, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
-    dy_bail("not yet implemented");
+    for (size_t i = 0; i < ctx->subtype_assumption_cache.num_elems; ++i) {
+        struct dy_subtype_assumption assumption;
+        dy_array_get(ctx->subtype_assumption_cache, i, &assumption);
+
+        if (rec.map.binding.id == assumption.rec_binding_id && dy_are_equal(subtype, assumption.type) == DY_YES) {
+            // Treat as X <: All
+            struct dy_core_expr all = {
+                .tag = DY_CORE_EXPR_END,
+                .end_polarity = DY_CORE_POLARITY_POSITIVE
+            };
+
+            return dy_is_subtype_sub(ctx, subtype, all, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        }
+    }
+
+    struct dy_subtype_assumption assumption = {
+        .type = subtype,
+        .rec_binding_id = rec.map.binding.id
+    };
+
+    size_t old_size = dy_array_add(&ctx->subtype_assumption_cache, &assumption);
+
+    struct dy_core_expr rec_expr = {
+        .tag = DY_CORE_EXPR_RECURSION,
+        .recursion = rec
+    };
+
+    struct dy_core_expr new_expr = substitute(*rec.map.expr, rec.map.binding.id, rec_expr);
+
+    dy_ternary_t result = dy_is_subtype_sub(ctx, subtype, new_expr, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+
+    dy_core_expr_release(new_expr);
+
+    ctx->subtype_assumption_cache.num_elems = old_size;
+
+    return result;
 }

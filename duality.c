@@ -80,7 +80,9 @@ int main(int argc, const char *argv[])
 
     struct dy_core_ctx core_ctx = {
         .running_id = ast_to_core_ctx.running_id,
-        .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), DY_ALIGNOF(struct dy_bound_constraint), 64)
+        .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), DY_ALIGNOF(struct dy_bound_constraint), 64),
+        .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
+        .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64)
     };
 
     struct dy_constraint constraint;

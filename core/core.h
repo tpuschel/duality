@@ -23,7 +23,12 @@
  */
 struct dy_core_ctx {
     size_t running_id;
+
     dy_array_t bound_constraints;
+
+    dy_array_t subtype_assumption_cache;
+
+    dy_array_t supertype_assumption_cache;
 };
 
 /** Hopefully self-explanatory :) */
@@ -170,6 +175,11 @@ struct dy_bound_constraint {
     size_t id;
     struct dy_core_expr type;
     dy_array_t binding_ids;
+};
+
+struct dy_subtype_assumption {
+    struct dy_core_expr type;
+    size_t rec_binding_id;
 };
 
 /**

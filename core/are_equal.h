@@ -42,8 +42,14 @@ static inline dy_ternary_t type_map_elim_is_equal(struct dy_core_type_map_elim e
 
 static inline dy_ternary_t alternative_is_equal(struct dy_core_alternative alternative, struct dy_core_expr expr);
 
+static inline dy_ternary_t dy_recursion_is_equal(struct dy_core_recursion rec1, struct dy_core_recursion rec2);
+
 dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
 {
+    if (e1.tag == DY_CORE_EXPR_RECURSION && e2.tag == DY_CORE_EXPR_RECURSION && e1.recursion.map.polarity == e2.recursion.map.polarity) {
+        return dy_recursion_is_equal(e1.recursion, e2.recursion);
+    }
+
     if (e1.tag == DY_CORE_EXPR_JUNCTION && e1.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
         return is_equal_to_junction_positive(e2, e1.junction);
     }
@@ -330,4 +336,20 @@ dy_ternary_t type_map_elim_is_equal(struct dy_core_type_map_elim elim, struct dy
     }
 
     return DY_YES;
+}
+
+dy_ternary_t dy_recursion_is_equal(struct dy_core_recursion rec1, struct dy_core_recursion rec2)
+{
+    struct dy_core_expr binding = {
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable = rec1.map.binding
+    };
+
+    struct dy_core_expr new_rec2_expr = substitute(*rec2.map.expr, rec2.map.binding.id, binding);
+
+    dy_ternary_t result = dy_are_equal(*rec1.map.expr, new_rec2_expr);
+
+    dy_core_expr_release(new_rec2_expr);
+
+    return result;
 }
