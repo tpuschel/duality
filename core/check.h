@@ -651,9 +651,28 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
             }
 
             if (solution.have_subtype) {
-                assert(!dy_core_expr_is_bound(id, solution.subtype));
+                struct dy_core_expr subtype = solution.subtype;
+                if (dy_core_expr_is_bound(id, solution.subtype)) {
+                    subtype = (struct dy_core_expr){
+                        .tag = DY_CORE_EXPR_RECURSION,
+                        .recursion = {
+                            .check_result = DY_YES,
+                            .map = {
+                                .binding = {
+                                    .id = id,
+                                    .type = dy_core_expr_new(type),
+                                },
+                                .expr = dy_core_expr_new(solution.subtype),
+                                .polarity = DY_CORE_POLARITY_NEGATIVE,
+                                .is_implicit = false,
+                            },
+                        }
+                    };
 
-                expr = substitute(expr, id, solution.subtype);
+                    dy_core_expr_release(solution.subtype);
+                }
+
+                expr = substitute(expr, id, subtype);
             } else {
                 struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
@@ -700,9 +719,28 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
             }
 
             if (solution.have_supertype) {
-                assert(!dy_core_expr_is_bound(id, solution.supertype));
+                struct dy_core_expr supertype = solution.supertype;
+                if (dy_core_expr_is_bound(id, solution.supertype)) {
+                    supertype = (struct dy_core_expr){
+                        .tag = DY_CORE_EXPR_RECURSION,
+                        .recursion = {
+                            .check_result = DY_YES,
+                            .map = {
+                                .binding = {
+                                    .id = id,
+                                    .type = dy_core_expr_new(type),
+                                },
+                                .expr = dy_core_expr_new(solution.supertype),
+                                .polarity = DY_CORE_POLARITY_POSITIVE,
+                                .is_implicit = false,
+                            },
+                        }
+                    };
 
-                expr = substitute(expr, id, solution.supertype);
+                    dy_core_expr_release(solution.supertype);
+                }
+
+                expr = substitute(expr, id, supertype);
             } else {
                 struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
