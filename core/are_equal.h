@@ -36,6 +36,8 @@ static inline dy_ternary_t type_map_is_equal_to_type_map(struct dy_core_type_map
 
 static inline dy_ternary_t variable_is_equal(struct dy_core_variable variable, struct dy_core_expr expr);
 
+static inline dy_ternary_t inference_variable_is_equal(struct dy_core_variable variable, struct dy_core_expr expr);
+
 static inline dy_ternary_t equality_map_elim_is_equal(struct dy_core_equality_map_elim elim, struct dy_core_expr expr);
 
 static inline dy_ternary_t type_map_elim_is_equal(struct dy_core_type_map_elim elim, struct dy_core_expr expr);
@@ -71,7 +73,7 @@ dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
     }
 
     if (e2.tag == DY_CORE_EXPR_INFERENCE_VARIABLE) {
-        return variable_is_equal(e2.inference_variable, e1);
+        return inference_variable_is_equal(e2.inference_variable, e1);
     }
 
     if (e2.tag == DY_CORE_EXPR_EQUALITY_MAP_ELIM) {
@@ -102,7 +104,7 @@ dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
     case DY_CORE_EXPR_VARIABLE:
         return variable_is_equal(e1.variable, e2);
     case DY_CORE_EXPR_INFERENCE_VARIABLE:
-        return variable_is_equal(e1.inference_variable, e2);
+        return inference_variable_is_equal(e1.inference_variable, e2);
     case DY_CORE_EXPR_ALTERNATIVE:
         return alternative_is_equal(e1.alternative, e2);
     case DY_CORE_EXPR_END:
@@ -120,7 +122,7 @@ dy_ternary_t dy_are_equal(struct dy_core_expr e1, struct dy_core_expr e2)
             return DY_NO;
         }
     case DY_CORE_EXPR_RECURSION:
-        dy_bail("Not yet implemented");
+        return DY_NO;
     case DY_CORE_EXPR_JUNCTION:
         // fallthrough
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
@@ -286,6 +288,19 @@ dy_ternary_t variable_is_equal(struct dy_core_variable variable, struct dy_core_
     }
 
     if (variable.id == expr.variable.id) {
+        return DY_YES;
+    } else {
+        return DY_MAYBE;
+    }
+}
+
+dy_ternary_t inference_variable_is_equal(struct dy_core_variable variable, struct dy_core_expr expr)
+{
+    if (expr.tag != DY_CORE_EXPR_INFERENCE_VARIABLE) {
+        return DY_MAYBE;
+    }
+
+    if (variable.id == expr.inference_variable.id) {
         return DY_YES;
     } else {
         return DY_MAYBE;
