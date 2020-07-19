@@ -72,10 +72,17 @@
 
     <script src="duality.js"></script>
 
-    <script src="processCode.js"></script>
-
     <script>
       'use strict'
+
+      let processCode = program => {
+        let cText = allocate(intArrayFromString(program, true), 'i8', ALLOC_NORMAL)
+        let cTextLength = lengthBytesUTF8(program)
+
+        let result = _process_code(cText, cTextLength)
+
+        return 'Result: ' + UTF8ToString(result, _strlen(result))
+      }
 
       let timeoutId = undefined
 
