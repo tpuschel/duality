@@ -61,9 +61,19 @@ static inline struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size
 static inline void remove_id(dy_array_t *ids, size_t id);
 
 /**
- * Determines if 'id' is mentioned in any of the constraints of 'constraint'.
+ * Removes all mentions of 'id' in 'constraint', which may involve lowering/raising the subtype/supertype bounds.
  */
-static inline bool is_mentioned_in_constraints(struct dy_core_ctx *ctx, size_t id, struct dy_constraint constraint);
+static inline struct dy_constraint remove_mentions_in_constraint(struct dy_core_ctx *ctx, size_t id, struct dy_constraint constraint);
+
+/**
+ * Removes all mentions of 'id'. The returned type is always a supertype of 'subtype'.
+ */
+static inline struct dy_core_expr remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr subtype);
+
+/**
+ * Removes all mentions of 'id'. The returned type is always a subtype of 'supertype'.
+ */
+static inline struct dy_core_expr remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr supertype);
 
 struct dy_core_expr dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
@@ -166,11 +176,9 @@ struct dy_core_type_map dy_check_type_map(struct dy_core_ctx *ctx, struct dy_cor
     type_map.expr = dy_core_expr_new(new_expr);
 
     if (have_c2) {
-        // Check to see if we're bound in one of the constraints.
-        // If that's the case, error out for now.
-        if (is_mentioned_in_constraints(ctx, type_map.binding.id, c2)) {
-            dy_bail("Not yet implemented.");
-        }
+        struct dy_constraint c3 = remove_mentions_in_constraint(ctx, type_map.binding.id, c2);
+        // free c2
+        c2 = c3;
     }
 
     if (have_c1 && have_c2) {
@@ -668,11 +676,11 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
                             },
                         }
                     };
-
-                    dy_core_expr_release(solution.subtype);
                 }
 
                 expr = substitute(expr, id, subtype);
+
+                dy_core_expr_release(subtype);
             } else {
                 struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
@@ -736,11 +744,11 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
                             },
                         }
                     };
-
-                    dy_core_expr_release(solution.supertype);
                 }
 
                 expr = substitute(expr, id, supertype);
+
+                dy_core_expr_release(supertype);
             } else {
                 struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
@@ -882,23 +890,204 @@ void remove_id(dy_array_t *ids, size_t id_to_remove)
     }
 }
 
-bool is_mentioned_in_constraints(struct dy_core_ctx *ctx, size_t id, struct dy_constraint constraint)
+struct dy_constraint remove_mentions_in_constraint(struct dy_core_ctx *ctx, size_t id, struct dy_constraint constraint)
 {
     switch (constraint.tag) {
     case DY_CONSTRAINT_SINGLE:
-        if (constraint.single.range.have_subtype && dy_core_expr_is_bound(id, constraint.single.range.subtype)) {
-            return true;
+        if (constraint.single.range.have_subtype) {
+            constraint.single.range.subtype = remove_mentions_in_subtype(ctx, id, constraint.single.range.subtype);
         }
 
-        if (constraint.single.range.have_supertype && dy_core_expr_is_bound(id, constraint.single.range.supertype)) {
-            return true;
+        if (constraint.single.range.have_supertype) {
+            constraint.single.range.supertype = remove_mentions_in_supertype(ctx, id, constraint.single.range.supertype);
         }
 
-        return false;
+        return constraint;
     case DY_CONSTRAINT_MULTIPLE:
-        return is_mentioned_in_constraints(ctx, id, *constraint.multiple.c1)
-               || is_mentioned_in_constraints(ctx, id, *constraint.multiple.c2);
+        constraint.multiple.c1 = alloc_constraint(remove_mentions_in_constraint(ctx, id, *constraint.multiple.c1));
+        constraint.multiple.c2 = alloc_constraint(remove_mentions_in_constraint(ctx, id, *constraint.multiple.c2));
+        return constraint;
     }
+}
+
+struct dy_core_expr remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr subtype)
+{
+    switch (subtype.tag) {
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        if (dy_core_expr_is_bound(id, *subtype.equality_map.e1)) {
+            if (subtype.equality_map.polarity == DY_CORE_POLARITY_NEGATIVE) {
+                return (struct dy_core_expr){
+                    .tag = DY_CORE_EXPR_END,
+                    .end_polarity = DY_CORE_POLARITY_NEGATIVE
+                };
+            } else {
+                struct dy_core_expr type_map = {
+                    .tag = DY_CORE_EXPR_TYPE_MAP,
+                    .type_map = {
+                        .binding = {
+                            .id = ctx->running_id++,
+                            .type = dy_core_expr_new(dy_type_of(ctx, *subtype.equality_map.e1)),
+                        },
+                        .expr = dy_core_expr_retain_ptr(subtype.equality_map.e2),
+                        .polarity = DY_CORE_POLARITY_NEGATIVE,
+                        .is_implicit = subtype.equality_map.is_implicit,
+                    }
+                };
+
+                struct dy_core_expr e = remove_mentions_in_supertype(ctx, id, type_map);
+
+                dy_core_expr_release(type_map);
+
+                return e;
+            }
+        }
+
+        subtype.equality_map.e2 = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.equality_map.e2));
+        return subtype;
+    case DY_CORE_EXPR_TYPE_MAP:
+        subtype.type_map.binding.type = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.type_map.binding.type));
+        subtype.type_map.expr = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.type_map.expr));
+        return subtype;
+    case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
+        subtype.inference_type_map.binding.type = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.inference_type_map.binding.type));
+        subtype.inference_type_map.expr = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.inference_type_map.expr));
+        return subtype;
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        // fallthrough
+    case DY_CORE_EXPR_ALTERNATIVE:
+        // fallthrough
+    case DY_CORE_EXPR_TYPE_MAP_ELIM:
+        if (dy_core_expr_is_bound(id, subtype)) {
+            return (struct dy_core_expr){
+                .tag = DY_CORE_EXPR_END,
+                .end_polarity = DY_CORE_POLARITY_NEGATIVE
+            };
+        } else {
+            return subtype;
+        }
+    case DY_CORE_EXPR_JUNCTION:
+        subtype.junction.e1 = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.junction.e1));
+        subtype.junction.e2 = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.junction.e2));
+        return subtype;
+    case DY_CORE_EXPR_RECURSION:
+        subtype.recursion.map.binding.type = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.recursion.map.binding.type));
+        subtype.recursion.map.expr = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.recursion.map.expr));
+        return subtype;
+    case DY_CORE_EXPR_VARIABLE:
+        if (subtype.variable.id == id) {
+            return (struct dy_core_expr){
+                .tag = DY_CORE_EXPR_END,
+                .end_polarity = DY_CORE_POLARITY_NEGATIVE
+            };
+        } else {
+            return subtype;
+        }
+    case DY_CORE_EXPR_INFERENCE_VARIABLE:
+        if (subtype.inference_variable.id == id) {
+            return (struct dy_core_expr){
+                .tag = DY_CORE_EXPR_END,
+                .end_polarity = DY_CORE_POLARITY_NEGATIVE
+            };
+        } else {
+            return subtype;
+        }
+    case DY_CORE_EXPR_END:
+    case DY_CORE_EXPR_CUSTOM:
+    case DY_CORE_EXPR_SYMBOL:
+        return subtype;
+    }
+
+    dy_bail("Impossible object type.");
+}
+
+struct dy_core_expr remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr supertype)
+{
+    switch (supertype.tag) {
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        if (dy_core_expr_is_bound(id, *supertype.equality_map.e1)) {
+            if (supertype.equality_map.polarity == DY_CORE_POLARITY_POSITIVE) {
+                return (struct dy_core_expr){
+                    .tag = DY_CORE_EXPR_END,
+                    .end_polarity = DY_CORE_POLARITY_POSITIVE
+                };
+            } else {
+                struct dy_core_expr type_map = {
+                    .tag = DY_CORE_EXPR_TYPE_MAP,
+                    .type_map = {
+                        .binding = {
+                            .id = ctx->running_id++,
+                            .type = dy_core_expr_new(dy_type_of(ctx, *supertype.equality_map.e1)),
+                        },
+                        .expr = dy_core_expr_retain_ptr(supertype.equality_map.e2),
+                        .polarity = DY_CORE_POLARITY_POSITIVE,
+                        .is_implicit = supertype.equality_map.is_implicit,
+                    }
+                };
+
+                struct dy_core_expr e = remove_mentions_in_supertype(ctx, id, type_map);
+
+                dy_core_expr_release(type_map);
+
+                return e;
+            }
+        }
+
+        supertype.equality_map.e2 = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *supertype.equality_map.e2));
+        return supertype;
+    case DY_CORE_EXPR_TYPE_MAP:
+        supertype.type_map.binding.type = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *supertype.type_map.binding.type));
+        supertype.type_map.expr = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *supertype.type_map.expr));
+        return supertype;
+    case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
+        supertype.inference_type_map.binding.type = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *supertype.inference_type_map.binding.type));
+        supertype.inference_type_map.expr = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *supertype.inference_type_map.expr));
+        return supertype;
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        // fallthrough
+    case DY_CORE_EXPR_ALTERNATIVE:
+        // fallthrough
+    case DY_CORE_EXPR_TYPE_MAP_ELIM:
+        if (dy_core_expr_is_bound(id, supertype)) {
+            return (struct dy_core_expr){
+                .tag = DY_CORE_EXPR_END,
+                .end_polarity = DY_CORE_POLARITY_POSITIVE
+            };
+        } else {
+            return supertype;
+        }
+    case DY_CORE_EXPR_JUNCTION:
+        supertype.junction.e1 = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *supertype.junction.e1));
+        supertype.junction.e2 = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *supertype.junction.e2));
+        return supertype;
+    case DY_CORE_EXPR_RECURSION:
+        supertype.recursion.map.binding.type = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *supertype.recursion.map.binding.type));
+        supertype.recursion.map.expr = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *supertype.recursion.map.expr));
+        return supertype;
+    case DY_CORE_EXPR_VARIABLE:
+        if (supertype.variable.id == id) {
+            return (struct dy_core_expr){
+                .tag = DY_CORE_EXPR_END,
+                .end_polarity = DY_CORE_POLARITY_POSITIVE
+            };
+        } else {
+            return supertype;
+        }
+    case DY_CORE_EXPR_INFERENCE_VARIABLE:
+        if (supertype.inference_variable.id == id) {
+            return (struct dy_core_expr){
+                .tag = DY_CORE_EXPR_END,
+                .end_polarity = DY_CORE_POLARITY_POSITIVE
+            };
+        } else {
+            return supertype;
+        }
+    case DY_CORE_EXPR_END:
+    case DY_CORE_EXPR_CUSTOM:
+    case DY_CORE_EXPR_SYMBOL:
+        return supertype;
+    }
+
+    dy_bail("Impossible object type.");
 }
 
 const struct dy_constraint *alloc_constraint(struct dy_constraint constraint)
