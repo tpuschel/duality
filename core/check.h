@@ -970,7 +970,7 @@ struct dy_core_expr remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t i
                     }
                 };
 
-                struct dy_core_expr e = remove_mentions_in_supertype(ctx, id, type_map);
+                struct dy_core_expr e = remove_mentions_in_subtype(ctx, id, type_map);
 
                 dy_core_expr_release(type_map);
 
@@ -981,12 +981,12 @@ struct dy_core_expr remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t i
         subtype.equality_map.e2 = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.equality_map.e2));
         return subtype;
     case DY_CORE_EXPR_TYPE_MAP:
-        subtype.type_map.binding.type = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.type_map.binding.type));
-        subtype.type_map.expr = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.type_map.expr));
+        subtype.type_map.binding.type = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.type_map.binding.type));
+        subtype.type_map.expr = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.type_map.expr));
         return subtype;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        subtype.inference_type_map.binding.type = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.inference_type_map.binding.type));
-        subtype.inference_type_map.expr = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.inference_type_map.expr));
+        subtype.inference_type_map.binding.type = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.inference_type_map.binding.type));
+        subtype.inference_type_map.expr = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.inference_type_map.expr));
         return subtype;
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
         // fallthrough
@@ -1002,12 +1002,12 @@ struct dy_core_expr remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t i
             return subtype;
         }
     case DY_CORE_EXPR_JUNCTION:
-        subtype.junction.e1 = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.junction.e1));
-        subtype.junction.e2 = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.junction.e2));
+        subtype.junction.e1 = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.junction.e1));
+        subtype.junction.e2 = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.junction.e2));
         return subtype;
     case DY_CORE_EXPR_RECURSION:
-        subtype.recursion.map.binding.type = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.recursion.map.binding.type));
-        subtype.recursion.map.expr = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.recursion.map.expr));
+        subtype.recursion.map.binding.type = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.recursion.map.binding.type));
+        subtype.recursion.map.expr = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.recursion.map.expr));
         return subtype;
     case DY_CORE_EXPR_VARIABLE:
         if (subtype.variable.id == id) {
@@ -1069,7 +1069,7 @@ struct dy_core_expr remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t
             }
         }
 
-        supertype.equality_map.e2 = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *supertype.equality_map.e2));
+        supertype.equality_map.e2 = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *supertype.equality_map.e2));
         return supertype;
     case DY_CORE_EXPR_TYPE_MAP:
         supertype.type_map.binding.type = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *supertype.type_map.binding.type));
