@@ -824,6 +824,7 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
     struct dy_core_ctx core_ctx = {
         .running_id = ast_to_core_ctx.running_id,
         .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), DY_ALIGNOF(struct dy_bound_constraint), 1),
+        .already_visited_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 64),
         .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
         .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64)
     };

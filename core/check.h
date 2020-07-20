@@ -49,6 +49,8 @@ static inline const struct dy_constraint *alloc_constraint(struct dy_constraint 
  */
 static inline void dy_binding_contraints(struct dy_core_ctx *ctx, size_t id, struct dy_constraint constraint, bool have_constraint, dy_array_t *ids);
 
+static inline bool dy_is_dependency_of_constraint(struct dy_core_ctx *ctx, size_t potential_dependency_id, size_t current_constraint_id);
+
 /**
  * Collects all constraint of 'id' in 'constraint' (if present) and forms its inferred expression.
  * It then recursively resolves any bound constraint that is now "free" as a result of 'id' being resolved.
@@ -608,23 +610,11 @@ void dy_binding_contraints(struct dy_core_ctx *ctx, size_t id, struct dy_constra
             }
         }
 
-        // No mutually recursive dependencies.
-        // TODO: Actually follow indirection.
-        for (size_t i = ctx->bound_constraints.num_elems; i-- > 0;) {
-            struct dy_bound_constraint bound_constraint;
-            dy_array_get(ctx->bound_constraints, i, &bound_constraint);
-
-            if (constraint.single.id != bound_constraint.id) {
-                continue;
-            }
-
-            for (size_t k = 0, size = bound_constraint.binding_ids.num_elems; k < size; ++k) {
-                size_t binding_id;
-                dy_array_get(bound_constraint.binding_ids, k, &binding_id);
-                if (binding_id == id) {
-                    return;
-                }
-            }
+        size_t old_size = ctx->already_visited_ids.num_elems;
+        bool is_dependency = dy_is_dependency_of_constraint(ctx, id, constraint.single.id);
+        ctx->already_visited_ids.num_elems = old_size;
+        if (is_dependency) {
+            return;
         }
 
         if (constraint.single.range.have_subtype && dy_core_expr_is_bound(id, constraint.single.range.subtype)) {
@@ -645,6 +635,52 @@ void dy_binding_contraints(struct dy_core_ctx *ctx, size_t id, struct dy_constra
     }
 
     dy_bail("Impossible constraint type.");
+}
+
+bool dy_is_dependency_of_constraint(struct dy_core_ctx *ctx, size_t potential_dependency_id, size_t current_constraint_id)
+{
+    dy_array_add(&ctx->already_visited_ids, &current_constraint_id);
+
+    for (size_t i = ctx->bound_constraints.num_elems; i-- > 0;) {
+        struct dy_bound_constraint bound_constraint;
+        dy_array_get(ctx->bound_constraints, i, &bound_constraint);
+
+        if (current_constraint_id != bound_constraint.id) {
+            continue;
+        }
+
+        for (size_t k = 0; k < bound_constraint.binding_ids.num_elems; ++k) {
+            size_t dependency_of_current_constraint_id;
+            dy_array_get(bound_constraint.binding_ids, k, &dependency_of_current_constraint_id);
+
+            if (dependency_of_current_constraint_id == potential_dependency_id) {
+                return true;
+            }
+
+            bool skip_id = false;
+            for (size_t h = 0; h < ctx->already_visited_ids.num_elems; ++h) {
+                size_t already_visited_id;
+                dy_array_get(ctx->already_visited_ids, h, &already_visited_id);
+
+                if (already_visited_id == dependency_of_current_constraint_id) {
+                    skip_id = true;
+                    break;
+                }
+            }
+
+            if (skip_id) {
+                continue;
+            }
+
+            if (dy_is_dependency_of_constraint(ctx, potential_dependency_id, dependency_of_current_constraint_id)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    return false;
 }
 
 struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr type, enum dy_core_polarity polarity, struct dy_constraint constraint, bool have_constraint, struct dy_constraint *new_constraint, bool *have_new_constraint, struct dy_core_expr expr)

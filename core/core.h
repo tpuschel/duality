@@ -26,6 +26,8 @@ struct dy_core_ctx {
 
     dy_array_t bound_constraints;
 
+    dy_array_t already_visited_ids;
+
     dy_array_t subtype_assumption_cache;
 
     dy_array_t supertype_assumption_cache;
