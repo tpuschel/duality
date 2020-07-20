@@ -117,6 +117,10 @@ struct dy_core_custom {
 
     struct dy_core_expr (*check)(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint);
 
+    struct dy_core_expr (*remove_mentions_in_subtype)(void *data, struct dy_core_ctx *ctx, size_t id);
+
+    struct dy_core_expr (*remove_mentions_in_supertype)(void *data, struct dy_core_ctx *ctx, size_t id);
+
     struct dy_core_expr (*eval)(void *data, struct dy_core_ctx *ctx, bool *is_value);
 
     struct dy_core_expr (*substitute)(void *data, size_t id, struct dy_core_expr sub);

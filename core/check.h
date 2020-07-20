@@ -1027,8 +1027,9 @@ struct dy_core_expr remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t i
         } else {
             return subtype;
         }
-    case DY_CORE_EXPR_END:
     case DY_CORE_EXPR_CUSTOM:
+        return subtype.custom.remove_mentions_in_subtype(subtype.custom.data, ctx, id);
+    case DY_CORE_EXPR_END:
     case DY_CORE_EXPR_SYMBOL:
         return subtype;
     }
@@ -1117,8 +1118,9 @@ struct dy_core_expr remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t
         } else {
             return supertype;
         }
-    case DY_CORE_EXPR_END:
     case DY_CORE_EXPR_CUSTOM:
+        return supertype.custom.remove_mentions_in_supertype(supertype.custom.data, ctx, id);
+    case DY_CORE_EXPR_END:
     case DY_CORE_EXPR_SYMBOL:
         return supertype;
     }
