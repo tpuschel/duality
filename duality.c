@@ -171,6 +171,10 @@ bool core_has_error(struct dy_core_expr expr)
     case DY_CORE_EXPR_VARIABLE:
         return false;
     case DY_CORE_EXPR_CUSTOM:
+        if (expr.custom.id == dy_uv_id) {
+            return true;
+        }
+
         return false;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
@@ -247,6 +251,13 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
     case DY_CORE_EXPR_END:
         return;
     case DY_CORE_EXPR_CUSTOM:
+        if (expr.custom.id == dy_uv_id) {
+            struct dy_uv_data *data = expr.custom.data;
+
+            fprintf(file, "Unbound variable: ");
+            print_error_fragment(file, data->var.text_range, text, text_size);
+        }
+
         return;
     case DY_CORE_EXPR_INFERENCE_VARIABLE:
         return;

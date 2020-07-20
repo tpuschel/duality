@@ -8,6 +8,7 @@
 
 #include "ast.h"
 #include "parser.h"
+#include "unbound_variable.h"
 
 #include "../core/core.h"
 
@@ -147,8 +148,14 @@ struct dy_core_expr dy_ast_variable_to_core(struct dy_ast_to_core_ctx *ctx, stru
         }
     }
 
-    // TODO: Reintroduce 'invalid' as a custom core expr.
-    dy_bail("not yet implemented");
+    struct dy_uv_data data = {
+        .var = variable
+    };
+
+    return (struct dy_core_expr){
+        .tag = DY_CORE_EXPR_CUSTOM,
+        .custom = dy_uv_create(data)
+    };
 }
 
 struct dy_core_expr ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_type_map type_map, enum dy_core_polarity polarity)

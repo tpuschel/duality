@@ -135,7 +135,7 @@ struct dy_core_custom {
 
     size_t (*num_occurrences)(void *data, size_t id);
 
-    void (*retain)(void *data);
+    void *(*retain)(void *data);
 
     void (*release)(void *data);
 
