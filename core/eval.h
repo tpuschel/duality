@@ -271,16 +271,18 @@ struct dy_core_expr dy_eval_alternative(struct dy_core_ctx *ctx, struct dy_core_
 
 struct dy_core_expr dy_eval_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, bool *is_value)
 {
+    struct dy_core_expr evaled_body = dy_eval_expr(ctx, *recursion.map.expr, is_value);
+
+    recursion.map.expr = dy_core_expr_new(evaled_body);
+
     struct dy_core_expr rec_expr = {
         .tag = DY_CORE_EXPR_RECURSION,
         .recursion = recursion
     };
 
-    struct dy_core_expr e = substitute(*recursion.map.expr, recursion.map.binding.id, rec_expr);
+    struct dy_core_expr substituted_body = substitute(evaled_body, recursion.map.binding.id, rec_expr);
 
-    struct dy_core_expr new_e = dy_eval_expr(ctx, e, is_value);
+    dy_core_expr_release_ptr(recursion.map.expr);
 
-    dy_core_expr_release(e);
-
-    return new_e;
+    return substituted_body;
 }

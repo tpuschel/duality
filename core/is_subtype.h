@@ -135,6 +135,10 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         return DY_MAYBE;
     }
 
+    if (subtype.tag == DY_CORE_EXPR_RECURSION && supertype.tag == DY_CORE_EXPR_RECURSION && subtype.recursion.map.polarity == supertype.recursion.map.polarity && subtype.recursion.map.binding.id == supertype.recursion.map.binding.id) {
+        return dy_is_subtype_sub(ctx, *subtype.recursion.map.expr, *supertype.recursion.map.expr, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+    }
+
     if (subtype.tag == DY_CORE_EXPR_RECURSION && subtype.recursion.map.polarity == DY_CORE_POLARITY_POSITIVE) {
         return positive_recursion_is_subtype(ctx, subtype.recursion, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
