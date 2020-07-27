@@ -102,6 +102,8 @@ static inline bool parse_do_block_body_let(struct dy_parser_ctx *ctx, struct dy_
 
 static inline bool parse_do_block_body_ignored_expr(struct dy_parser_ctx *ctx, struct dy_ast_do_block_ignored_expr *ignored_expr);
 
+static inline bool parse_do_block_def(struct dy_parser_ctx *ctx, struct dy_ast_do_block_def *def);
+
 static inline bool skip_semicolon_or_newline(struct dy_parser_ctx *ctx);
 
 bool dy_parse_literal(struct dy_parser_ctx *ctx, dy_string_t s)
@@ -126,7 +128,7 @@ bool dy_parse_variable(struct dy_parser_ctx *ctx, struct dy_ast_literal *var)
     dy_array_add(&ctx->string_arrays, &var_name);
 
     char c;
-    if (!parse_one_of(ctx, DY_STR_LIT("abcdefghijklmnopqrstuvwxyz"), &c)) {
+    if (!parse_one_of(ctx, DY_STR_LIT("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"), &c)) {
         ctx->stream.current_index = start_index;
         return false;
     }
@@ -134,7 +136,7 @@ bool dy_parse_variable(struct dy_parser_ctx *ctx, struct dy_ast_literal *var)
     dy_array_add(&var_name, &c);
 
     for (;;) {
-        if (!parse_one_of(ctx, DY_STR_LIT("abcdefghijklmnopqrstuvwxyz0123456789-?"), &c)) {
+        if (!parse_one_of(ctx, DY_STR_LIT("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-?"), &c)) {
             dy_string_t final_var = {
                 .ptr = var_name.buffer,
                 .size = var_name.num_elems
@@ -147,7 +149,8 @@ bool dy_parse_variable(struct dy_parser_ctx *ctx, struct dy_ast_literal *var)
                 || dy_string_are_equal(final_var, DY_STR_LIT("All"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("Any"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("rec"))
-                || dy_string_are_equal(final_var, DY_STR_LIT("Symbol"))) {
+                || dy_string_are_equal(final_var, DY_STR_LIT("Symbol"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("def"))) {
                 ctx->stream.current_index = start_index;
                 return false;
             }
@@ -738,6 +741,16 @@ bool parse_do_block_body(struct dy_parser_ctx *ctx, struct dy_ast_do_block_body 
         return true;
     }
 
+    struct dy_ast_do_block_def def;
+    if (parse_do_block_def(ctx, &def)) {
+        *do_block = (struct dy_ast_do_block_body){
+            .tag = DY_AST_DO_BLOCK_DEF,
+            .def = def
+        };
+
+        return true;
+    }
+
     struct dy_ast_do_block_ignored_expr ignored_expr;
     if (parse_do_block_body_ignored_expr(ctx, &ignored_expr)) {
         *do_block = (struct dy_ast_do_block_body){
@@ -759,6 +772,64 @@ bool parse_do_block_body(struct dy_parser_ctx *ctx, struct dy_ast_do_block_body 
     }
 
     return false;
+}
+
+bool parse_do_block_def(struct dy_parser_ctx *ctx, struct dy_ast_do_block_def *def)
+{
+    size_t start_index = ctx->stream.current_index;
+
+    if (!dy_parse_literal(ctx, DY_STR_LIT("def"))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    skip_whitespace_except_newline(ctx);
+
+    struct dy_ast_literal name;
+    if (!dy_parse_variable(ctx, &name)) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    skip_whitespace_except_newline(ctx);
+
+    if (!dy_parse_literal(ctx, DY_STR_LIT("="))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    skip_whitespace_except_newline(ctx);
+
+    struct dy_ast_expr expr;
+    if (!dy_parse_expr(ctx, &expr)) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    skip_whitespace_except_newline(ctx);
+
+    if (!skip_semicolon_or_newline(ctx)) {
+        dy_ast_expr_release(expr);
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    skip_whitespace(ctx);
+
+    struct dy_ast_do_block_body rest;
+    if (!parse_do_block_body(ctx, &rest)) {
+        dy_ast_expr_release(expr);
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    *def = (struct dy_ast_do_block_def){
+        .name = name,
+        .expr = dy_ast_expr_new(expr),
+        .rest = dy_ast_do_block_new(rest)
+    };
+
+    return true;
 }
 
 bool parse_do_block_body_equality(struct dy_parser_ctx *ctx, struct dy_ast_do_block_equality *equality)

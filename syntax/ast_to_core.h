@@ -9,6 +9,7 @@
 #include "ast.h"
 #include "parser.h"
 #include "unbound_variable.h"
+#include "def.h"
 
 #include "../core/core.h"
 
@@ -76,6 +77,8 @@ static inline struct dy_core_expr do_block_equality_to_core(struct dy_ast_to_cor
 static inline struct dy_core_expr do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_let let);
 
 static inline struct dy_core_expr do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_ignored_expr ignored_expr);
+
+static inline struct dy_core_expr do_block_def_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_def def);
 
 static inline struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_recursion rec, enum dy_core_polarity polarity);
 
@@ -346,6 +349,8 @@ struct dy_core_expr ast_do_block_body_to_core(struct dy_ast_to_core_ctx *ctx, st
         return do_block_ignored_expr_to_core(ctx, do_block.ignored_expr);
     case DY_AST_DO_BLOCK_EQUALITY:
         return do_block_equality_to_core(ctx, do_block.equality);
+    case DY_AST_DO_BLOCK_DEF:
+        return do_block_def_to_core(ctx, do_block.def);
     }
 
     dy_bail("Impossible do block type.");
@@ -354,6 +359,41 @@ struct dy_core_expr ast_do_block_body_to_core(struct dy_ast_to_core_ctx *ctx, st
 struct dy_core_expr dy_ast_do_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block do_block)
 {
     return ast_do_block_body_to_core(ctx, do_block.body);
+}
+
+struct dy_core_expr do_block_def_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_def def)
+{
+    struct dy_core_expr expr = dy_ast_expr_to_core(ctx, *def.expr);
+
+    size_t id = ctx->running_id++;
+
+    struct dy_core_expr arg_type = {
+        .tag = DY_CORE_EXPR_END,
+        .end_polarity = DY_CORE_POLARITY_NEGATIVE
+    };
+
+    struct dy_ast_to_core_bound_var bound_var = {
+        .name = def.name.value,
+        .replacement_id = id,
+        .type = arg_type
+    };
+
+    size_t old_size = dy_array_add(&ctx->bound_vars, &bound_var);
+
+    struct dy_core_expr rest = ast_do_block_body_to_core(ctx, *def.rest);
+
+    ctx->bound_vars.num_elems = old_size;
+
+    struct dy_def_data data = {
+        .id = id,
+        .arg = expr,
+        .body = rest
+    };
+
+    return (struct dy_core_expr){
+        .tag = DY_CORE_EXPR_CUSTOM,
+        .custom = dy_def_create(data)
+    };
 }
 
 struct dy_core_expr do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_equality equality)
