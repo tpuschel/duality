@@ -76,6 +76,8 @@ static inline struct dy_core_expr do_block_equality_to_core(struct dy_ast_to_cor
 
 static inline struct dy_core_expr do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_let let);
 
+static inline struct dy_core_expr do_block_inverted_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_let inverted_let);
+
 static inline struct dy_core_expr do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_ignored_expr ignored_expr);
 
 static inline struct dy_core_expr do_block_def_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_def def);
@@ -345,6 +347,8 @@ struct dy_core_expr ast_do_block_body_to_core(struct dy_ast_to_core_ctx *ctx, st
         return dy_ast_expr_to_core(ctx, *do_block.end_expr);
     case DY_AST_DO_BLOCK_LET:
         return do_block_let_to_core(ctx, do_block.let);
+    case DY_AST_DO_BLOCK_INVERTED_LET:
+        return do_block_inverted_let_to_core(ctx, do_block.inverted_let);
     case DY_AST_DO_BLOCK_IGNORED_EXPR:
         return do_block_ignored_expr_to_core(ctx, do_block.ignored_expr);
     case DY_AST_DO_BLOCK_EQUALITY:
@@ -425,6 +429,88 @@ struct dy_core_expr do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, st
             .expr = dy_core_expr_new(positive_equality_map),
             .map = {
                 .e1 = dy_core_expr_new(e2),
+                .e2 = dy_core_expr_new(dy_core_expr_retain(result_type)),
+                .polarity = DY_CORE_POLARITY_NEGATIVE,
+                .is_implicit = false,
+            },
+            .check_result = DY_MAYBE,
+        }
+    };
+
+    return (struct dy_core_expr){
+        .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
+        .inference_type_map = {
+            .binding = {
+                .id = result_type.variable.id,
+                .type = result_type.variable.type,
+            },
+            .expr = dy_core_expr_new(elim),
+            .polarity = DY_CORE_POLARITY_POSITIVE,
+        }
+    };
+}
+
+struct dy_core_expr do_block_inverted_let_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block_let inverted_let)
+{
+    struct dy_core_expr e = dy_ast_expr_to_core(ctx, *inverted_let.expr);
+
+    size_t id = ctx->running_id++;
+
+    struct dy_core_variable variable = create_inference_var(ctx);
+
+    struct dy_core_expr arg_type = {
+        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
+        .inference_variable = variable
+    };
+
+    struct dy_ast_to_core_bound_var bound_var = {
+        .name = inverted_let.arg_name.value,
+        .replacement_id = id,
+        .type = arg_type
+    };
+
+    size_t old_size = dy_array_add(&ctx->bound_vars, &bound_var);
+
+    struct dy_core_expr rest = ast_do_block_body_to_core(ctx, *inverted_let.rest);
+
+    ctx->bound_vars.num_elems = old_size;
+
+    struct dy_core_expr positive_type_map = {
+        .tag = DY_CORE_EXPR_TYPE_MAP,
+        .type_map = {
+            .binding = {
+                .id = id,
+                .type = dy_core_expr_new(dy_core_expr_retain(arg_type)),
+            },
+            .expr = dy_core_expr_new(rest),
+            .polarity = DY_CORE_POLARITY_POSITIVE,
+            .is_implicit = false,
+        }
+    };
+
+    struct dy_core_expr result_inference_type_map = {
+        .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
+        .inference_type_map = {
+            .binding = {
+                .id = variable.id,
+                .type = dy_core_expr_retain_ptr(variable.type),
+            },
+            .expr = dy_core_expr_new(positive_type_map),
+            .polarity = DY_CORE_POLARITY_NEGATIVE,
+        }
+    };
+
+    struct dy_core_expr result_type = {
+        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
+        .inference_variable = create_inference_var(ctx)
+    };
+
+    struct dy_core_expr elim = {
+        .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
+        .equality_map_elim = {
+            .expr = dy_core_expr_new(e),
+            .map = {
+                .e1 = dy_core_expr_new(result_inference_type_map),
                 .e2 = dy_core_expr_new(dy_core_expr_retain(result_type)),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = false,

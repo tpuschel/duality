@@ -72,6 +72,7 @@ struct dy_ast_do_block_def {
 enum dy_ast_do_block_tag {
     DY_AST_DO_BLOCK_EQUALITY,
     DY_AST_DO_BLOCK_LET,
+    DY_AST_DO_BLOCK_INVERTED_LET,
     DY_AST_DO_BLOCK_IGNORED_EXPR,
     DY_AST_DO_BLOCK_END_EXPR,
     DY_AST_DO_BLOCK_DEF
@@ -81,6 +82,7 @@ struct dy_ast_do_block_body {
     union {
         struct dy_ast_do_block_equality equality;
         struct dy_ast_do_block_let let;
+        struct dy_ast_do_block_let inverted_let;
         struct dy_ast_do_block_ignored_expr ignored_expr;
         const struct dy_ast_expr *end_expr;
         struct dy_ast_do_block_def def;
@@ -427,6 +429,10 @@ void dy_ast_do_block_retain(struct dy_ast_do_block_body do_block)
         dy_ast_expr_retain_ptr(do_block.let.expr);
         dy_ast_do_block_retain_ptr(do_block.let.rest);
         return;
+    case DY_AST_DO_BLOCK_INVERTED_LET:
+        dy_ast_expr_retain_ptr(do_block.inverted_let.expr);
+        dy_ast_do_block_retain_ptr(do_block.inverted_let.rest);
+        return;
     case DY_AST_DO_BLOCK_DEF:
         dy_ast_expr_retain_ptr(do_block.def.expr);
         dy_ast_do_block_retain_ptr(do_block.def.rest);
@@ -454,6 +460,10 @@ void dy_ast_do_block_release(struct dy_ast_do_block_body do_block)
     case DY_AST_DO_BLOCK_LET:
         dy_ast_expr_release_ptr(do_block.let.expr);
         dy_ast_do_block_release_ptr(do_block.let.rest);
+        return;
+    case DY_AST_DO_BLOCK_INVERTED_LET:
+        dy_ast_expr_release_ptr(do_block.inverted_let.expr);
+        dy_ast_do_block_release_ptr(do_block.inverted_let.rest);
         return;
     case DY_AST_DO_BLOCK_DEF:
         dy_ast_expr_release_ptr(do_block.def.expr);

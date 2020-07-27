@@ -100,6 +100,8 @@ static inline bool parse_do_block_body_equality(struct dy_parser_ctx *ctx, struc
 
 static inline bool parse_do_block_body_let(struct dy_parser_ctx *ctx, struct dy_ast_do_block_let *let);
 
+static inline bool parse_do_block_body_inverted_let(struct dy_parser_ctx *ctx, struct dy_ast_do_block_let *let);
+
 static inline bool parse_do_block_body_ignored_expr(struct dy_parser_ctx *ctx, struct dy_ast_do_block_ignored_expr *ignored_expr);
 
 static inline bool parse_do_block_def(struct dy_parser_ctx *ctx, struct dy_ast_do_block_def *def);
@@ -150,7 +152,9 @@ bool dy_parse_variable(struct dy_parser_ctx *ctx, struct dy_ast_literal *var)
                 || dy_string_are_equal(final_var, DY_STR_LIT("Any"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("rec"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("Symbol"))
-                || dy_string_are_equal(final_var, DY_STR_LIT("def"))) {
+                || dy_string_are_equal(final_var, DY_STR_LIT("def"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("invert"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("do"))) {
                 ctx->stream.current_index = start_index;
                 return false;
             }
@@ -741,6 +745,16 @@ bool parse_do_block_body(struct dy_parser_ctx *ctx, struct dy_ast_do_block_body 
         return true;
     }
 
+    struct dy_ast_do_block_let inverted_let;
+    if (parse_do_block_body_inverted_let(ctx, &inverted_let)) {
+        *do_block = (struct dy_ast_do_block_body){
+            .tag = DY_AST_DO_BLOCK_INVERTED_LET,
+            .inverted_let = inverted_let
+        };
+
+        return true;
+    }
+
     struct dy_ast_do_block_def def;
     if (parse_do_block_def(ctx, &def)) {
         *do_block = (struct dy_ast_do_block_body){
@@ -889,6 +903,20 @@ bool parse_do_block_body_equality(struct dy_parser_ctx *ctx, struct dy_ast_do_bl
     };
 
     return true;
+}
+
+bool parse_do_block_body_inverted_let(struct dy_parser_ctx *ctx, struct dy_ast_do_block_let *let)
+{
+    size_t start_index = ctx->stream.current_index;
+
+    if (!dy_parse_literal(ctx, DY_STR_LIT("invert"))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    skip_whitespace_except_newline(ctx);
+
+    return parse_do_block_body_let(ctx, let);
 }
 
 bool parse_do_block_body_let(struct dy_parser_ctx *ctx, struct dy_ast_do_block_let *let)

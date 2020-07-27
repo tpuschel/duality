@@ -10,6 +10,9 @@
 		},
 		{
 			"include": "#comments"
+		},
+		{
+			"include": "#variables"
 		}
 	],
 	"repository": {
@@ -17,7 +20,7 @@
 			"patterns": [
 				{
 					"name": "keyword.control.duality",
-					"match": "\\b(list|try|let|def|choice|do|rec)\\b"
+					"match": "\\b(list|try|let|def|choice|do|rec|invert)\\b"
 				}
 			]
 		},
@@ -42,6 +45,14 @@
 				{
 					"name": "constant.character.escape.duality",
 					"match": "\\\\."
+				}
+			]
+		},
+		"variables": {
+			"patterns": [
+				{
+					"name": "variable.language.duality",
+					"match": "\\b(Symbol|Any|All)\\b"
 				}
 			]
 		}
