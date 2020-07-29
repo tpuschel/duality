@@ -470,6 +470,12 @@ struct dy_core_alternative dy_check_alternative(struct dy_core_ctx *ctx, struct 
             }
         };
         *did_generate_constraint = true;
+    } else if (have_c1) {
+        *constraint = c1;
+        *did_generate_constraint = true;
+    } else if (have_c2) {
+        *constraint = c2;
+        *did_generate_constraint = true;
     }
 
     return alternative;

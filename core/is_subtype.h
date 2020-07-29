@@ -825,6 +825,12 @@ dy_ternary_t positive_junction_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
             }
         };
         *did_generate_constraint = true;
+    } else if (have_c1) {
+        *constraint = c1;
+        *did_generate_constraint = true;
+    } else if (have_c2) {
+        *constraint = c2;
+        *did_generate_constraint = true;
     }
 
     if (did_transform_e1 && did_transform_e2) {
@@ -905,6 +911,12 @@ dy_ternary_t negative_junction_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
+        *did_generate_constraint = true;
+    } else if (have_c1) {
+        *constraint = c1;
+        *did_generate_constraint = true;
+    } else if (have_c2) {
+        *constraint = c2;
         *did_generate_constraint = true;
     }
 
@@ -1062,6 +1074,12 @@ dy_ternary_t is_subtype_of_negative_junction(struct dy_core_ctx *ctx, struct dy_
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
+        *did_generate_constraint = true;
+    } else if (have_c1) {
+        *constraint = c1;
+        *did_generate_constraint = true;
+    } else if (have_c2) {
+        *constraint = c2;
         *did_generate_constraint = true;
     }
 

@@ -185,13 +185,32 @@ struct dy_constraint_range constraint_conjunction(struct dy_constraint_range ran
  * This is achived using the following rules ('_' = empty; all rules are commutative):
  *
  * (_  <: _ ) OR (_  <: _ ) =    _    <:    _
- * (E1 <: _ ) OR (_  <: E4) =    _    <:    _
- * (_  <: _ ) OR (E3 <: E4) =    _    <:    _
+ * (E1 <: _ ) OR (_  <: E4) =    E1   <:    E4 (*)
+ * (_  <: _ ) OR (E3 <: E4) =    E3   <:    E3 (*)
  * (E1 <: _ ) OR (E3 <: _ ) = E1 & E3 <:    _
  * (_  <: E2) OR (_  <: E4) =    _    <: E2 | E4
  * (E1 <: E2) OR (E3 <: E4) = E1 & E3 <: E2 | E4
  *
  * The equality checks are an optimization to avoid superfluous bounds.
+ *
+ * (*) Those two rules represent a decision to a problem that is not
+ *     perfectly solvable.
+ *
+ *     Image the following expression: '[a] -> [b] -> try { a "a"; b "b" }'
+ *     There are essentially two ways the types of a and b can be inferred,
+ *     too permissive: '[a Any] -> [b Any] -> try { a "a"; b "b" }'
+ *     or too restrictive: '[a "a" ~> ...] -> [b "b" ~> ...] -> try { a "a"; b "b" }'.
+ *
+ *     Dropping the bounds in (*) leads to the permissive variant, while keeping them
+ *     leads to the restrictive variant.
+ *
+ *     In each of the two cases, the expression can be rewritten to avoid those problems:
+ *     '[x] -> try { x "a"; x "b" }' where the type of 'x' is inferred to be
+ *     'choice { "a" ~> ..., "b" ~> ... }', which is neither too permissive nor restrictive.
+ *
+ *     Since the expression is suboptimal, the question is how to best nudge
+ *     the user to reformulate their expression. For these purposes, we have chosen
+ *     the keep the bounds in (*).
  */
 struct dy_constraint_range constraint_disjunction(struct dy_constraint_range range1, struct dy_constraint_range range2)
 {
@@ -212,6 +231,12 @@ struct dy_constraint_range constraint_disjunction(struct dy_constraint_range ran
         }
 
         have_supertype = true;
+    } else if (range1.have_supertype) {
+        supertype = dy_core_expr_retain(range1.supertype);
+        have_supertype = true;
+    } else if (range2.have_supertype) {
+        supertype = dy_core_expr_retain(range2.supertype);
+        have_supertype = true;
     }
 
     struct dy_core_expr subtype;
@@ -230,6 +255,12 @@ struct dy_constraint_range constraint_disjunction(struct dy_constraint_range ran
             };
         }
 
+        have_subtype = true;
+    } else if (range1.have_subtype) {
+        subtype = dy_core_expr_retain(range1.subtype);
+        have_subtype = true;
+    } else if (range2.have_subtype) {
+        subtype = dy_core_expr_retain(range2.subtype);
         have_subtype = true;
     }
 
