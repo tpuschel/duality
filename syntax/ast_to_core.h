@@ -857,7 +857,7 @@ struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_
                     .type = dy_core_expr_retain_ptr(variable.type),
                 },
                 .expr = dy_core_expr_new(result_recursion),
-                .polarity = DY_CORE_POLARITY_NEGATIVE,
+                .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
     }
