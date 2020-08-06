@@ -165,16 +165,16 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         return DY_NO;
     }
 
+    if (supertype.tag == DY_CORE_EXPR_JUNCTION && supertype.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
+        return is_subtype_of_positive_junction(ctx, subtype, supertype.junction, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+    }
+
     if (supertype.tag == DY_CORE_EXPR_JUNCTION && supertype.junction.polarity == DY_CORE_POLARITY_NEGATIVE) {
         return is_subtype_of_negative_junction(ctx, subtype, supertype.junction, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
 
     if (subtype.tag == DY_CORE_EXPR_JUNCTION && subtype.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
         return positive_junction_is_subtype(ctx, subtype.junction, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-    }
-
-    if (supertype.tag == DY_CORE_EXPR_JUNCTION && supertype.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
-        return is_subtype_of_positive_junction(ctx, subtype, supertype.junction, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
 
     if (subtype.tag == DY_CORE_EXPR_JUNCTION && subtype.junction.polarity == DY_CORE_POLARITY_NEGATIVE) {
@@ -773,10 +773,6 @@ dy_ternary_t negative_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
 
 dy_ternary_t positive_junction_is_subtype(struct dy_core_ctx *ctx, struct dy_core_junction junction, struct dy_core_expr expr, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
-    if (expr.tag == DY_CORE_EXPR_JUNCTION && expr.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
-        return junction_is_subtype_of_junction(ctx, junction, expr.junction, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-    }
-
     struct dy_constraint c1;
     bool have_c1 = false;
     struct dy_core_expr e1;
@@ -956,10 +952,6 @@ dy_ternary_t negative_junction_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
 
 dy_ternary_t is_subtype_of_positive_junction(struct dy_core_ctx *ctx, struct dy_core_expr expr, struct dy_core_junction junction, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
-    if (expr.tag == DY_CORE_EXPR_JUNCTION && expr.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
-        return junction_is_subtype_of_junction(ctx, expr.junction, junction, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-    }
-
     struct dy_constraint c1;
     bool have_c1 = false;
     struct dy_core_expr e1;
