@@ -67,8 +67,17 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
         return expr.custom.type_of(expr.custom.data, ctx);
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("Should not happen\n");
-    case DY_CORE_EXPR_RECURSION:
-        return dy_core_expr_retain(*expr.recursion.map.binding.type);
+    case DY_CORE_EXPR_RECURSION: {
+        struct dy_core_expr type = dy_type_of(ctx, *expr.recursion.expr);
+
+        if (dy_core_expr_is_bound(expr.recursion.id, type)) {
+            expr.recursion.expr = dy_core_expr_new(type);
+            expr.recursion.polarity = DY_CORE_POLARITY_POSITIVE;
+            return expr;
+        } else {
+            return type;
+        }
+    }
     case DY_CORE_EXPR_END:
         // fallthrough
     case DY_CORE_EXPR_SYMBOL:

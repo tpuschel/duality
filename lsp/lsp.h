@@ -977,8 +977,7 @@ void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_s
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
-        produce_diagnostics(ctx, *expr.recursion.map.binding.type, text, diagnostics);
-        produce_diagnostics(ctx, *expr.recursion.map.expr, text, diagnostics);
+        produce_diagnostics(ctx, *expr.recursion.expr, text, diagnostics);
         return;
     case DY_CORE_EXPR_END:
         return;

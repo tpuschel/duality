@@ -67,8 +67,12 @@ struct dy_core_expr substitute(struct dy_core_expr expr, size_t id, struct dy_co
         expr.inference_type_map = substitute_type_map(expr.inference_type_map, id, sub);
         return expr;
     case DY_CORE_EXPR_RECURSION:
-        expr.recursion.map = substitute_type_map(expr.recursion.map, id, sub);
-        return expr;
+        if (expr.recursion.id == id) {
+            return dy_core_expr_retain(expr);
+        } else {
+            expr.recursion.expr = dy_core_expr_new(substitute(*expr.recursion.expr, id, sub));
+            return expr;
+        }
     }
 
     dy_bail("Impossible object type.");

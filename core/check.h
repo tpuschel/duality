@@ -483,40 +483,73 @@ struct dy_core_alternative dy_check_alternative(struct dy_core_ctx *ctx, struct 
 
 struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
-    struct dy_constraint c1;
-    bool have_c1 = false;
-    recursion.map = dy_check_type_map(ctx, recursion.map, &c1, &have_c1);
+    size_t inference_id = ctx->running_id++;
 
-    struct dy_constraint c2;
-    bool have_c2 = false;
-    if (recursion.check_result == DY_MAYBE) {
-        struct dy_core_expr type_of_body = dy_type_of(ctx, *recursion.map.expr);
+    struct dy_core_expr any = {
+        .tag = DY_CORE_EXPR_END,
+        .end_polarity = DY_CORE_POLARITY_NEGATIVE
+    };
 
-        struct dy_core_expr new_body;
-        recursion.check_result = dy_is_subtype(ctx, type_of_body, *recursion.map.binding.type, &c2, &have_c2, *recursion.map.expr, &new_body);
+    struct dy_core_expr inference_var = {
+        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
+        .inference_variable = {
+            .id = inference_id,
+            .type = dy_core_expr_new(any),
+        }
+    };
 
-        dy_core_expr_release(type_of_body);
-        dy_core_expr_release_ptr(recursion.map.expr);
-        recursion.map.expr = dy_core_expr_new(new_body);
-    }
+    struct dy_core_expr provisional_type = {
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable = {
+            .id = recursion.id,
+            .type = dy_core_expr_new(inference_var),
+        }
+    };
 
-    if (have_c1 && have_c2) {
-        *constraint = (struct dy_constraint){
-            .tag = DY_CONSTRAINT_MULTIPLE,
-            .multiple = {
-                .c1 = alloc_constraint(c1),
-                .c2 = alloc_constraint(c2),
-                .polarity = DY_CORE_POLARITY_POSITIVE,
-            }
-        };
-        *did_generate_constraint = true;
-    } else if (have_c1) {
-        *constraint = c1;
-        *did_generate_constraint = true;
-    } else if (have_c2) {
-        *constraint = c2;
-        *did_generate_constraint = true;
-    }
+    struct dy_core_expr new_body = substitute(*recursion.expr, recursion.id, provisional_type);
+
+    dy_core_expr_release(provisional_type);
+
+    struct dy_constraint c;
+    bool have_c = false;
+    struct dy_core_expr checked_body = dy_check_expr(ctx, new_body, &c, &have_c);
+
+    dy_core_expr_release(new_body);
+
+    struct dy_core_expr type_of_body = dy_type_of(ctx, checked_body);
+
+    dy_core_expr_release(checked_body);
+
+    struct dy_core_expr self_type = {
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable = {
+            .id = recursion.id,
+            .type = dy_core_expr_new(any),
+        }
+    };
+
+    struct dy_core_expr actual_type = substitute(type_of_body, inference_id, self_type);
+
+    dy_core_expr_release(type_of_body);
+    dy_core_expr_release(self_type);
+
+    struct dy_core_expr self = {
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable = {
+            .id = recursion.id,
+            .type = dy_core_expr_new(actual_type),
+        }
+    };
+
+    struct dy_core_expr actual_body = substitute(*recursion.expr, recursion.id, self);
+
+    dy_core_expr_release(self);
+
+    struct dy_core_expr checked_actual_body = dy_check_expr(ctx, actual_body, constraint, did_generate_constraint);
+
+    dy_core_expr_release(actual_body);
+
+    recursion.expr = dy_core_expr_new(checked_actual_body);
 
     return recursion;
 }
@@ -703,19 +736,24 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
             if (solution.have_subtype) {
                 struct dy_core_expr subtype = solution.subtype;
                 if (dy_core_expr_is_bound(id, solution.subtype)) {
+                    struct dy_core_expr new_var = {
+                        .tag = DY_CORE_EXPR_VARIABLE,
+                        .variable = {
+                            .id = id,
+                            .type = dy_core_expr_new(dy_core_expr_retain(type)),
+                        }
+                    };
+
+                    subtype = substitute(solution.subtype, id, new_var);
+
+                    dy_core_expr_release(new_var);
+
                     subtype = (struct dy_core_expr){
                         .tag = DY_CORE_EXPR_RECURSION,
                         .recursion = {
-                            .check_result = DY_YES,
-                            .map = {
-                                .binding = {
-                                    .id = id,
-                                    .type = dy_core_expr_new(type),
-                                },
-                                .expr = dy_core_expr_new(solution.subtype),
-                                .polarity = DY_CORE_POLARITY_NEGATIVE,
-                                .is_implicit = false,
-                            },
+                            .id = id,
+                            .expr = dy_core_expr_new(subtype),
+                            .polarity = DY_CORE_POLARITY_NEGATIVE,
                         }
                     };
                 }
@@ -771,19 +809,24 @@ struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct 
             if (solution.have_supertype) {
                 struct dy_core_expr supertype = solution.supertype;
                 if (dy_core_expr_is_bound(id, solution.supertype)) {
+                    struct dy_core_expr new_var = {
+                        .tag = DY_CORE_EXPR_VARIABLE,
+                        .variable = {
+                            .id = id,
+                            .type = dy_core_expr_new(dy_core_expr_retain(type)),
+                        }
+                    };
+
+                    supertype = substitute(solution.supertype, id, new_var);
+
+                    dy_core_expr_release(new_var);
+
                     supertype = (struct dy_core_expr){
                         .tag = DY_CORE_EXPR_RECURSION,
                         .recursion = {
-                            .check_result = DY_YES,
-                            .map = {
-                                .binding = {
-                                    .id = id,
-                                    .type = dy_core_expr_new(type),
-                                },
-                                .expr = dy_core_expr_new(solution.supertype),
-                                .polarity = DY_CORE_POLARITY_POSITIVE,
-                                .is_implicit = false,
-                            },
+                            .id = id,
+                            .expr = dy_core_expr_new(supertype),
+                            .polarity = DY_CORE_POLARITY_POSITIVE,
                         }
                     };
                 }
@@ -1012,8 +1055,7 @@ struct dy_core_expr remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t i
         subtype.junction.e2 = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.junction.e2));
         return subtype;
     case DY_CORE_EXPR_RECURSION:
-        subtype.recursion.map.binding.type = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *subtype.recursion.map.binding.type));
-        subtype.recursion.map.expr = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.recursion.map.expr));
+        subtype.recursion.expr = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *subtype.recursion.expr));
         return subtype;
     case DY_CORE_EXPR_VARIABLE:
         if (subtype.variable.id == id) {
@@ -1103,8 +1145,7 @@ struct dy_core_expr remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t
         supertype.junction.e2 = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *supertype.junction.e2));
         return supertype;
     case DY_CORE_EXPR_RECURSION:
-        supertype.recursion.map.binding.type = dy_core_expr_new(remove_mentions_in_subtype(ctx, id, *supertype.recursion.map.binding.type));
-        supertype.recursion.map.expr = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *supertype.recursion.map.expr));
+        supertype.recursion.expr = dy_core_expr_new(remove_mentions_in_supertype(ctx, id, *supertype.recursion.expr));
         return supertype;
     case DY_CORE_EXPR_VARIABLE:
         if (supertype.variable.id == id) {

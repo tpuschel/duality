@@ -102,8 +102,9 @@ struct dy_core_alternative {
 };
 
 struct dy_core_recursion {
-    struct dy_core_type_map map;
-    dy_ternary_t check_result;
+    size_t id;
+    const struct dy_core_expr *expr;
+    enum dy_core_polarity polarity;
 };
 
 struct dy_core_custom {
@@ -244,7 +245,7 @@ bool dy_core_expr_is_computation(struct dy_core_expr expr)
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
-        return dy_core_expr_is_computation(*expr.recursion.map.binding.type) || dy_core_expr_is_computation(*expr.recursion.map.expr);
+        return dy_core_expr_is_computation(*expr.recursion.expr);
     case DY_CORE_EXPR_END:
         // fallthrough
     case DY_CORE_EXPR_SYMBOL:
@@ -306,13 +307,11 @@ size_t dy_core_expr_num_occurrences(size_t id, struct dy_core_expr expr)
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION: {
-        size_t x = dy_core_expr_num_occurrences(id, *expr.recursion.map.binding.type);
-
-        if (id == expr.recursion.map.binding.id) {
-            return x;
+        if (id == expr.recursion.id) {
+            return 0;
         }
 
-        return x + dy_core_expr_num_occurrences(id, *expr.recursion.map.expr);
+        return dy_core_expr_num_occurrences(id, *expr.recursion.expr);
     }
     case DY_CORE_EXPR_END:
         // fallthrough
@@ -384,8 +383,7 @@ struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
 
         return expr;
     case DY_CORE_EXPR_RECURSION:
-        dy_core_expr_retain_ptr(expr.recursion.map.binding.type);
-        dy_core_expr_retain_ptr(expr.recursion.map.expr);
+        dy_core_expr_retain_ptr(expr.recursion.expr);
 
         return expr;
     case DY_CORE_EXPR_END:
@@ -457,8 +455,7 @@ void dy_core_expr_release(struct dy_core_expr expr)
 
         return;
     case DY_CORE_EXPR_RECURSION:
-        dy_core_expr_release_ptr(expr.recursion.map.binding.type);
-        dy_core_expr_release_ptr(expr.recursion.map.expr);
+        dy_core_expr_release_ptr(expr.recursion.expr);
 
         return;
     case DY_CORE_EXPR_END:
@@ -532,7 +529,17 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
         add_string(string, DY_STR_LIT("("));
         dy_core_expr_to_string(*expr.equality_map_elim.expr, string);
-        add_string(string, DY_STR_LIT(" ! "));
+        switch (expr.equality_map_elim.check_result) {
+        case DY_YES:
+            add_string(string, DY_STR_LIT(" \x1b[32m!\x1b[0m "));
+            break;
+        case DY_MAYBE:
+            add_string(string, DY_STR_LIT(" \x1b[33m!\x1b[0m "));
+            break;
+        case DY_NO:
+            add_string(string, DY_STR_LIT(" \x1b[31m!\x1b[0m "));
+            break;
+        }
         dy_core_expr_to_string(*expr.equality_map_elim.map.e1, string);
         if (expr.equality_map_elim.map.is_implicit) {
             add_string(string, DY_STR_LIT(" @"));
@@ -597,19 +604,17 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         add_string(string, DY_STR_LIT(")"));
         return;
     case DY_CORE_EXPR_RECURSION:
-        add_string(string, DY_STR_LIT("(rec "));
-
-        add_string(string, DY_STR_LIT("["));
-        add_size_t_decimal(string, expr.recursion.map.binding.id);
-        add_string(string, DY_STR_LIT(" "));
-        dy_core_expr_to_string(*expr.recursion.map.binding.type, string);
-        add_string(string, DY_STR_LIT("]"));
-        if (expr.recursion.map.polarity == DY_CORE_POLARITY_POSITIVE) {
-            add_string(string, DY_STR_LIT(" -> "));
+        if (expr.recursion.polarity == DY_CORE_POLARITY_POSITIVE) {
+            add_string(string, DY_STR_LIT("(prec "));
         } else {
-            add_string(string, DY_STR_LIT(" ~> "));
+            add_string(string, DY_STR_LIT("(nrec "));
         }
-        dy_core_expr_to_string(*expr.recursion.map.expr, string);
+
+        add_size_t_decimal(string, expr.recursion.id);
+
+        add_string(string, DY_STR_LIT(" = "));
+
+        dy_core_expr_to_string(*expr.recursion.expr, string);
         add_string(string, DY_STR_LIT(")"));
         return;
     case DY_CORE_EXPR_SYMBOL:

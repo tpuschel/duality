@@ -175,11 +175,17 @@ bool core_has_error(struct dy_core_expr expr)
             return true;
         }
 
+        if (expr.custom.id == dy_def_id) {
+            struct dy_def_data *data = expr.custom.data;
+
+            return core_has_error(data->arg) || core_has_error(data->body);
+        }
+
         return false;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
-        return core_has_error(*expr.recursion.map.binding.type) || core_has_error(*expr.recursion.map.expr);
+        return core_has_error(*expr.recursion.expr);
     case DY_CORE_EXPR_END:
         // fallthrough
     case DY_CORE_EXPR_SYMBOL:
@@ -245,8 +251,7 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
-        print_core_errors(file, *expr.recursion.map.binding.type, text, text_size);
-        print_core_errors(file, *expr.recursion.map.expr, text, text_size);
+        print_core_errors(file, *expr.recursion.expr, text, text_size);
         return;
     case DY_CORE_EXPR_END:
         return;
@@ -256,6 +261,13 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
 
             fprintf(file, "Unbound variable: ");
             print_error_fragment(file, data->var.text_range, text, text_size);
+        }
+
+        if (expr.custom.id == dy_def_id) {
+            struct dy_def_data *data = expr.custom.data;
+
+            print_core_errors(file, data->arg, text, text_size);
+            print_core_errors(file, data->body, text, text_size);
         }
 
         return;

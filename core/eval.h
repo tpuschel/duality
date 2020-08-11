@@ -184,28 +184,31 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
     dy_core_expr_release(right);
 
     if (left.tag == DY_CORE_EXPR_JUNCTION) {
-        struct dy_core_equality_map_elim new_elim = {
-            .expr = left.junction.e1,
-            .map = equality_map.equality_map,
-            .check_result = DY_MAYBE
-        };
+        struct dy_core_expr type_of_junction_e1 = dy_type_of(ctx, *left.junction.e1);
 
-        struct dy_core_expr new_expr = dy_eval_equality_map_elim(ctx, new_elim, is_value);
+        struct dy_constraint c1;
+        bool have_c1 = false;
+        dy_ternary_t res1 = dy_is_subtype_no_transformation(ctx, type_of_junction_e1, equality_map, &c1, &have_c1);
 
-        if (*is_value) {
-            dy_core_expr_release(left);
-            dy_core_expr_release(equality_map);
-            return new_expr;
+        assert(!have_c1);
+
+        if (res1 == DY_YES) {
+            struct dy_core_equality_map_elim new_elim = {
+                .expr = left.junction.e1,
+                .map = equality_map.equality_map,
+                .check_result = DY_YES
+            };
+
+            return dy_eval_equality_map_elim(ctx, new_elim, is_value);
         }
 
-        new_elim.expr = left.junction.e2;
+        struct dy_core_equality_map_elim new_elim = {
+            .expr = left.junction.e2,
+            .map = equality_map.equality_map,
+            .check_result = DY_YES
+        };
 
-        new_expr = dy_eval_equality_map_elim(ctx, new_elim, is_value);
-
-        dy_core_expr_release(left);
-        dy_core_expr_release(equality_map);
-
-        return new_expr;
+        return dy_eval_equality_map_elim(ctx, new_elim, is_value);
     }
 
     if (left.tag == DY_CORE_EXPR_CUSTOM && left.custom.can_be_eliminated) {
@@ -271,18 +274,18 @@ struct dy_core_expr dy_eval_alternative(struct dy_core_ctx *ctx, struct dy_core_
 
 struct dy_core_expr dy_eval_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, bool *is_value)
 {
-    struct dy_core_expr evaled_body = dy_eval_expr(ctx, *recursion.map.expr, is_value);
+    struct dy_core_expr evaled_body = dy_eval_expr(ctx, *recursion.expr, is_value);
 
-    recursion.map.expr = dy_core_expr_new(evaled_body);
+    recursion.expr = dy_core_expr_new(evaled_body);
 
     struct dy_core_expr rec_expr = {
         .tag = DY_CORE_EXPR_RECURSION,
         .recursion = recursion
     };
 
-    struct dy_core_expr substituted_body = substitute(evaled_body, recursion.map.binding.id, rec_expr);
+    struct dy_core_expr substituted_body = substitute(evaled_body, recursion.id, rec_expr);
 
-    dy_core_expr_release_ptr(recursion.map.expr);
+    dy_core_expr_release_ptr(recursion.expr);
 
     return substituted_body;
 }

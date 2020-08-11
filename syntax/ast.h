@@ -126,7 +126,7 @@ struct dy_ast_juxtaposition {
 
 struct dy_ast_recursion {
     struct dy_range text_range;
-    struct dy_ast_arg arg;
+    struct dy_ast_literal name;
     const struct dy_ast_expr *expr;
 };
 
@@ -291,15 +291,9 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
         dy_ast_expr_retain_ptr(expr.juxtaposition.right);
         return expr;
     case DY_AST_EXPR_POSITIVE_RECURSION:
-        if (expr.positive_recursion.arg.has_type) {
-            dy_ast_expr_retain_ptr(expr.positive_recursion.arg.type);
-        }
         dy_ast_expr_retain_ptr(expr.positive_recursion.expr);
         return expr;
     case DY_AST_EXPR_NEGATIVE_RECURSION:
-        if (expr.negative_recursion.arg.has_type) {
-            dy_ast_expr_retain_ptr(expr.negative_recursion.arg.type);
-        }
         dy_ast_expr_retain_ptr(expr.negative_recursion.expr);
         return expr;
     case DY_AST_EXPR_ALL:
@@ -375,15 +369,9 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
         dy_ast_expr_release_ptr(expr.juxtaposition.right);
         return;
     case DY_AST_EXPR_POSITIVE_RECURSION:
-        if (expr.positive_recursion.arg.has_type) {
-            dy_ast_expr_release_ptr(expr.positive_recursion.arg.type);
-        }
         dy_ast_expr_release_ptr(expr.positive_recursion.expr);
         return;
     case DY_AST_EXPR_NEGATIVE_RECURSION:
-        if (expr.negative_recursion.arg.has_type) {
-            dy_ast_expr_release_ptr(expr.negative_recursion.arg.type);
-        }
         dy_ast_expr_release_ptr(expr.negative_recursion.expr);
         return;
     case DY_AST_EXPR_ALL:
