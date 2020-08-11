@@ -20,7 +20,7 @@
 			"patterns": [
 				{
 					"name": "keyword.control.duality",
-					"match": "\\b(list|try|let|def|choice|do|rec|invert)\\b"
+					"match": "\\b(list|try|let|def|choice|do|prec|nrec|invert)\\b"
 				}
 			]
 		},
