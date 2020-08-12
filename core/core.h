@@ -653,14 +653,8 @@ void add_size_t_decimal(dy_array_t *string, size_t x)
     }
 
     // Reverse digits in buffer.
-    for (;;) {
-        size_t i = start_size, k = string->num_elems - 1;
+    for (size_t i = start_size, k = string->num_elems - 1; i < k; ++i, --k) {
         char c;
-
-        if (k >= i) {
-            break;
-        }
-
         dy_array_get(*string, i, &c);
         dy_array_set(*string, i, dy_array_pos(*string, k));
         dy_array_set(*string, k, &c);
