@@ -37,7 +37,9 @@ static struct dy_core_expr dy_uv_eliminate(void *data, struct dy_core_ctx *ctx, 
 
 static bool dy_uv_is_computation(void *data);
 
-static size_t dy_uv_num_occurrences(void *data, size_t id);
+static bool dy_uv_is_bound(void *data, size_t id);
+
+static bool dy_uv_appears_in_opposite_polarity(void *data, size_t id, enum dy_core_polarity polarity);
 
 static void *dy_uv_retain(void *data);
 
@@ -73,7 +75,8 @@ struct dy_core_custom dy_uv_create_no_alloc(const struct dy_uv_data *data)
         .is_supertype = dy_uv_is_supertype,
         .eliminate = dy_uv_eliminate,
         .is_computation = dy_uv_is_computation,
-        .num_occurrences = dy_uv_num_occurrences,
+        .is_bound = dy_uv_is_bound,
+        .appears_in_opposite_polarity = dy_uv_appears_in_opposite_polarity,
         .retain = dy_uv_retain,
         .release = dy_uv_release,
         .to_string = dy_uv_to_string
@@ -156,9 +159,14 @@ bool dy_uv_is_computation(void *data)
     return DY_NO;
 }
 
-size_t dy_uv_num_occurrences(void *data, size_t id)
+bool dy_uv_is_bound(void *data, size_t id)
 {
-    return 0;
+    return false;
+}
+
+bool dy_uv_appears_in_opposite_polarity(void *data, size_t id, enum dy_core_polarity polarity)
+{
+    return false;
 }
 
 void *dy_uv_retain(void *data)

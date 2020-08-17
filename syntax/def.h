@@ -40,7 +40,9 @@ static struct dy_core_expr dy_def_eliminate(void *data, struct dy_core_ctx *ctx,
 
 static bool dy_def_is_computation(void *data);
 
-static size_t dy_def_num_occurrences(void *data, size_t id);
+static bool dy_def_is_bound(void *data, size_t id);
+
+static bool dy_def_appears_in_opposite_polarity(void *data, size_t id, enum dy_core_polarity polarity);
 
 static void *dy_def_retain(void *data);
 
@@ -76,7 +78,8 @@ struct dy_core_custom dy_def_create_no_alloc(const struct dy_def_data *data)
         .is_supertype = dy_def_is_supertype,
         .eliminate = dy_def_eliminate,
         .is_computation = dy_def_is_computation,
-        .num_occurrences = dy_def_num_occurrences,
+        .is_bound = dy_def_is_bound,
+        .appears_in_opposite_polarity = dy_def_appears_in_opposite_polarity,
         .retain = dy_def_retain,
         .release = dy_def_release,
         .to_string = dy_def_to_string
@@ -297,17 +300,24 @@ bool dy_def_is_computation(void *data)
     return DY_YES;
 }
 
-size_t dy_def_num_occurrences(void *data, size_t id)
+bool dy_def_is_bound(void *data, size_t id)
 {
     struct dy_def_data *def = data;
 
-    size_t a = dy_core_expr_num_occurrences(id, def->arg);
-
-    if (id == def->id) {
-        return a;
+    if (dy_core_expr_is_bound(id, def->arg)) {
+        return true;
     }
 
-    return a + dy_core_expr_num_occurrences(id, def->body);
+    if (id == def->id) {
+        return false;
+    }
+
+    return dy_core_expr_is_bound(id, def->body);
+}
+
+bool dy_def_appears_in_opposite_polarity(void *data, size_t id, enum dy_core_polarity polarity)
+{
+    return false;
 }
 
 void *dy_def_retain(void *data)

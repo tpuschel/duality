@@ -146,7 +146,9 @@ struct dy_core_custom {
 
     bool (*is_computation)(void *data);
 
-    size_t (*num_occurrences)(void *data, size_t id);
+    bool (*is_bound)(void *data, size_t id);
+
+    bool (*appears_in_opposite_polarity)(void *data, size_t id, enum dy_core_polarity polarity);
 
     void *(*retain)(void *data);
 
@@ -208,9 +210,6 @@ static inline enum dy_core_polarity flip_polarity(enum dy_core_polarity polarity
  * Determines if an expression is syntactically a value or a computation.
  */
 static inline bool dy_core_expr_is_computation(struct dy_core_expr expr);
-
-/** How often 'id' is mentioned in 'expr'. */
-static inline size_t dy_core_expr_num_occurrences(size_t id, struct dy_core_expr expr);
 
 /** Returns whether 'id' occurs in expr at all. */
 static inline bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr);
@@ -288,66 +287,56 @@ bool dy_core_expr_is_computation(struct dy_core_expr expr)
 
 bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr)
 {
-    // TODO: Optimize by not using num_occurrences (can stop traversing after finding one instance).
-    return dy_core_expr_num_occurrences(id, expr) > 0;
-}
-
-size_t dy_core_expr_num_occurrences(size_t id, struct dy_core_expr expr)
-{
     switch (expr.tag) {
     case DY_CORE_EXPR_EQUALITY_MAP:
-        return dy_core_expr_num_occurrences(id, *expr.equality_map.e1) + dy_core_expr_num_occurrences(id, *expr.equality_map.e2);
+        return dy_core_expr_is_bound(id, *expr.equality_map.e1) || dy_core_expr_is_bound(id, *expr.equality_map.e2);
     case DY_CORE_EXPR_TYPE_MAP: {
-        size_t x = dy_core_expr_num_occurrences(id, *expr.type_map.binding.type);
+        if (dy_core_expr_is_bound(id, *expr.type_map.binding.type)) {
+            return true;
+        }
 
         if (id == expr.type_map.binding.id) {
-            return x;
+            return false;
         }
 
-        return x + dy_core_expr_num_occurrences(id, *expr.type_map.expr);
+        return dy_core_expr_is_bound(id, *expr.type_map.expr);
     }
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
-        return dy_core_expr_num_occurrences(id, *expr.equality_map_elim.expr) + dy_core_expr_num_occurrences(id, *expr.equality_map_elim.map.e1) + dy_core_expr_num_occurrences(id, *expr.equality_map_elim.map.e2);
+        return dy_core_expr_is_bound(id, *expr.equality_map_elim.expr) || dy_core_expr_is_bound(id, *expr.equality_map_elim.map.e1) || dy_core_expr_is_bound(id, *expr.equality_map_elim.map.e2);
     case DY_CORE_EXPR_TYPE_MAP_ELIM: {
-        size_t x = dy_core_expr_num_occurrences(id, *expr.type_map_elim.expr) + dy_core_expr_num_occurrences(id, *expr.type_map_elim.map.binding.type);
+        if (dy_core_expr_is_bound(id, *expr.type_map_elim.expr) || dy_core_expr_is_bound(id, *expr.type_map_elim.map.binding.type)) {
+            return true;
+        }
 
         if (id == expr.type_map_elim.map.binding.id) {
-            return x;
+            return false;
         }
 
-        return x + dy_core_expr_num_occurrences(id, *expr.type_map_elim.map.expr);
+        return dy_core_expr_is_bound(id, *expr.type_map_elim.map.expr);
     }
     case DY_CORE_EXPR_JUNCTION:
-        return dy_core_expr_num_occurrences(id, *expr.junction.e1) + dy_core_expr_num_occurrences(id, *expr.junction.e2);
+        return dy_core_expr_is_bound(id, *expr.junction.e1) || dy_core_expr_is_bound(id, *expr.junction.e2);
     case DY_CORE_EXPR_ALTERNATIVE:
-        return dy_core_expr_num_occurrences(id, *expr.alternative.first) + dy_core_expr_num_occurrences(id, *expr.alternative.second);
+        return dy_core_expr_is_bound(id, *expr.alternative.first) || dy_core_expr_is_bound(id, *expr.alternative.second);
     case DY_CORE_EXPR_VARIABLE:
-        if (expr.variable.id == id) {
-            return 1;
-        } else {
-            return 0;
-        }
+        return expr.variable.id == id;
     case DY_CORE_EXPR_INFERENCE_VARIABLE:
-        if (expr.inference_variable.id == id) {
-            return 1;
-        } else {
-            return 0;
-        }
+        return expr.inference_variable.id == id;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION: {
         if (id == expr.recursion.id) {
-            return 0;
+            return false;
         }
 
-        return dy_core_expr_num_occurrences(id, *expr.recursion.expr);
+        return dy_core_expr_is_bound(id, *expr.recursion.expr);
     }
     case DY_CORE_EXPR_END:
         // fallthrough
     case DY_CORE_EXPR_SYMBOL:
-        return 0;
+        return false;
     case DY_CORE_EXPR_CUSTOM:
-        return expr.custom.num_occurrences(expr.custom.data, id);
+        return expr.custom.is_bound(expr.custom.data, id);
     }
 
     dy_bail("Impossible object type.");
@@ -383,7 +372,7 @@ bool dy_core_appears_in_opposite_polarity(size_t id, struct dy_core_expr expr, e
     case DY_CORE_EXPR_SYMBOL:
         return false;
     case DY_CORE_EXPR_CUSTOM:
-        return false;
+        return expr.custom.appears_in_opposite_polarity(expr.custom.data, id, current_polarity);
     }
 
     dy_bail("Impossible object type.");
