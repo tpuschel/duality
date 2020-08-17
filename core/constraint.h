@@ -127,4 +127,6 @@ bool dy_constraint_collect(struct dy_constraint constraint, size_t id, enum dy_c
         return true;
     }
     }
+
+    dy_bail("Impossible constraint type");
 }

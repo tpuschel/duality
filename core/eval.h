@@ -169,7 +169,7 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
     if (left.tag == DY_CORE_EXPR_TYPE_MAP) {
         dy_core_expr_release(equality_map);
 
-        struct dy_core_expr e = substitute(*left.type_map.expr, left.type_map.binding.id, right);
+        struct dy_core_expr e = substitute(ctx, *left.type_map.expr, left.type_map.binding.id, right);
 
         dy_core_expr_release(left);
         dy_core_expr_release(right);
@@ -283,7 +283,7 @@ struct dy_core_expr dy_eval_recursion(struct dy_core_ctx *ctx, struct dy_core_re
         .recursion = recursion
     };
 
-    struct dy_core_expr substituted_body = substitute(evaled_body, recursion.id, rec_expr);
+    struct dy_core_expr substituted_body = substitute(ctx, evaled_body, recursion.id, rec_expr);
 
     dy_core_expr_release_ptr(recursion.expr);
 

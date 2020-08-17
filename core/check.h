@@ -164,7 +164,7 @@ struct dy_core_type_map dy_check_type_map(struct dy_core_ctx *ctx, struct dy_cor
         },
     };
 
-    struct dy_core_expr expr = substitute(*type_map.expr, type_map.binding.id, new_unknown);
+    struct dy_core_expr expr = substitute(ctx, *type_map.expr, type_map.binding.id, new_unknown);
 
     dy_core_expr_release(new_unknown);
 
@@ -236,7 +236,7 @@ struct dy_core_equality_map_elim dy_check_equality_map_elim(struct dy_core_ctx *
 
             elim.check_result = dy_is_subtype(ctx, type_of_expr, type_map_expr, &c3, &have_c3, expr, &new_expr);
 
-            dy_core_expr_release(type_of_equality_map_e1);
+            dy_core_expr_release(type_map_expr);
         } else {
             struct dy_core_expr equality_map_expr = {
                 .tag = DY_CORE_EXPR_EQUALITY_MAP,
@@ -505,7 +505,7 @@ struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_c
         }
     };
 
-    struct dy_core_expr new_body = substitute(*recursion.expr, recursion.id, provisional_type);
+    struct dy_core_expr new_body = substitute(ctx, *recursion.expr, recursion.id, provisional_type);
 
     dy_core_expr_release(provisional_type);
 
@@ -531,7 +531,7 @@ struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_c
         }
     };
 
-    struct dy_core_expr actual_type = substitute(type_of_body, inference_id, self_type);
+    struct dy_core_expr actual_type = substitute(ctx, type_of_body, inference_id, self_type);
 
     dy_core_expr_release(type_of_body);
     dy_core_expr_release(self_type);
@@ -544,7 +544,7 @@ struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_c
         }
     };
 
-    struct dy_core_expr actual_body = substitute(*recursion.expr, recursion.id, self);
+    struct dy_core_expr actual_body = substitute(ctx, *recursion.expr, recursion.id, self);
 
     dy_core_expr_release(self);
 
@@ -572,7 +572,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct 
         },
     };
 
-    struct dy_core_expr inner_expr = substitute(*inference_type_map.expr, inference_type_map.binding.id, new_unknown);
+    struct dy_core_expr inner_expr = substitute(ctx, *inference_type_map.expr, inference_type_map.binding.id, new_unknown);
 
     dy_core_expr_release(new_unknown);
 
@@ -600,7 +600,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct 
                 }
             };
 
-            struct dy_core_expr result2 = substitute(result, inference_type_map.binding.id, new_var);
+            struct dy_core_expr result2 = substitute(ctx, result, inference_type_map.binding.id, new_var);
 
             dy_core_expr_release(result);
 
@@ -616,7 +616,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct 
             };
         }
 
-        inner_expr = substitute(new_inner_expr, inference_type_map.binding.id, result);
+        inner_expr = substitute(ctx, new_inner_expr, inference_type_map.binding.id, result);
 
         dy_core_expr_release(new_inner_expr);
 
@@ -650,7 +650,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct 
                     }
                 };
 
-                inner_expr = substitute(new_inner_expr, inference_type_map.binding.id, unknown);
+                inner_expr = substitute(ctx, new_inner_expr, inference_type_map.binding.id, unknown);
 
                 dy_core_expr_release(unknown);
                 dy_core_expr_release(new_inner_expr);
@@ -673,7 +673,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct 
                     .end_polarity = inference_type_map.polarity
                 };
 
-                inner_expr = substitute(new_inner_expr, inference_type_map.binding.id, end);
+                inner_expr = substitute(ctx, new_inner_expr, inference_type_map.binding.id, end);
 
                 dy_core_expr_release(new_inner_expr);
 
@@ -700,7 +700,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct 
                 }
             };
 
-            inner_expr = substitute(new_inner_expr, inference_type_map.binding.id, inference_var);
+            inner_expr = substitute(ctx, new_inner_expr, inference_type_map.binding.id, inference_var);
 
             dy_core_expr_release(new_inner_expr);
 
@@ -854,7 +854,7 @@ struct dy_core_expr dy_free_constraint(struct dy_core_ctx *ctx, size_t id, struc
             }
         };
 
-        struct dy_core_expr e = substitute(ret, bound_constraint->id, inference_var);
+        struct dy_core_expr e = substitute(ctx, ret, bound_constraint->id, inference_var);
 
         dy_core_expr_release(ret);
 
@@ -911,11 +911,15 @@ struct dy_constraint remove_mentions_in_constraint(struct dy_core_ctx *ctx, size
             constraint.single.expr = remove_mentions_in_supertype(ctx, id, constraint.single.expr);
             return constraint;
         }
+
+        dy_bail("Impossible polarity");
     case DY_CONSTRAINT_MULTIPLE:
         constraint.multiple.c1 = alloc_constraint(remove_mentions_in_constraint(ctx, id, *constraint.multiple.c1));
         constraint.multiple.c2 = alloc_constraint(remove_mentions_in_constraint(ctx, id, *constraint.multiple.c2));
         return constraint;
     }
+
+    dy_bail("Impossible constraint type");
 }
 
 struct dy_core_expr remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr subtype)

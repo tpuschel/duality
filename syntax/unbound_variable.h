@@ -17,7 +17,7 @@ struct dy_uv_data {
 
 static struct dy_core_expr dy_uv_type_of(void *data, struct dy_core_ctx *ctx);
 
-static dy_ternary_t dy_uv_is_equal(void *data, struct dy_core_expr expr);
+static dy_ternary_t dy_uv_is_equal(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr);
 
 static struct dy_core_expr dy_uv_check(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint);
 
@@ -27,7 +27,7 @@ static struct dy_core_expr dy_uv_remove_mentions_in_supertype(void *data, struct
 
 static struct dy_core_expr dy_uv_eval(void *data, struct dy_core_ctx *ctx, bool *is_value);
 
-static struct dy_core_expr dy_uv_substitute(void *data, size_t id, struct dy_core_expr sub);
+static struct dy_core_expr dy_uv_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub);
 
 static dy_ternary_t dy_uv_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);
 
@@ -91,7 +91,7 @@ struct dy_core_expr dy_uv_type_of(void *data, struct dy_core_ctx *ctx)
     };
 }
 
-dy_ternary_t dy_uv_is_equal(void *data, struct dy_core_expr expr)
+dy_ternary_t dy_uv_is_equal(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr)
 {
     return DY_NO;
 }
@@ -128,7 +128,7 @@ struct dy_core_expr dy_uv_eval(void *data, struct dy_core_ctx *ctx, bool *is_val
     };
 }
 
-struct dy_core_expr dy_uv_substitute(void *data, size_t id, struct dy_core_expr sub)
+struct dy_core_expr dy_uv_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub)
 {
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_CUSTOM,

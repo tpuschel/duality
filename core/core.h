@@ -126,7 +126,7 @@ struct dy_core_custom {
 
     struct dy_core_expr (*type_of)(void *data, struct dy_core_ctx *ctx);
 
-    dy_ternary_t (*is_equal)(void *data, struct dy_core_expr expr);
+    dy_ternary_t (*is_equal)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr);
 
     struct dy_core_expr (*check)(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint);
 
@@ -136,7 +136,7 @@ struct dy_core_custom {
 
     struct dy_core_expr (*eval)(void *data, struct dy_core_ctx *ctx, bool *is_value);
 
-    struct dy_core_expr (*substitute)(void *data, size_t id, struct dy_core_expr sub);
+    struct dy_core_expr (*substitute)(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub);
 
     dy_ternary_t (*is_subtype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);
 
@@ -255,9 +255,9 @@ bool dy_core_expr_is_computation(struct dy_core_expr expr)
 {
     switch (expr.tag) {
     case DY_CORE_EXPR_EQUALITY_MAP:
-        return dy_core_expr_is_computation(*expr.equality_map.e1);
+        return dy_core_expr_is_computation(*expr.equality_map.e1) || dy_core_expr_is_computation(*expr.equality_map.e2);
     case DY_CORE_EXPR_TYPE_MAP:
-        return dy_core_expr_is_computation(*expr.type_map.binding.type);
+        return dy_core_expr_is_computation(*expr.type_map.binding.type) || dy_core_expr_is_computation(*expr.type_map.expr);
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
         return true;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
