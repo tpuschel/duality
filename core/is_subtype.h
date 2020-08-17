@@ -101,16 +101,13 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         return DY_YES;
     }
 
-    if (subtype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE) {
+    if (subtype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE && subtype.inference_variable.polarity == DY_CORE_POLARITY_NEGATIVE) {
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_SINGLE,
             .single = {
                 .id = subtype.inference_variable.id,
-                .range = {
-                    .have_subtype = false,
-                    .have_supertype = true,
-                    .supertype = dy_core_expr_retain(supertype),
-                },
+                .expr = dy_core_expr_retain(supertype),
+                .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
 
@@ -119,21 +116,22 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         return DY_MAYBE;
     }
 
-    if (supertype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE) {
+    if (supertype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE && supertype.inference_variable.polarity == DY_CORE_POLARITY_POSITIVE) {
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_SINGLE,
             .single = {
                 .id = supertype.inference_variable.id,
-                .range = {
-                    .have_supertype = false,
-                    .have_subtype = true,
-                    .subtype = dy_core_expr_retain(subtype),
-                },
+                .expr = dy_core_expr_retain(subtype),
+                .polarity = DY_CORE_POLARITY_POSITIVE,
             }
         };
 
         *did_generate_constraint = true;
 
+        return DY_MAYBE;
+    }
+
+    if (subtype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE || supertype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE) {
         return DY_MAYBE;
     }
 
@@ -721,6 +719,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
             .inference_variable = {
                 .id = id,
                 .type = type_map.binding.type,
+                .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
         };
 

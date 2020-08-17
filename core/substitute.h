@@ -63,9 +63,15 @@ struct dy_core_expr substitute(struct dy_core_expr expr, size_t id, struct dy_co
         expr.type_map_elim.expr = dy_core_expr_new(substitute(*expr.type_map_elim.expr, id, sub));
         expr.type_map_elim.map = substitute_type_map(expr.type_map_elim.map, id, sub);
         return expr;
-    case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        expr.inference_type_map = substitute_type_map(expr.inference_type_map, id, sub);
+    case DY_CORE_EXPR_INFERENCE_TYPE_MAP: {
+        expr.inference_type_map.binding.type = dy_core_expr_new(substitute(*expr.inference_type_map.binding.type, id, sub));
+        if (id != expr.inference_type_map.binding.id) {
+            expr.inference_type_map.expr = dy_core_expr_new(substitute(*expr.inference_type_map.expr, id, sub));
+        } else {
+            expr.inference_type_map.expr = dy_core_expr_retain_ptr(expr.inference_type_map.expr);
+        }
         return expr;
+    }
     case DY_CORE_EXPR_RECURSION:
         if (expr.recursion.id == id) {
             return dy_core_expr_retain(expr);

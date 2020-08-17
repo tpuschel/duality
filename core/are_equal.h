@@ -36,7 +36,7 @@ static inline dy_ternary_t type_map_is_equal_to_type_map(struct dy_core_type_map
 
 static inline dy_ternary_t variable_is_equal(struct dy_core_variable variable, struct dy_core_expr expr);
 
-static inline dy_ternary_t inference_variable_is_equal(struct dy_core_variable variable, struct dy_core_expr expr);
+static inline dy_ternary_t inference_variable_is_equal(struct dy_core_inference_variable variable, struct dy_core_expr expr);
 
 static inline dy_ternary_t equality_map_elim_is_equal(struct dy_core_equality_map_elim elim, struct dy_core_expr expr);
 
@@ -294,7 +294,7 @@ dy_ternary_t variable_is_equal(struct dy_core_variable variable, struct dy_core_
     }
 }
 
-dy_ternary_t inference_variable_is_equal(struct dy_core_variable variable, struct dy_core_expr expr)
+dy_ternary_t inference_variable_is_equal(struct dy_core_inference_variable variable, struct dy_core_expr expr)
 {
     if (expr.tag != DY_CORE_EXPR_INFERENCE_VARIABLE) {
         return DY_MAYBE;

@@ -37,11 +37,13 @@ static inline struct dy_core_junction dy_check_junction(struct dy_core_ctx *ctx,
 
 static inline struct dy_core_alternative dy_check_alternative(struct dy_core_ctx *ctx, struct dy_core_alternative alternative, struct dy_constraint *constraint, bool *did_generate_constraint);
 
-static inline struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map inference_type_map, struct dy_constraint *constraint, bool *did_generate_constraint);
+static inline struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct dy_core_inference_type_map inference_type_map, struct dy_constraint *constraint, bool *did_generate_constraint);
 
 static inline struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, struct dy_constraint *constraint, bool *did_generate_constraint);
 
 static inline const struct dy_constraint *alloc_constraint(struct dy_constraint constraint);
+
+static inline dy_array_t dy_deep_copy_bound_constraints(struct dy_core_ctx *ctx);
 
 /**
  * Collects the id of every constraint that mentions 'id'.
@@ -51,11 +53,7 @@ static inline void dy_binding_contraints(struct dy_core_ctx *ctx, size_t id, str
 
 static inline bool dy_is_dependency_of_constraint(struct dy_core_ctx *ctx, size_t potential_dependency_id, size_t current_constraint_id);
 
-/**
- * Collects all constraint of 'id' in 'constraint' (if present) and forms its inferred expression.
- * It then recursively resolves any bound constraint that is now "free" as a result of 'id' being resolved.
- */
-static inline struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr type, enum dy_core_polarity polarity, struct dy_constraint constraint, bool have_constraint, struct dy_constraint *new_constraint, bool *have_new_constraint, struct dy_core_expr expr);
+static inline struct dy_core_expr dy_free_constraint(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr expr);
 
 /**
  * Just removes 'id' from 'ids', if present.
@@ -495,6 +493,7 @@ struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_c
         .inference_variable = {
             .id = inference_id,
             .type = dy_core_expr_new(any),
+            .polarity = DY_CORE_POLARITY_NEGATIVE,
         }
     };
 
@@ -510,9 +509,13 @@ struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_c
 
     dy_core_expr_release(provisional_type);
 
+    dy_array_t bc_copy = dy_deep_copy_bound_constraints(ctx);
+
     struct dy_constraint c;
     bool have_c = false;
     struct dy_core_expr checked_body = dy_check_expr(ctx, new_body, &c, &have_c);
+
+    ctx->bound_constraints = bc_copy;
 
     dy_core_expr_release(new_body);
 
@@ -554,7 +557,7 @@ struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_c
     return recursion;
 }
 
-struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map inference_type_map, struct dy_constraint *constraint, bool *did_generate_constraint)
+struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct dy_core_inference_type_map inference_type_map, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
     struct dy_constraint c1;
     bool have_c1 = false;
@@ -565,6 +568,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct 
         .inference_variable = {
             .id = inference_type_map.binding.id,
             .type = dy_core_expr_new(dy_core_expr_retain(type)),
+            .polarity = inference_type_map.polarity,
         },
     };
 
@@ -578,32 +582,142 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct 
 
     dy_core_expr_release(inner_expr);
 
-    dy_array_t ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 4);
-    dy_binding_contraints(ctx, inference_type_map.binding.id, c2, have_c2, &ids);
+    struct dy_core_expr result;
+    bool have_result;
+    if (have_c2) {
+        have_result = dy_constraint_collect(c2, inference_type_map.binding.id, inference_type_map.polarity, &result);
+    } else {
+        have_result = false;
+    }
 
-    if (ids.num_elems == 0) {
-        dy_array_destroy(ids);
+    if (have_result) {
+        if (dy_core_expr_is_bound(inference_type_map.binding.id, result)) {
+            struct dy_core_expr new_var = {
+                .tag = DY_CORE_EXPR_VARIABLE,
+                .variable = {
+                    .id = inference_type_map.binding.id,
+                    .type = dy_core_expr_new(dy_core_expr_retain(type)),
+                }
+            };
 
-        dy_core_expr_release(type);
+            struct dy_core_expr result2 = substitute(result, inference_type_map.binding.id, new_var);
 
-        struct dy_constraint c3;
-        bool have_new_constaint = false;
-        struct dy_core_expr resolved_expr = resolve_implicit(ctx, inference_type_map.binding.id, *inference_type_map.binding.type, inference_type_map.polarity, c2, have_c2, &c3, &have_new_constaint, new_inner_expr);
+            dy_core_expr_release(result);
+
+            dy_core_expr_release(new_var);
+
+            result = (struct dy_core_expr){
+                .tag = DY_CORE_EXPR_RECURSION,
+                .recursion = {
+                    .id = inference_type_map.binding.id,
+                    .expr = dy_core_expr_new(result2),
+                    .polarity = inference_type_map.polarity,
+                }
+            };
+        }
+
+        inner_expr = substitute(new_inner_expr, inference_type_map.binding.id, result);
 
         dy_core_expr_release(new_inner_expr);
 
-        new_inner_expr = resolved_expr;
+        new_inner_expr = dy_free_constraint(ctx, inference_type_map.binding.id, inner_expr);
 
-        have_c2 = have_new_constaint;
-        c2 = c3;
+        dy_core_expr_release(inner_expr);
+
+        have_c2 = false;
+        inner_expr = dy_check_expr(ctx, new_inner_expr, &c2, &have_c2);
+
+        dy_core_expr_release(new_inner_expr);
+
+        new_inner_expr = inner_expr;
     } else {
-        struct dy_bound_constraint bound_constraint = {
-            .id = inference_type_map.binding.id,
-            .type = type,
-            .binding_ids = ids
-        };
+        dy_array_t ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 4);
+        dy_binding_contraints(ctx, inference_type_map.binding.id, c2, have_c2, &ids);
 
-        dy_array_add(&ctx->bound_constraints, &bound_constraint);
+        if (ids.num_elems == 0) {
+            dy_array_destroy(ids);
+
+            dy_core_expr_release(type);
+
+            struct dy_core_expr type_of_inner_expr = dy_type_of(ctx, new_inner_expr);
+
+            if (dy_core_appears_in_opposite_polarity(inference_type_map.binding.id, type_of_inner_expr, DY_CORE_POLARITY_POSITIVE)) {
+                struct dy_core_expr unknown = {
+                    .tag = DY_CORE_EXPR_VARIABLE,
+                    .variable = {
+                        .id = inference_type_map.binding.id,
+                        .type = dy_core_expr_new(dy_core_expr_retain(type)),
+                    }
+                };
+
+                inner_expr = substitute(new_inner_expr, inference_type_map.binding.id, unknown);
+
+                dy_core_expr_release(unknown);
+                dy_core_expr_release(new_inner_expr);
+
+                new_inner_expr = (struct dy_core_expr){
+                    .tag = DY_CORE_EXPR_TYPE_MAP,
+                    .type_map = {
+                        .binding = {
+                            .id = inference_type_map.binding.id,
+                            .type = dy_core_expr_new(dy_core_expr_retain(type)),
+                        },
+                        .polarity = DY_CORE_POLARITY_POSITIVE,
+                        .expr = dy_core_expr_new(inner_expr),
+                        .is_implicit = true,
+                    }
+                };
+            } else {
+                struct dy_core_expr end = {
+                    .tag = DY_CORE_EXPR_END,
+                    .end_polarity = inference_type_map.polarity
+                };
+
+                inner_expr = substitute(new_inner_expr, inference_type_map.binding.id, end);
+
+                dy_core_expr_release(new_inner_expr);
+
+                new_inner_expr = inner_expr;
+            }
+
+            dy_core_expr_release(type_of_inner_expr);
+
+            inner_expr = dy_free_constraint(ctx, inference_type_map.binding.id, new_inner_expr);
+
+            dy_core_expr_release(new_inner_expr);
+
+            have_c2 = false;
+            new_inner_expr = dy_check_expr(ctx, inner_expr, &c2, &have_c2);
+
+            dy_core_expr_release(inner_expr);
+        } else {
+            struct dy_core_expr inference_var = {
+                .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
+                .inference_variable = {
+                    .id = inference_type_map.binding.id,
+                    .type = dy_core_expr_new(dy_core_expr_retain(type)),
+                    .polarity = flip_polarity(inference_type_map.polarity),
+                }
+            };
+
+            inner_expr = substitute(new_inner_expr, inference_type_map.binding.id, inference_var);
+
+            dy_core_expr_release(new_inner_expr);
+
+            have_c2 = false;
+            new_inner_expr = dy_check_expr(ctx, inner_expr, &c2, &have_c2);
+
+            dy_core_expr_release(inner_expr);
+
+            struct dy_bound_constraint bound_constraint = {
+                .id = inference_type_map.binding.id,
+                .type = type,
+                .polarity = flip_polarity(inference_type_map.polarity),
+                .binding_ids = ids
+            };
+
+            dy_array_add(&ctx->bound_constraints, &bound_constraint);
+        }
     }
 
     if (have_c1 && have_c2) {
@@ -656,12 +770,7 @@ void dy_binding_contraints(struct dy_core_ctx *ctx, size_t id, struct dy_constra
             return;
         }
 
-        if (constraint.single.range.have_subtype && dy_core_expr_is_bound(id, constraint.single.range.subtype)) {
-            dy_array_add(ids, &constraint.single.id);
-            return;
-        }
-
-        if (constraint.single.range.have_supertype && dy_core_expr_is_bound(id, constraint.single.range.supertype)) {
+        if (dy_core_expr_is_bound(id, constraint.single.expr)) {
             dy_array_add(ids, &constraint.single.id);
             return;
         }
@@ -722,244 +831,59 @@ bool dy_is_dependency_of_constraint(struct dy_core_ctx *ctx, size_t potential_de
     return false;
 }
 
-struct dy_core_expr resolve_implicit(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr type, enum dy_core_polarity polarity, struct dy_constraint constraint, bool have_constraint, struct dy_constraint *new_constraint, bool *have_new_constraint, struct dy_core_expr expr)
+struct dy_core_expr dy_free_constraint(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr expr)
 {
-    if (have_constraint) {
-        struct dy_constraint_range solution = dy_constraint_collect(constraint, id);
-
-        switch (polarity) {
-        case DY_CORE_POLARITY_POSITIVE:
-            if (solution.have_supertype) {
-                dy_core_expr_release(solution.supertype);
-            }
-
-            if (solution.have_subtype) {
-                struct dy_core_expr subtype = solution.subtype;
-                if (dy_core_expr_is_bound(id, solution.subtype)) {
-                    struct dy_core_expr new_var = {
-                        .tag = DY_CORE_EXPR_VARIABLE,
-                        .variable = {
-                            .id = id,
-                            .type = dy_core_expr_new(dy_core_expr_retain(type)),
-                        }
-                    };
-
-                    subtype = substitute(solution.subtype, id, new_var);
-
-                    dy_core_expr_release(new_var);
-
-                    subtype = (struct dy_core_expr){
-                        .tag = DY_CORE_EXPR_RECURSION,
-                        .recursion = {
-                            .id = id,
-                            .expr = dy_core_expr_new(subtype),
-                            .polarity = DY_CORE_POLARITY_NEGATIVE,
-                        }
-                    };
-                }
-
-                expr = substitute(expr, id, subtype);
-
-                dy_core_expr_release(subtype);
-            } else {
-                struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
-
-                if (dy_core_expr_num_occurrences(id, type_of_expr) > 1) {
-                    struct dy_core_expr new_unknown = {
-                        .tag = DY_CORE_EXPR_VARIABLE,
-                        .variable = {
-                            .id = id,
-                            .type = dy_core_expr_new(dy_core_expr_retain(type)),
-                        }
-                    };
-
-                    expr = substitute(expr, id, new_unknown);
-
-                    dy_core_expr_release(new_unknown);
-
-                    expr = (struct dy_core_expr){
-                        .tag = DY_CORE_EXPR_TYPE_MAP,
-                        .type_map = {
-                            .binding = {
-                                .id = id,
-                                .type = dy_core_expr_new(dy_core_expr_retain(type)),
-                            },
-                            .polarity = DY_CORE_POLARITY_POSITIVE,
-                            .expr = dy_core_expr_new(expr),
-                            .is_implicit = true,
-                        }
-                    };
-                } else {
-                    struct dy_core_expr all = {
-                        .tag = DY_CORE_EXPR_END,
-                        .end_polarity = DY_CORE_POLARITY_POSITIVE
-                    };
-
-                    expr = substitute(expr, id, all);
-                }
-
-                dy_core_expr_release(type_of_expr);
-            }
-            break;
-        case DY_CORE_POLARITY_NEGATIVE:
-            if (solution.have_subtype) {
-                dy_core_expr_release(solution.subtype);
-            }
-
-            if (solution.have_supertype) {
-                struct dy_core_expr supertype = solution.supertype;
-                if (dy_core_expr_is_bound(id, solution.supertype)) {
-                    struct dy_core_expr new_var = {
-                        .tag = DY_CORE_EXPR_VARIABLE,
-                        .variable = {
-                            .id = id,
-                            .type = dy_core_expr_new(dy_core_expr_retain(type)),
-                        }
-                    };
-
-                    supertype = substitute(solution.supertype, id, new_var);
-
-                    dy_core_expr_release(new_var);
-
-                    supertype = (struct dy_core_expr){
-                        .tag = DY_CORE_EXPR_RECURSION,
-                        .recursion = {
-                            .id = id,
-                            .expr = dy_core_expr_new(supertype),
-                            .polarity = DY_CORE_POLARITY_POSITIVE,
-                        }
-                    };
-                }
-
-                expr = substitute(expr, id, supertype);
-
-                dy_core_expr_release(supertype);
-            } else {
-                struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
-
-                if (dy_core_expr_num_occurrences(id, type_of_expr) > 1) {
-                    struct dy_core_expr new_unknown = {
-                        .tag = DY_CORE_EXPR_VARIABLE,
-                        .variable = {
-                            .id = id,
-                            .type = dy_core_expr_new(dy_core_expr_retain(type)),
-                        }
-                    };
-
-                    expr = substitute(expr, id, new_unknown);
-
-                    dy_core_expr_release(new_unknown);
-
-                    expr = (struct dy_core_expr){
-                        .tag = DY_CORE_EXPR_TYPE_MAP,
-                        .type_map = {
-                            .binding = {
-                                .id = id,
-                                .type = dy_core_expr_new(dy_core_expr_retain(type)),
-                            },
-                            .polarity = DY_CORE_POLARITY_POSITIVE,
-                            .expr = dy_core_expr_new(expr),
-                            .is_implicit = true,
-                        }
-                    };
-                } else {
-                    struct dy_core_expr any = {
-                        .tag = DY_CORE_EXPR_END,
-                        .end_polarity = DY_CORE_POLARITY_NEGATIVE
-                    };
-
-                    expr = substitute(expr, id, any);
-                }
-
-                dy_core_expr_release(type_of_expr);
-            }
-            break;
-        }
-
-        have_constraint = false;
-        struct dy_core_expr checked_expr = dy_check_expr(ctx, expr, &constraint, &have_constraint);
-
-        dy_core_expr_release(expr);
-
-        expr = checked_expr;
-    } else {
-        struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
-
-        if (dy_core_expr_num_occurrences(id, type_of_expr) > 1) {
-            struct dy_core_expr new_unknown = {
-                .tag = DY_CORE_EXPR_VARIABLE,
-                .variable = {
-                    .id = id,
-                    .type = dy_core_expr_new(dy_core_expr_retain(type)),
-                }
-            };
-
-            expr = substitute(expr, id, new_unknown);
-
-            dy_core_expr_release(new_unknown);
-
-            expr = (struct dy_core_expr){
-                .tag = DY_CORE_EXPR_TYPE_MAP,
-                .type_map = {
-                    .binding = {
-                        .id = id,
-                        .type = dy_core_expr_new(dy_core_expr_retain(type)),
-                    },
-                    .polarity = DY_CORE_POLARITY_POSITIVE,
-                    .expr = dy_core_expr_new(expr),
-                    .is_implicit = true,
-                }
-            };
-        } else {
-            struct dy_core_expr e = {
-                .tag = DY_CORE_EXPR_END,
-                .end_polarity = polarity
-            };
-
-            expr = substitute(expr, id, e);
-        }
-
-        dy_core_expr_release(type_of_expr);
-    }
-
+    struct dy_core_expr ret = dy_core_expr_retain(expr);
     for (size_t i = ctx->bound_constraints.num_elems; i-- > 0;) {
         struct dy_bound_constraint *bound_constraint = dy_array_pos(ctx->bound_constraints, i);
 
         remove_id(&bound_constraint->binding_ids, id);
 
-        dy_binding_contraints(ctx, bound_constraint->id, constraint, have_constraint, &bound_constraint->binding_ids);
-
-        if (bound_constraint->binding_ids.num_elems == 0) {
-            dy_array_destroy(bound_constraint->binding_ids);
-
-            struct dy_bound_constraint bound_constraint_copy = *bound_constraint;
-
-            dy_array_remove(&ctx->bound_constraints, i);
-
-            struct dy_constraint resolved_constraint;
-            bool have_new_constraint2 = false;
-            struct dy_core_expr resolved_expr = resolve_implicit(ctx, bound_constraint_copy.id, bound_constraint_copy.type, polarity, constraint, have_constraint, &resolved_constraint, &have_new_constraint2, expr);
-
-            dy_core_expr_release(expr);
-
-            if (have_constraint) {
-                // release constraint
-            }
-
-            expr = resolved_expr;
-            have_constraint = have_new_constraint2;
-            constraint = resolved_constraint;
-
-            i = ctx->bound_constraints.num_elems;
+        if (bound_constraint->binding_ids.num_elems != 0) {
+            continue;
         }
+
+        dy_array_destroy(bound_constraint->binding_ids);
+
+        struct dy_core_expr inference_var = {
+            .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
+            .inference_variable = {
+                .id = bound_constraint->id,
+                .type = dy_core_expr_new(dy_core_expr_retain(bound_constraint->type)),
+                .polarity = bound_constraint->polarity,
+            }
+        };
+
+        struct dy_core_expr e = substitute(ret, bound_constraint->id, inference_var);
+
+        dy_core_expr_release(ret);
+
+        ret = (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
+            .inference_type_map = {
+                .binding = {
+                    .id = bound_constraint->id,
+                    .type = dy_core_expr_new(dy_core_expr_retain(bound_constraint->type)),
+                },
+                .expr = dy_core_expr_new(e),
+                .polarity = bound_constraint->polarity,
+            }
+        };
+
+        struct dy_bound_constraint copy = *bound_constraint;
+
+        dy_array_remove(&ctx->bound_constraints, i);
+
+        e = dy_free_constraint(ctx, copy.id, ret);
+
+        dy_core_expr_release(ret);
+
+        ret = e;
+
+        i = ctx->bound_constraints.num_elems;
     }
 
-    if (have_constraint) {
-        *new_constraint = constraint;
-        *have_new_constraint = true;
-    }
-
-    return expr;
+    return ret;
 }
 
 void remove_id(dy_array_t *ids, size_t id_to_remove)
@@ -979,15 +903,14 @@ struct dy_constraint remove_mentions_in_constraint(struct dy_core_ctx *ctx, size
 {
     switch (constraint.tag) {
     case DY_CONSTRAINT_SINGLE:
-        if (constraint.single.range.have_subtype) {
-            constraint.single.range.subtype = remove_mentions_in_subtype(ctx, id, constraint.single.range.subtype);
+        switch (constraint.single.polarity) {
+        case DY_CORE_POLARITY_POSITIVE:
+            constraint.single.expr = remove_mentions_in_subtype(ctx, id, constraint.single.expr);
+            return constraint;
+        case DY_CORE_POLARITY_NEGATIVE:
+            constraint.single.expr = remove_mentions_in_supertype(ctx, id, constraint.single.expr);
+            return constraint;
         }
-
-        if (constraint.single.range.have_supertype) {
-            constraint.single.range.supertype = remove_mentions_in_supertype(ctx, id, constraint.single.range.supertype);
-        }
-
-        return constraint;
     case DY_CONSTRAINT_MULTIPLE:
         constraint.multiple.c1 = alloc_constraint(remove_mentions_in_constraint(ctx, id, *constraint.multiple.c1));
         constraint.multiple.c2 = alloc_constraint(remove_mentions_in_constraint(ctx, id, *constraint.multiple.c2));
@@ -1173,6 +1096,29 @@ struct dy_core_expr remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t
     }
 
     dy_bail("Impossible object type.");
+}
+
+dy_array_t dy_deep_copy_bound_constraints(struct dy_core_ctx *ctx)
+{
+    dy_array_t copy = dy_array_create(sizeof(struct dy_bound_constraint), DY_ALIGNOF(struct dy_bound_constraint), ctx->bound_constraints.num_elems);
+
+    for (size_t i = 0; i < ctx->bound_constraints.num_elems; ++i) {
+        struct dy_bound_constraint bc;
+        dy_array_get(ctx->bound_constraints, i, &bc);
+
+        dy_array_t ids_copy = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), bc.binding_ids.num_elems);
+        for (size_t k = 0; k < bc.binding_ids.num_elems; ++k) {
+            size_t id;
+            dy_array_get(bc.binding_ids, k, &id);
+            dy_array_add(&ids_copy, &id);
+        }
+
+        bc.binding_ids = ids_copy;
+
+        dy_array_add(&copy, &bc);
+    }
+
+    return copy;
 }
 
 const struct dy_constraint *alloc_constraint(struct dy_constraint constraint)

@@ -11,26 +11,13 @@
 
 /**
  * This file deals with collecting/resolving constraints.
- *
- * Note that throughout this file, lower and upper bound
- * are synonymous with subtype and supertype, respectively.
  */
 
-/**
- * Represents lower and upper bound of any inference variable.
- * Note that neither bound has to necessarily exist.
- */
-struct dy_constraint_range {
-    struct dy_core_expr subtype;
-    bool have_subtype;
-    struct dy_core_expr supertype;
-    bool have_supertype;
-};
-
-/** An inference variable + its associated upper/lower bounds. */
+/** An inference variable + its associated upper or lower bound. */
 struct dy_constraint_single {
     size_t id;
-    struct dy_constraint_range range;
+    struct dy_core_expr expr;
+    enum dy_core_polarity polarity;
 };
 
 /**
@@ -63,235 +50,81 @@ struct dy_constraint {
 /**
  * Returns both the subtype and supertype (if any) of 'id' build from 'constraint'.
  */
-static inline struct dy_constraint_range dy_constraint_collect(struct dy_constraint constraint, size_t id);
+static inline bool dy_constraint_collect(struct dy_constraint constraint, size_t id, enum dy_core_polarity polarity, struct dy_core_expr *result);
 
-/** Just ref-count stuff. */
-static inline struct dy_constraint_range retain_range(struct dy_constraint_range range);
-static inline void release_range(struct dy_constraint_range range);
-
-/**
- * Merges two ranges. The type of junction determines the way they are merged.
- * Refer to their implementation for details.
- */
-static inline struct dy_constraint_range constraint_conjunction(struct dy_constraint_range range1, struct dy_constraint_range range2);
-static inline struct dy_constraint_range constraint_disjunction(struct dy_constraint_range range1, struct dy_constraint_range range2);
-
-struct dy_constraint_range dy_constraint_collect(struct dy_constraint constraint, size_t id)
+bool dy_constraint_collect(struct dy_constraint constraint, size_t id, enum dy_core_polarity polarity, struct dy_core_expr *result)
 {
     switch (constraint.tag) {
     case DY_CONSTRAINT_SINGLE:
         if (constraint.single.id != id) {
-            return (struct dy_constraint_range){
-                .have_subtype = false,
-                .have_supertype = false
-            };
+            return false;
         }
 
-        return retain_range(constraint.single.range);
+        *result = dy_core_expr_retain(constraint.single.expr);
+        return true;
     case DY_CONSTRAINT_MULTIPLE: {
-        struct dy_constraint_range range1 = dy_constraint_collect(*constraint.multiple.c1, id);
-        struct dy_constraint_range range2 = dy_constraint_collect(*constraint.multiple.c2, id);
+        struct dy_core_expr e1;
+        bool r1 = dy_constraint_collect(*constraint.multiple.c1, id, polarity, &e1);
 
-        struct dy_constraint_range r;
+        struct dy_core_expr e2;
+        bool r2 = dy_constraint_collect(*constraint.multiple.c2, id, polarity, &e2);
 
-        switch (constraint.multiple.polarity) {
-        case DY_CORE_POLARITY_POSITIVE:
-            r = constraint_conjunction(range1, range2);
-            break;
-        case DY_CORE_POLARITY_NEGATIVE:
-            r = constraint_disjunction(range1, range2);
-            break;
+        if (!r1 && !r2) {
+            return false;
         }
 
-        release_range(range1);
-        release_range(range2);
+        /**
+         * We never throw constraints away, even in disjunctive cases where only one
+         * bound is present.
+         *
+         * Image the following expression: '[a] -> [b] -> try { a "a"; b "b" }'
+         * There are essentially two ways the types of a and b can be inferred,
+         * too permissive: '[a Any] -> [b Any] -> try { a "a"; b "b" }'
+         * or too restrictive: '[a "a" ~> ...] -> [b "b" ~> ...] -> try { a "a"; b "b" }'.
+         *
+         * Dropping the bounds leads to the permissive variant, while keeping them
+         * leads to the restrictive variant.
+         *
+         * In each of the two cases, the expression can be rewritten to avoid those problems:
+         * '[x] -> try { x "a"; x "b" }' where the type of 'x' is inferred to be
+         * 'choice { "a" ~> ..., "b" ~> ... }', which is neither too permissive nor restrictive.
+         *
+         * Since the expression is suboptimal, the question is how to best nudge
+         * the user to reformulate their expression. For these purposes, we have chosen
+         * the always keep the bounds.
+         */
 
-        return r;
-    }
-    }
-}
+        if (r1 && !r2) {
+            *result = e1;
+            return true;
+        }
 
-/**
- * Merges two ranges in a conjunctive way.
- *
- * The resulting range should be at least as 'strong' as both input ranges.
- * This is achived using the following rules ('_' = empty; all rules are commutative):
- *
- * (_  <: _ ) AND (_  <: _ )  =    _    <:    _
- * (E1 <: _ ) AND (_  <: E4)  =    E1   <:    E4
- * (_  <: _ ) AND (E3 <: E4)  =    E3   <:    E4
- * (E1 <: _ ) AND (E3 <: _ )  = E1 | E3 <:    _
- * (_  <: E2) AND (_  <: E4)  =    _    <: E2 & E4
- * (E1 <: E2) AND (E3 <: E4)  = E1 | E3 <: E2 & E4
- *
- * The equality checks are an optimization to avoid superfluous bounds.
- */
-struct dy_constraint_range constraint_conjunction(struct dy_constraint_range range1, struct dy_constraint_range range2)
-{
-    struct dy_core_expr supertype;
-    bool have_supertype = false;
-    if (range1.have_supertype && range2.have_supertype && dy_are_equal(range1.supertype, range2.supertype) != DY_YES) {
-        supertype = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_JUNCTION,
-            .junction = {
-                .e1 = dy_core_expr_new(dy_core_expr_retain(range1.supertype)),
-                .e2 = dy_core_expr_new(dy_core_expr_retain(range2.supertype)),
-                .polarity = DY_CORE_POLARITY_POSITIVE,
-            }
-        };
+        if (!r1 && r2) {
+            *result = e2;
+            return true;
+        }
 
-        have_supertype = true;
-    } else if (range1.have_supertype) {
-        supertype = dy_core_expr_retain(range1.supertype);
-        have_supertype = true;
-    } else if (range2.have_supertype) {
-        supertype = dy_core_expr_retain(range2.supertype);
-        have_supertype = true;
-    }
-
-    struct dy_core_expr subtype;
-    bool have_subtype = false;
-    if (range1.have_subtype && range2.have_subtype && dy_are_equal(range1.subtype, range2.subtype) != DY_YES) {
-        subtype = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_JUNCTION,
-            .junction = {
-                .e1 = dy_core_expr_new(dy_core_expr_retain(range1.subtype)),
-                .e2 = dy_core_expr_new(dy_core_expr_retain(range2.subtype)),
-                .polarity = DY_CORE_POLARITY_NEGATIVE,
-            }
-        };
-
-        have_subtype = true;
-    } else if (range1.have_subtype) {
-        subtype = dy_core_expr_retain(range1.subtype);
-        have_subtype = true;
-    } else if (range2.have_subtype) {
-        subtype = dy_core_expr_retain(range2.subtype);
-        have_subtype = true;
-    }
-
-    return (struct dy_constraint_range){
-        .subtype = subtype,
-        .have_subtype = have_subtype,
-        .supertype = supertype,
-        .have_supertype = have_supertype
-    };
-}
-
-/**
- * Merges two ranges in a disjunctive way.
- *
- * The resulting range should be at most as 'strong' as both input ranges.
- * This is achived using the following rules ('_' = empty; all rules are commutative):
- *
- * (_  <: _ ) OR (_  <: _ ) =    _    <:    _
- * (E1 <: _ ) OR (_  <: E4) =    E1   <:    E4 (*)
- * (_  <: _ ) OR (E3 <: E4) =    E3   <:    E3 (*)
- * (E1 <: _ ) OR (E3 <: _ ) = E1 & E3 <:    _
- * (_  <: E2) OR (_  <: E4) =    _    <: E2 | E4
- * (E1 <: E2) OR (E3 <: E4) = E1 & E3 <: E2 | E4
- *
- * The equality checks are an optimization to avoid superfluous bounds.
- *
- * (*) Those two rules represent a decision to a problem that is not
- *     perfectly solvable.
- *
- *     Image the following expression: '[a] -> [b] -> try { a "a"; b "b" }'
- *     There are essentially two ways the types of a and b can be inferred,
- *     too permissive: '[a Any] -> [b Any] -> try { a "a"; b "b" }'
- *     or too restrictive: '[a "a" ~> ...] -> [b "b" ~> ...] -> try { a "a"; b "b" }'.
- *
- *     Dropping the bounds in (*) leads to the permissive variant, while keeping them
- *     leads to the restrictive variant.
- *
- *     In each of the two cases, the expression can be rewritten to avoid those problems:
- *     '[x] -> try { x "a"; x "b" }' where the type of 'x' is inferred to be
- *     'choice { "a" ~> ..., "b" ~> ... }', which is neither too permissive nor restrictive.
- *
- *     Since the expression is suboptimal, the question is how to best nudge
- *     the user to reformulate their expression. For these purposes, we have chosen
- *     the keep the bounds in (*).
- */
-struct dy_constraint_range constraint_disjunction(struct dy_constraint_range range1, struct dy_constraint_range range2)
-{
-    struct dy_core_expr supertype;
-    bool have_supertype = false;
-    if (range1.have_supertype && range2.have_supertype) {
-        if (dy_are_equal(range1.supertype, range2.supertype) == DY_YES) {
-            supertype = dy_core_expr_retain(range1.supertype);
-        } else {
-            supertype = (struct dy_core_expr){
+        if (polarity == constraint.multiple.polarity) {
+            *result = (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_JUNCTION,
                 .junction = {
-                    .e1 = dy_core_expr_new(dy_core_expr_retain(range1.supertype)),
-                    .e2 = dy_core_expr_new(dy_core_expr_retain(range2.supertype)),
+                    .e1 = dy_core_expr_new(e1),
+                    .e2 = dy_core_expr_new(e2),
                     .polarity = DY_CORE_POLARITY_NEGATIVE,
                 }
             };
-        }
-
-        have_supertype = true;
-    } else if (range1.have_supertype) {
-        supertype = dy_core_expr_retain(range1.supertype);
-        have_supertype = true;
-    } else if (range2.have_supertype) {
-        supertype = dy_core_expr_retain(range2.supertype);
-        have_supertype = true;
-    }
-
-    struct dy_core_expr subtype;
-    bool have_subtype = false;
-    if (range1.have_subtype && range2.have_subtype) {
-        if (dy_are_equal(range1.subtype, range2.subtype) == DY_YES) {
-            subtype = dy_core_expr_retain(range1.subtype);
         } else {
-            subtype = (struct dy_core_expr){
+            *result = (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_JUNCTION,
                 .junction = {
-                    .e1 = dy_core_expr_new(dy_core_expr_retain(range1.subtype)),
-                    .e2 = dy_core_expr_new(dy_core_expr_retain(range2.subtype)),
+                    .e1 = dy_core_expr_new(e1),
+                    .e2 = dy_core_expr_new(e2),
                     .polarity = DY_CORE_POLARITY_POSITIVE,
                 }
             };
         }
 
-        have_subtype = true;
-    } else if (range1.have_subtype) {
-        subtype = dy_core_expr_retain(range1.subtype);
-        have_subtype = true;
-    } else if (range2.have_subtype) {
-        subtype = dy_core_expr_retain(range2.subtype);
-        have_subtype = true;
+        return true;
     }
-
-    return (struct dy_constraint_range){
-        .subtype = subtype,
-        .have_subtype = have_subtype,
-        .supertype = supertype,
-        .have_supertype = have_supertype
-    };
-}
-
-struct dy_constraint_range retain_range(struct dy_constraint_range range)
-{
-    if (range.have_subtype) {
-        dy_core_expr_retain(range.subtype);
-    }
-
-    if (range.have_supertype) {
-        dy_core_expr_retain(range.supertype);
-    }
-
-    return range;
-}
-
-void release_range(struct dy_constraint_range range)
-{
-    if (range.have_subtype) {
-        dy_core_expr_release(range.subtype);
-    }
-
-    if (range.have_supertype) {
-        dy_core_expr_release(range.supertype);
     }
 }
