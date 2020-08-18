@@ -58,6 +58,8 @@ static inline dy_ternary_t is_subtype_of_negative_recursion(struct dy_core_ctx *
 
 static inline const struct dy_constraint *alloc_constraint(struct dy_constraint constraint);
 
+static inline bool dy_is_vacuous(size_t id, struct dy_core_expr expr);
+
 dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr)
 {
     bool did_transform_expr = false;
@@ -87,12 +89,6 @@ dy_ternary_t dy_is_subtype_no_transformation(struct dy_core_ctx *ctx, struct dy_
 
 dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
-    if (subtype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE && supertype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE) {
-        if (subtype.inference_variable.id == supertype.inference_variable.id) {
-            return DY_YES;
-        }
-    }
-
     if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
         return DY_YES;
     }
@@ -102,6 +98,10 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
     }
 
     if (subtype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE && subtype.inference_variable.polarity == DY_CORE_POLARITY_NEGATIVE) {
+        if (dy_is_vacuous(subtype.inference_variable.id, supertype)) {
+            return DY_YES;
+        }
+
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_SINGLE,
             .single = {
@@ -117,6 +117,10 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
     }
 
     if (supertype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE && supertype.inference_variable.polarity == DY_CORE_POLARITY_POSITIVE) {
+        if (dy_is_vacuous(supertype.inference_variable.id, subtype)) {
+            return DY_YES;
+        }
+
         *constraint = (struct dy_constraint){
             .tag = DY_CONSTRAINT_SINGLE,
             .single = {
@@ -754,7 +758,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
 
         dy_core_expr_release(inference_ctx);
 
-        return DY_YES;
+        return DY_MAYBE;
     }
 
     return DY_NO;
@@ -1394,4 +1398,38 @@ dy_ternary_t is_subtype_of_negative_recursion(struct dy_core_ctx *ctx, struct dy
     ctx->subtype_assumption_cache.num_elems = old_size;
 
     return result;
+}
+
+bool dy_is_vacuous(size_t id, struct dy_core_expr expr)
+{
+    switch (expr.tag) {
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        return false;
+    case DY_CORE_EXPR_TYPE_MAP:
+        return false;
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        return false;
+    case DY_CORE_EXPR_TYPE_MAP_ELIM:
+        return false;
+    case DY_CORE_EXPR_JUNCTION:
+        return dy_is_vacuous(id, *expr.junction.e1) && dy_is_vacuous(id, *expr.junction.e2);
+    case DY_CORE_EXPR_ALTERNATIVE:
+        return false;
+    case DY_CORE_EXPR_VARIABLE:
+        return expr.variable.id == id;
+    case DY_CORE_EXPR_INFERENCE_VARIABLE:
+        return expr.inference_variable.id == id;
+    case DY_CORE_EXPR_CUSTOM:
+        return false;
+    case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
+        dy_bail("Should not happen\n");
+    case DY_CORE_EXPR_RECURSION:
+        return dy_is_vacuous(id, *expr.recursion.expr);
+    case DY_CORE_EXPR_END:
+        return false;
+    case DY_CORE_EXPR_SYMBOL:
+        return false;
+    }
+
+    dy_bail("Impossible object type.");
 }
