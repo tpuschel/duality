@@ -104,6 +104,8 @@ static inline bool parse_do_block_body_inverted_let(struct dy_parser_ctx *ctx, s
 
 static inline bool parse_do_block_body_ignored_expr(struct dy_parser_ctx *ctx, struct dy_ast_do_block_ignored_expr *ignored_expr);
 
+static inline bool parse_do_block_body_inverted_ignored_expr(struct dy_parser_ctx *ctx, struct dy_ast_do_block_ignored_expr *ignored_expr);
+
 static inline bool parse_do_block_def(struct dy_parser_ctx *ctx, struct dy_ast_do_block_def *def);
 
 static inline bool skip_semicolon_or_newline(struct dy_parser_ctx *ctx);
@@ -756,6 +758,16 @@ bool parse_do_block_body(struct dy_parser_ctx *ctx, struct dy_ast_do_block_body 
         return true;
     }
 
+    struct dy_ast_do_block_ignored_expr inverted_ignored_expr;
+    if (parse_do_block_body_inverted_ignored_expr(ctx, &inverted_ignored_expr)) {
+        *do_block = (struct dy_ast_do_block_body){
+            .tag = DY_AST_DO_BLOCK_INVERTED_IGNORED_EXPR,
+            .ignored_expr = inverted_ignored_expr
+        };
+
+        return true;
+    }
+
     struct dy_ast_do_block_def def;
     if (parse_do_block_def(ctx, &def)) {
         *do_block = (struct dy_ast_do_block_body){
@@ -917,7 +929,12 @@ bool parse_do_block_body_inverted_let(struct dy_parser_ctx *ctx, struct dy_ast_d
 
     skip_whitespace_except_newline(ctx);
 
-    return parse_do_block_body_let(ctx, let);
+    if (!parse_do_block_body_let(ctx, let)) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    return true;
 }
 
 bool parse_do_block_body_let(struct dy_parser_ctx *ctx, struct dy_ast_do_block_let *let)
@@ -978,6 +995,25 @@ bool parse_do_block_body_let(struct dy_parser_ctx *ctx, struct dy_ast_do_block_l
         .expr = dy_ast_expr_new(expr),
         .rest = dy_ast_do_block_new(rest)
     };
+
+    return true;
+}
+
+bool parse_do_block_body_inverted_ignored_expr(struct dy_parser_ctx *ctx, struct dy_ast_do_block_ignored_expr *ignored_expr)
+{
+    size_t start_index = ctx->stream.current_index;
+
+    if (!dy_parse_literal(ctx, DY_STR_LIT("invert"))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    skip_whitespace_except_newline(ctx);
+
+    if (!parse_do_block_body_ignored_expr(ctx, ignored_expr)) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
 
     return true;
 }
