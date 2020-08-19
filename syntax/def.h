@@ -32,6 +32,8 @@ static struct dy_core_expr dy_def_eval(void *data, struct dy_core_ctx *ctx, bool
 
 static struct dy_core_expr dy_def_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub);
 
+static struct dy_core_expr dy_def_rename_id(void *data, struct dy_core_ctx *ctx, size_t id, size_t sub_id);
+
 static dy_ternary_t dy_def_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);
 
 static dy_ternary_t dy_def_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);
@@ -74,6 +76,7 @@ struct dy_core_custom dy_def_create_no_alloc(const struct dy_def_data *data)
         .remove_mentions_in_supertype = dy_def_remove_mentions_in_supertype,
         .eval = dy_def_eval,
         .substitute = dy_def_substitute,
+        .rename_id = dy_def_rename_id,
         .is_subtype = dy_def_is_subtype,
         .is_supertype = dy_def_is_supertype,
         .eliminate = dy_def_eliminate,
@@ -263,7 +266,48 @@ struct dy_core_expr dy_def_substitute(void *data, struct dy_core_ctx *ctx, size_
         };
     }
 
+    if (dy_core_expr_is_bound(def->id, sub)) {
+        dy_bail("shit");
+    }
+
     struct dy_core_expr new_body = substitute(ctx, def->body, id, sub);
+
+    struct dy_def_data new_data = {
+        .id = def->id,
+        .arg = new_arg,
+        .body = new_body
+    };
+
+    return (struct dy_core_expr){
+        .tag = DY_CORE_EXPR_CUSTOM,
+        .custom = dy_def_create(new_data)
+    };
+}
+
+struct dy_core_expr dy_def_rename_id(void *data, struct dy_core_ctx *ctx, size_t id, size_t sub_id)
+{
+    struct dy_def_data *def = data;
+
+    struct dy_core_expr new_arg = rename_id(ctx, def->arg, id, sub_id);
+
+    if (id == def->id) {
+        struct dy_def_data new_data = {
+            .id = def->id,
+            .arg = new_arg,
+            .body = dy_core_expr_retain(def->body)
+        };
+
+        return (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_CUSTOM,
+            .custom = dy_def_create(new_data)
+        };
+    }
+
+    if (def->id == sub_id) {
+        dy_bail("shit");
+    }
+
+    struct dy_core_expr new_body = rename_id(ctx, def->body, id, sub_id);
 
     struct dy_def_data new_data = {
         .id = def->id,

@@ -138,6 +138,8 @@ struct dy_core_custom {
 
     struct dy_core_expr (*substitute)(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub);
 
+    struct dy_core_expr (*rename_id)(void *data, struct dy_core_ctx *ctx, size_t id, size_t new_id);
+
     dy_ternary_t (*is_subtype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);
 
     dy_ternary_t (*is_supertype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);

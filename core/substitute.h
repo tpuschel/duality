@@ -22,6 +22,15 @@ static inline struct dy_core_type_map substitute_type_map(struct dy_core_ctx *ct
 
 static inline struct dy_core_inference_type_map substitute_inference_type_map(struct dy_core_ctx *ctx, struct dy_core_inference_type_map type_map, size_t id, struct dy_core_expr sub);
 
+
+static inline struct dy_core_expr rename_id(struct dy_core_ctx *ctx, struct dy_core_expr expr, size_t id, size_t sub_id);
+
+static inline struct dy_core_equality_map rename_id_in_equality_map(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, size_t id, size_t sub_id);
+
+static inline struct dy_core_type_map rename_id_in_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map inference_type_map, size_t id, size_t sub_id);
+
+static inline struct dy_core_inference_type_map rename_id_in_inference_type_map(struct dy_core_ctx *ctx, struct dy_core_inference_type_map type_map, size_t id, size_t sub_id);
+
 struct dy_core_expr substitute(struct dy_core_ctx *ctx, struct dy_core_expr expr, size_t id, struct dy_core_expr sub)
 {
     switch (expr.tag) {
@@ -75,7 +84,9 @@ struct dy_core_expr substitute(struct dy_core_ctx *ctx, struct dy_core_expr expr
             return dy_core_expr_retain(expr);
         } else {
             if (dy_core_expr_is_bound(expr.recursion.id, sub)) {
-                dy_bail("Recursion binding appears in substitution!\n");
+                size_t new_id = ctx->running_id++;
+                expr.recursion.expr = dy_core_expr_new(rename_id(ctx, *expr.recursion.expr, expr.recursion.id, new_id));
+                expr.recursion.id = new_id;
             }
 
             expr.recursion.expr = dy_core_expr_new(substitute(ctx, *expr.recursion.expr, id, sub));
@@ -100,18 +111,8 @@ static struct dy_core_type_map substitute_type_map(struct dy_core_ctx *ctx, stru
         if (dy_core_expr_is_bound(type_map.binding.id, sub)) {
             size_t new_id = ctx->running_id++;
 
-            struct dy_core_expr var_expr = {
-                .tag = DY_CORE_EXPR_VARIABLE,
-                .variable = {
-                    .id = new_id,
-                    .type = type_map.binding.type,
-                }
-            };
-
-            struct dy_core_expr new_body = substitute(ctx, *type_map.expr, type_map.binding.id, var_expr);
-
+            type_map.expr = dy_core_expr_new(rename_id(ctx, *type_map.expr, type_map.binding.id, new_id));
             type_map.binding.id = new_id;
-            type_map.expr = dy_core_expr_new(new_body);
         }
 
         type_map.expr = dy_core_expr_new(substitute(ctx, *type_map.expr, id, sub));
@@ -128,22 +129,123 @@ struct dy_core_inference_type_map substitute_inference_type_map(struct dy_core_c
         if (dy_core_expr_is_bound(inference_type_map.binding.id, sub)) {
             size_t new_id = ctx->running_id++;
 
-            struct dy_core_expr var_expr = {
-                .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-                .inference_variable = {
-                    .id = new_id,
-                    .type = inference_type_map.binding.type,
-                    .polarity = inference_type_map.polarity,
-                }
-            };
-
-            struct dy_core_expr new_body = substitute(ctx, *inference_type_map.expr, inference_type_map.binding.id, var_expr);
-
+            inference_type_map.expr = dy_core_expr_new(rename_id(ctx, *inference_type_map.expr, inference_type_map.binding.id, new_id));
             inference_type_map.binding.id = new_id;
-            inference_type_map.expr = dy_core_expr_new(new_body);
         }
 
         inference_type_map.expr = dy_core_expr_new(substitute(ctx, *inference_type_map.expr, id, sub));
+    } else {
+        inference_type_map.expr = dy_core_expr_retain_ptr(inference_type_map.expr);
+    }
+
+    return inference_type_map;
+}
+
+struct dy_core_expr rename_id(struct dy_core_ctx *ctx, struct dy_core_expr expr, size_t id, size_t sub_id)
+{
+    switch (expr.tag) {
+    case DY_CORE_EXPR_CUSTOM:
+        return expr.custom.rename_id(expr.custom.data, ctx, id, sub_id);
+    case DY_CORE_EXPR_END:
+        // fallthrough
+    case DY_CORE_EXPR_SYMBOL:
+        return dy_core_expr_retain(expr);
+    case DY_CORE_EXPR_EQUALITY_MAP:
+        expr.equality_map = rename_id_in_equality_map(ctx, expr.equality_map, id, sub_id);
+        return expr;
+    case DY_CORE_EXPR_TYPE_MAP:
+        expr.type_map = rename_id_in_type_map(ctx, expr.type_map, id, sub_id);
+        return expr;
+    case DY_CORE_EXPR_VARIABLE:
+        if (expr.variable.id == id) {
+            expr.variable.id = sub_id;
+            return dy_core_expr_retain(expr);
+        } else {
+            expr.variable.type = dy_core_expr_new(rename_id(ctx, *expr.variable.type, id, sub_id));
+            return expr;
+        }
+    case DY_CORE_EXPR_INFERENCE_VARIABLE:
+        if (expr.inference_variable.id == id) {
+            expr.inference_variable.id = sub_id;
+            return dy_core_expr_retain(expr);
+        } else {
+            expr.inference_variable.type = dy_core_expr_new(rename_id(ctx, *expr.inference_variable.type, id, sub_id));
+            return expr;
+        }
+    case DY_CORE_EXPR_JUNCTION:
+        expr.junction.e1 = dy_core_expr_new(rename_id(ctx, *expr.junction.e1, id, sub_id));
+        expr.junction.e2 = dy_core_expr_new(rename_id(ctx, *expr.junction.e2, id, sub_id));
+        return expr;
+    case DY_CORE_EXPR_ALTERNATIVE:
+        expr.alternative.first = dy_core_expr_new(rename_id(ctx, *expr.alternative.first, id, sub_id));
+        expr.alternative.second = dy_core_expr_new(rename_id(ctx, *expr.alternative.second, id, sub_id));
+        return expr;
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
+        expr.equality_map_elim.expr = dy_core_expr_new(rename_id(ctx, *expr.equality_map_elim.expr, id, sub_id));
+        expr.equality_map_elim.map = rename_id_in_equality_map(ctx, expr.equality_map_elim.map, id, sub_id);
+        return expr;
+    case DY_CORE_EXPR_TYPE_MAP_ELIM:
+        expr.type_map_elim.expr = dy_core_expr_new(rename_id(ctx, *expr.type_map_elim.expr, id, sub_id));
+        expr.type_map_elim.map = rename_id_in_type_map(ctx, expr.type_map_elim.map, id, sub_id);
+        return expr;
+    case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
+        expr.inference_type_map = rename_id_in_inference_type_map(ctx, expr.inference_type_map, id, sub_id);
+        return expr;
+    case DY_CORE_EXPR_RECURSION:
+        if (expr.recursion.id == id) {
+            return dy_core_expr_retain(expr);
+        } else {
+            if (expr.recursion.id == sub_id) {
+                size_t new_id = ctx->running_id++;
+                expr.recursion.expr = dy_core_expr_new(rename_id(ctx, *expr.recursion.expr, expr.recursion.id, new_id));
+                expr.recursion.id = new_id;
+            }
+
+            expr.recursion.expr = dy_core_expr_new(rename_id(ctx, *expr.recursion.expr, id, sub_id));
+            return expr;
+        }
+    }
+
+    dy_bail("Impossible object type.");
+}
+
+struct dy_core_equality_map rename_id_in_equality_map(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, size_t id, size_t sub_id)
+{
+    equality_map.e1 = dy_core_expr_new(rename_id(ctx, *equality_map.e1, id, sub_id));
+    equality_map.e2 = dy_core_expr_new(rename_id(ctx, *equality_map.e2, id, sub_id));
+    return equality_map;
+}
+
+struct dy_core_type_map rename_id_in_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map, size_t id, size_t sub_id)
+{
+    type_map.binding.type = dy_core_expr_new(rename_id(ctx, *type_map.binding.type, id, sub_id));
+    if (id != type_map.binding.id) {
+        if (type_map.binding.id == sub_id) {
+            size_t new_id = ctx->running_id++;
+
+            type_map.expr = dy_core_expr_new(rename_id(ctx, *type_map.expr, type_map.binding.id, new_id));
+            type_map.binding.id = new_id;
+        }
+
+        type_map.expr = dy_core_expr_new(rename_id(ctx, *type_map.expr, id, sub_id));
+    } else {
+        type_map.expr = dy_core_expr_retain_ptr(type_map.expr);
+    }
+    return type_map;
+}
+
+struct dy_core_inference_type_map rename_id_in_inference_type_map(struct dy_core_ctx *ctx, struct dy_core_inference_type_map inference_type_map, size_t id, size_t sub_id)
+{
+    inference_type_map.binding.type = dy_core_expr_new(rename_id(ctx, *inference_type_map.binding.type, id, sub_id));
+    if (id != inference_type_map.binding.id) {
+        if (inference_type_map.binding.id == sub_id) {
+            size_t new_id = ctx->running_id++;
+
+            inference_type_map.expr = dy_core_expr_new(rename_id(ctx, *inference_type_map.expr, inference_type_map.binding.id, new_id));
+            inference_type_map.binding.id = new_id;
+        }
+
+        inference_type_map.expr = dy_core_expr_new(rename_id(ctx, *inference_type_map.expr, id, sub_id));
     } else {
         inference_type_map.expr = dy_core_expr_retain_ptr(inference_type_map.expr);
     }
