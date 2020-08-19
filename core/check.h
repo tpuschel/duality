@@ -548,11 +548,21 @@ struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_c
 
     dy_core_expr_release(self);
 
-    struct dy_core_expr checked_actual_body = dy_check_expr(ctx, actual_body, constraint, did_generate_constraint);
+    have_c = false;
+    struct dy_core_expr checked_actual_body = dy_check_expr(ctx, actual_body, &c, &have_c);
 
     dy_core_expr_release(actual_body);
 
     recursion.expr = dy_core_expr_new(checked_actual_body);
+
+    if (have_c) {
+        struct dy_constraint c2 = remove_mentions_in_constraint(ctx, recursion.id, c);
+        // free c
+        c = c2;
+    }
+
+    *constraint = c;
+    *did_generate_constraint = have_c;
 
     return recursion;
 }
