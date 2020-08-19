@@ -156,6 +156,10 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
     }
 
     if (left.tag == DY_CORE_EXPR_EQUALITY_MAP) {
+        if (left.equality_map.is_implicit != elim.map.is_implicit) {
+            dy_bail("Bug: Implicitness mismatch!");
+        }
+
         dy_core_expr_release(equality_map);
         dy_core_expr_release(right);
 
@@ -167,6 +171,10 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
     }
 
     if (left.tag == DY_CORE_EXPR_TYPE_MAP) {
+        if (left.type_map.is_implicit != elim.map.is_implicit) {
+            dy_bail("Bug: Implicitness mismatch!");
+        }
+
         dy_core_expr_release(equality_map);
 
         struct dy_core_expr e = substitute(ctx, *left.type_map.expr, left.type_map.binding.id, right);

@@ -34,9 +34,9 @@ static struct dy_core_expr dy_def_substitute(void *data, struct dy_core_ctx *ctx
 
 static struct dy_core_expr dy_def_rename_id(void *data, struct dy_core_ctx *ctx, size_t id, size_t sub_id);
 
-static dy_ternary_t dy_def_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);
+static dy_ternary_t dy_def_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, dy_array_t *subtype_implicits);
 
-static dy_ternary_t dy_def_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);
+static dy_ternary_t dy_def_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, dy_array_t *subtype_implicits);
 
 static struct dy_core_expr dy_def_eliminate(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value);
 
@@ -44,7 +44,7 @@ static bool dy_def_is_computation(void *data);
 
 static bool dy_def_is_bound(void *data, size_t id);
 
-static bool dy_def_appears_in_opposite_polarity(void *data, size_t id, enum dy_core_polarity polarity);
+static void dy_def_appears_in_polarity(void *data, size_t id, enum dy_core_polarity current_polarity, bool *in_positive, bool *in_negative);
 
 static void *dy_def_retain(void *data);
 
@@ -82,7 +82,7 @@ struct dy_core_custom dy_def_create_no_alloc(const struct dy_def_data *data)
         .eliminate = dy_def_eliminate,
         .is_computation = dy_def_is_computation,
         .is_bound = dy_def_is_bound,
-        .appears_in_opposite_polarity = dy_def_appears_in_opposite_polarity,
+        .appears_in_polarity = dy_def_appears_in_polarity,
         .retain = dy_def_retain,
         .release = dy_def_release,
         .to_string = dy_def_to_string
@@ -321,12 +321,12 @@ struct dy_core_expr dy_def_rename_id(void *data, struct dy_core_ctx *ctx, size_t
     };
 }
 
-dy_ternary_t dy_def_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr)
+dy_ternary_t dy_def_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, dy_array_t *subtype_implicits)
 {
     return DY_MAYBE;
 }
 
-dy_ternary_t dy_def_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr)
+dy_ternary_t dy_def_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, dy_array_t *subtype_implicits)
 {
     return DY_MAYBE;
 }
@@ -359,9 +359,9 @@ bool dy_def_is_bound(void *data, size_t id)
     return dy_core_expr_is_bound(id, def->body);
 }
 
-bool dy_def_appears_in_opposite_polarity(void *data, size_t id, enum dy_core_polarity polarity)
+void dy_def_appears_in_polarity(void *data, size_t id, enum dy_core_polarity current_polarity, bool *in_positive, bool *in_negative)
 {
-    return false;
+    return;
 }
 
 void *dy_def_retain(void *data)

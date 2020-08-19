@@ -140,9 +140,9 @@ struct dy_core_custom {
 
     struct dy_core_expr (*rename_id)(void *data, struct dy_core_ctx *ctx, size_t id, size_t new_id);
 
-    dy_ternary_t (*is_subtype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);
+    dy_ternary_t (*is_subtype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, dy_array_t *subtype_implicits);
 
-    dy_ternary_t (*is_supertype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr);
+    dy_ternary_t (*is_supertype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, dy_array_t *subtype_implicits);
 
     struct dy_core_expr (*eliminate)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value);
 
@@ -150,7 +150,7 @@ struct dy_core_custom {
 
     bool (*is_bound)(void *data, size_t id);
 
-    bool (*appears_in_opposite_polarity)(void *data, size_t id, enum dy_core_polarity polarity);
+    void (*appears_in_polarity)(void *data, size_t id, enum dy_core_polarity current_polarity, bool *in_positive, bool *in_negative);
 
     void *(*retain)(void *data);
 
@@ -219,7 +219,7 @@ static inline bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr);
 /** Appends a utf8 represention of expr to 'string'. */
 static inline void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string);
 
-static inline bool dy_core_appears_in_opposite_polarity(size_t id, struct dy_core_expr expr, enum dy_core_polarity current_polarity);
+static inline void dy_core_appears_in_polarity(size_t id, struct dy_core_expr expr, enum dy_core_polarity current_polarity, bool *in_positive, bool *in_negative);
 
 
 /** Boring ref-count stuff. */
@@ -344,37 +344,78 @@ bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr)
     dy_bail("Impossible object type.");
 }
 
-bool dy_core_appears_in_opposite_polarity(size_t id, struct dy_core_expr expr, enum dy_core_polarity current_polarity)
+void dy_core_appears_in_polarity(size_t id, struct dy_core_expr expr, enum dy_core_polarity current_polarity, bool *in_positive, bool *in_negative)
 {
     switch (expr.tag) {
     case DY_CORE_EXPR_EQUALITY_MAP:
-        return dy_core_appears_in_opposite_polarity(id, *expr.equality_map.e2, current_polarity);
+        dy_core_appears_in_polarity(id, *expr.equality_map.e2, current_polarity, in_positive, in_negative);
+        return;
     case DY_CORE_EXPR_TYPE_MAP:
-        return dy_core_appears_in_opposite_polarity(id, *expr.type_map.binding.type, flip_polarity(current_polarity))
-               || dy_core_appears_in_opposite_polarity(id, *expr.type_map.expr, current_polarity);
+        dy_core_appears_in_polarity(id, *expr.type_map.binding.type, flip_polarity(current_polarity), in_positive, in_negative);
+        if (*in_negative && *in_positive) {
+            return;
+        }
+
+        dy_core_appears_in_polarity(id, *expr.type_map.expr, current_polarity, in_positive, in_negative);
+
+        return;
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
-        return false;
+        return;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
-        return false;
+        return;
     case DY_CORE_EXPR_JUNCTION:
-        return dy_core_appears_in_opposite_polarity(id, *expr.junction.e1, current_polarity)
-               || dy_core_appears_in_opposite_polarity(id, *expr.junction.e2, current_polarity);
+        dy_core_appears_in_polarity(id, *expr.junction.e1, current_polarity, in_positive, in_negative);
+        if (*in_positive && *in_negative) {
+            return;
+        }
+
+        dy_core_appears_in_polarity(id, *expr.junction.e2, current_polarity, in_positive, in_negative);
+
+        return;
     case DY_CORE_EXPR_ALTERNATIVE:
-        return false;
+        return;
     case DY_CORE_EXPR_VARIABLE:
-        return false;
+        if (expr.variable.id == id) {
+            switch (current_polarity) {
+            case DY_CORE_POLARITY_POSITIVE:
+                *in_positive = true;
+                return;
+            case DY_CORE_POLARITY_NEGATIVE:
+                *in_negative = true;
+                return;
+            }
+
+            dy_bail("Impossible polarity.");
+        }
+
+        return;
     case DY_CORE_EXPR_INFERENCE_VARIABLE:
-        return expr.inference_variable.id == id && expr.inference_variable.polarity != current_polarity;
+        if (expr.inference_variable.id == id) {
+            switch (current_polarity) {
+            case DY_CORE_POLARITY_POSITIVE:
+                *in_positive = true;
+                return;
+            case DY_CORE_POLARITY_NEGATIVE:
+                *in_negative = true;
+                return;
+            }
+
+            dy_bail("Impossible polarity.");
+        }
+
+        return;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
-        return dy_core_appears_in_opposite_polarity(id, *expr.recursion.expr, current_polarity);
+        dy_core_appears_in_polarity(id, *expr.recursion.expr, current_polarity, in_positive, in_negative);
+        return;
     case DY_CORE_EXPR_END:
-        return false;
+        return;
     case DY_CORE_EXPR_SYMBOL:
-        return false;
+        return;
     case DY_CORE_EXPR_CUSTOM:
-        return expr.custom.appears_in_opposite_polarity(expr.custom.data, id, current_polarity);
+        expr.custom.appears_in_polarity(expr.custom.data, id, current_polarity, in_positive, in_negative);
+        return;
     }
 
     dy_bail("Impossible object type.");
