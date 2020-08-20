@@ -89,14 +89,6 @@ dy_ternary_t dy_is_subtype_no_transformation(struct dy_core_ctx *ctx, struct dy_
 
 dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr, dy_array_t *subtype_implicits)
 {
-    if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
-        return DY_YES;
-    }
-
-    if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_POSITIVE) {
-        return DY_YES;
-    }
-
     if (subtype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE && subtype.inference_variable.polarity == DY_CORE_POLARITY_NEGATIVE) {
         if (dy_is_vacuous(subtype.inference_variable.id, supertype)) {
             return DY_YES;
@@ -137,6 +129,14 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
 
     if (subtype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE || supertype.tag == DY_CORE_EXPR_INFERENCE_VARIABLE) {
         return DY_MAYBE;
+    }
+
+    if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
+        return DY_YES;
+    }
+
+    if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_POSITIVE) {
+        return DY_YES;
     }
 
     if (subtype.tag == DY_CORE_EXPR_RECURSION && supertype.tag == DY_CORE_EXPR_RECURSION && subtype.recursion.polarity == supertype.recursion.polarity && subtype.recursion.id == supertype.recursion.id) {
