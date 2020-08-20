@@ -7,6 +7,7 @@
 #pragma once
 
 #include "core.h"
+#include "substitute.h"
 
 /**
  * Determines the type of the expression 'expr'.
@@ -68,9 +69,33 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("Should not happen\n");
     case DY_CORE_EXPR_RECURSION: {
-        struct dy_core_expr type = dy_type_of(ctx, *expr.recursion.expr);
+        struct dy_core_expr any = {
+            .tag = DY_CORE_EXPR_END,
+            .end_polarity = DY_CORE_POLARITY_NEGATIVE
+        };
+
+        struct dy_core_expr self_type = {
+            .tag = DY_CORE_EXPR_VARIABLE,
+            .variable = {
+                .id = expr.recursion.id,
+                .type = dy_core_expr_new(any),
+            }
+        };
+
+        struct dy_core_expr self = {
+            .tag = DY_CORE_EXPR_VARIABLE,
+            .variable = {
+                .id = expr.recursion.id,
+                .type = dy_core_expr_new(self_type),
+            }
+        };
+
+        struct dy_core_expr new_body = substitute(ctx, *expr.recursion.expr, expr.recursion.id, self);
+
+        struct dy_core_expr type = dy_type_of(ctx, new_body);
 
         if (dy_core_expr_is_bound(expr.recursion.id, type)) {
+            expr.recursion.type = dy_core_expr_new(any);
             expr.recursion.expr = dy_core_expr_new(type);
             expr.recursion.polarity = DY_CORE_POLARITY_POSITIVE;
             return expr;

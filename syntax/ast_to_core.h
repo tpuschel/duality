@@ -86,6 +86,8 @@ static inline struct dy_core_expr do_block_def_to_core(struct dy_ast_to_core_ctx
 
 static inline struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_recursion rec, enum dy_core_polarity polarity);
 
+static inline struct dy_core_expr peel_inf_maps(struct dy_core_expr expr, struct dy_core_recursion rec);
+
 static inline struct dy_core_inference_variable create_inference_var(struct dy_ast_to_core_ctx *ctx, enum dy_core_polarity polarity);
 
 struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr expr)
@@ -848,31 +850,84 @@ struct dy_core_expr dy_ast_negative_recursion_to_core(struct dy_ast_to_core_ctx 
 
 struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_recursion rec, enum dy_core_polarity polarity)
 {
-    size_t id = ctx->running_id++;
+    if (rec.has_type) {
+        struct dy_core_expr type = dy_ast_expr_to_core(ctx, *rec.type);
 
-    struct dy_ast_to_core_bound_var bound_var = {
-        .name = rec.name.value,
-        .replacement_id = id,
-        .type = {
-            .tag = DY_CORE_EXPR_END,
-            .end_polarity = DY_CORE_POLARITY_NEGATIVE,
-        }
-    };
+        size_t id = ctx->running_id++;
 
-    size_t old_size = dy_array_add(&ctx->bound_vars, &bound_var);
+        struct dy_ast_to_core_bound_var bound_var = {
+            .name = rec.name.value,
+            .replacement_id = id,
+            .type = type
+        };
 
-    struct dy_core_expr body = dy_ast_expr_to_core(ctx, *rec.expr);
+        size_t old_size = dy_array_add(&ctx->bound_vars, &bound_var);
 
-    ctx->bound_vars.num_elems = old_size;
+        struct dy_core_expr body = dy_ast_expr_to_core(ctx, *rec.expr);
 
-    return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_RECURSION,
-        .recursion = {
+        ctx->bound_vars.num_elems = old_size;
+
+        struct dy_core_recursion ret = {
             .id = id,
-            .expr = dy_core_expr_new(body),
+            .type = dy_core_expr_new(type),
             .polarity = polarity,
-        }
-    };
+        };
+
+        return peel_inf_maps(body, ret);
+    } else {
+        size_t id = ctx->running_id++;
+
+        struct dy_core_inference_variable var = create_inference_var(ctx, DY_CORE_POLARITY_NEGATIVE);
+
+        struct dy_ast_to_core_bound_var bound_var = {
+            .name = rec.name.value,
+            .replacement_id = id,
+            .type = {
+                .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
+                .inference_variable = var,
+            }
+        };
+
+        size_t old_size = dy_array_add(&ctx->bound_vars, &bound_var);
+
+        struct dy_core_expr body = dy_ast_expr_to_core(ctx, *rec.expr);
+
+        ctx->bound_vars.num_elems = old_size;
+
+        struct dy_core_recursion recursion = {
+            .id = id,
+            .type = dy_core_expr_new(bound_var.type),
+            .polarity = polarity,
+        };
+
+        return (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
+            .inference_type_map = {
+                .binding = {
+                    .id = var.id,
+                    .type = var.type,
+                },
+                .expr = dy_core_expr_new(peel_inf_maps(body, recursion)),
+                .polarity = DY_CORE_POLARITY_NEGATIVE,
+            }
+        };
+    }
+}
+
+struct dy_core_expr peel_inf_maps(struct dy_core_expr expr, struct dy_core_recursion rec)
+{
+    if (expr.tag != DY_CORE_EXPR_INFERENCE_TYPE_MAP) {
+        rec.expr = dy_core_expr_new(expr);
+
+        return (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_RECURSION,
+            .recursion = rec,
+        };
+    }
+
+    expr.inference_type_map.expr = dy_core_expr_new(peel_inf_maps(*expr.inference_type_map.expr, rec));
+
+    return expr;
 }
 
 struct dy_core_inference_variable create_inference_var(struct dy_ast_to_core_ctx *ctx, enum dy_core_polarity polarity)

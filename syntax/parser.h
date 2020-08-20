@@ -1125,6 +1125,11 @@ bool parse_recursion(struct dy_parser_ctx *ctx, dy_string_t rec_lit, struct dy_a
 
     skip_whitespace_except_newline(ctx);
 
+    struct dy_ast_expr type;
+    bool has_type = dy_parse_expr(ctx, &type);
+
+    skip_whitespace_except_newline(ctx);
+
     if (!dy_parse_literal(ctx, DY_STR_LIT("="))) {
         ctx->stream.current_index = start_index;
         return false;
@@ -1144,6 +1149,8 @@ bool parse_recursion(struct dy_parser_ctx *ctx, dy_string_t rec_lit, struct dy_a
             .end = ctx->stream.current_index,
         },
         .name = self_name,
+        .type = dy_ast_expr_new(type),
+        .has_type = has_type,
         .expr = dy_ast_expr_new(expr)
     };
 

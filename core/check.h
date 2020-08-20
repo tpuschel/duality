@@ -537,88 +537,66 @@ struct dy_core_alternative dy_check_alternative(struct dy_core_ctx *ctx, struct 
 
 struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, struct dy_constraint *constraint, bool *did_generate_constraint)
 {
-    size_t inference_id = ctx->running_id++;
+    struct dy_constraint c1;
+    bool have_c1 = false;
+    struct dy_core_expr type = dy_check_expr(ctx, *recursion.type, &c1, &have_c1);
+    recursion.type = dy_core_expr_new(type);
 
-    struct dy_core_expr any = {
-        .tag = DY_CORE_EXPR_END,
-        .end_polarity = DY_CORE_POLARITY_NEGATIVE
-    };
-
-    struct dy_core_expr inference_var = {
-        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = {
-            .id = inference_id,
-            .type = dy_core_expr_new(any),
-            .polarity = DY_CORE_POLARITY_NEGATIVE,
-        }
-    };
-
-    struct dy_core_expr provisional_type = {
+    struct dy_core_expr new_unknown = {
         .tag = DY_CORE_EXPR_VARIABLE,
         .variable = {
             .id = recursion.id,
-            .type = dy_core_expr_new(inference_var),
-        }
+            .type = dy_core_expr_new(dy_core_expr_retain(type)),
+        },
     };
 
-    struct dy_core_expr new_body = substitute(ctx, *recursion.expr, recursion.id, provisional_type);
+    struct dy_core_expr expr = substitute(ctx, *recursion.expr, recursion.id, new_unknown);
 
-    dy_core_expr_release(provisional_type);
+    dy_core_expr_release(new_unknown);
 
     dy_array_t bc_copy = dy_deep_copy_bound_constraints(ctx);
 
-    struct dy_constraint c;
-    bool have_c = false;
-    struct dy_core_expr checked_body = dy_check_expr(ctx, new_body, &c, &have_c);
+    struct dy_constraint c2;
+    bool have_c2 = false;
+    struct dy_core_expr new_expr = dy_check_expr(ctx, expr, &c2, &have_c2);
 
     ctx->bound_constraints = bc_copy;
 
-    dy_core_expr_release(new_body);
+    struct dy_core_expr type_of_body = dy_type_of(ctx, new_expr);
 
-    struct dy_core_expr type_of_body = dy_type_of(ctx, checked_body);
+    new_unknown.variable.type = dy_core_expr_new(type_of_body);
 
-    dy_core_expr_release(checked_body);
+    expr = substitute(ctx, expr, recursion.id, new_unknown);
 
-    struct dy_core_expr self_type = {
-        .tag = DY_CORE_EXPR_VARIABLE,
-        .variable = {
-            .id = recursion.id,
-            .type = dy_core_expr_new(any),
-        }
-    };
+    have_c2 = false;
+    new_expr = dy_check_expr(ctx, expr, &c2, &have_c2);
 
-    struct dy_core_expr actual_type = substitute(ctx, type_of_body, inference_id, self_type);
-
-    dy_core_expr_release(type_of_body);
-    dy_core_expr_release(self_type);
-
-    struct dy_core_expr self = {
-        .tag = DY_CORE_EXPR_VARIABLE,
-        .variable = {
-            .id = recursion.id,
-            .type = dy_core_expr_new(actual_type),
-        }
-    };
-
-    struct dy_core_expr actual_body = substitute(ctx, *recursion.expr, recursion.id, self);
-
-    dy_core_expr_release(self);
-
-    have_c = false;
-    struct dy_core_expr checked_actual_body = dy_check_expr(ctx, actual_body, &c, &have_c);
-
-    dy_core_expr_release(actual_body);
-
-    recursion.expr = dy_core_expr_new(checked_actual_body);
-
-    if (have_c) {
-        struct dy_constraint c2 = remove_mentions_in_constraint(ctx, recursion.id, c);
-        // free c
-        c = c2;
+    if (have_c2) {
+        struct dy_constraint c3 = remove_mentions_in_constraint(ctx, recursion.id, c2);
+        // free c2
+        c2 = c3;
     }
 
-    *constraint = c;
-    *did_generate_constraint = have_c;
+    //recursion.type = dy_core_expr_retain_ptr(new_unknown.variable.type);
+    recursion.expr = dy_core_expr_new(new_expr);
+
+    if (have_c1 && have_c2) {
+        *constraint = (struct dy_constraint){
+            .tag = DY_CONSTRAINT_MULTIPLE,
+            .multiple = {
+                .c1 = alloc_constraint(c1),
+                .c2 = alloc_constraint(c2),
+                .polarity = DY_CORE_POLARITY_NEGATIVE,
+            }
+        };
+        *did_generate_constraint = true;
+    } else if (have_c1) {
+        *constraint = c1;
+        *did_generate_constraint = true;
+    } else if (have_c2) {
+        *constraint = c2;
+        *did_generate_constraint = true;
+    }
 
     return recursion;
 }
@@ -676,6 +654,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct 
                 .tag = DY_CORE_EXPR_RECURSION,
                 .recursion = {
                     .id = inference_type_map.binding.id,
+                    .type = dy_core_expr_retain_ptr(inference_type_map.binding.type),
                     .expr = dy_core_expr_new(result2),
                     .polarity = inference_type_map.polarity,
                 }

@@ -115,6 +115,7 @@ struct dy_core_alternative {
 
 struct dy_core_recursion {
     size_t id;
+    const struct dy_core_expr *type;
     const struct dy_core_expr *expr;
     enum dy_core_polarity polarity;
 };
@@ -327,6 +328,10 @@ bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr)
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION: {
+        if (dy_core_expr_is_bound(id, *expr.recursion.type)) {
+            return true;
+        }
+
         if (id == expr.recursion.id) {
             return false;
         }
@@ -407,6 +412,11 @@ void dy_core_appears_in_polarity(size_t id, struct dy_core_expr expr, enum dy_co
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
+        dy_core_appears_in_polarity(id, *expr.recursion.type, flip_polarity(current_polarity), in_positive, in_negative);
+        if (*in_positive && *in_negative) {
+            return;
+        }
+
         dy_core_appears_in_polarity(id, *expr.recursion.expr, current_polarity, in_positive, in_negative);
         return;
     case DY_CORE_EXPR_END:
@@ -480,6 +490,7 @@ struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
 
         return expr;
     case DY_CORE_EXPR_RECURSION:
+        dy_core_expr_retain_ptr(expr.recursion.type);
         dy_core_expr_retain_ptr(expr.recursion.expr);
 
         return expr;
@@ -552,6 +563,7 @@ void dy_core_expr_release(struct dy_core_expr expr)
 
         return;
     case DY_CORE_EXPR_RECURSION:
+        dy_core_expr_release_ptr(expr.recursion.type);
         dy_core_expr_release_ptr(expr.recursion.expr);
 
         return;
@@ -666,6 +678,7 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         return;
     case DY_CORE_EXPR_VARIABLE:
         add_size_t_decimal(string, expr.variable.id);
+
         return;
     case DY_CORE_EXPR_INFERENCE_VARIABLE:
         add_string(string, DY_STR_LIT("?"));
@@ -716,6 +729,8 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         }
 
         add_size_t_decimal(string, expr.recursion.id);
+        add_string(string, DY_STR_LIT(" "));
+        dy_core_expr_to_string(*expr.recursion.type, string);
 
         add_string(string, DY_STR_LIT(" = "));
 

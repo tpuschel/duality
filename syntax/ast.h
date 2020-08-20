@@ -129,6 +129,8 @@ struct dy_ast_juxtaposition {
 struct dy_ast_recursion {
     struct dy_range text_range;
     struct dy_ast_literal name;
+    const struct dy_ast_expr *type;
+    bool has_type;
     const struct dy_ast_expr *expr;
 };
 

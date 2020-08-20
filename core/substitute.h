@@ -80,6 +80,8 @@ struct dy_core_expr substitute(struct dy_core_ctx *ctx, struct dy_core_expr expr
         expr.inference_type_map = substitute_inference_type_map(ctx, expr.inference_type_map, id, sub);
         return expr;
     case DY_CORE_EXPR_RECURSION:
+        expr.recursion.type = dy_core_expr_new(substitute(ctx, *expr.recursion.type, id, sub));
+
         if (expr.recursion.id == id) {
             return dy_core_expr_retain(expr);
         } else {
@@ -192,6 +194,8 @@ struct dy_core_expr rename_id(struct dy_core_ctx *ctx, struct dy_core_expr expr,
         expr.inference_type_map = rename_id_in_inference_type_map(ctx, expr.inference_type_map, id, sub_id);
         return expr;
     case DY_CORE_EXPR_RECURSION:
+        expr.recursion.type = dy_core_expr_new(rename_id(ctx, *expr.recursion.type, id, sub_id));
+
         if (expr.recursion.id == id) {
             return dy_core_expr_retain(expr);
         } else {
