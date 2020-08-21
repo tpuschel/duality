@@ -979,7 +979,7 @@ struct dy_core_expr remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t i
             if (subtype.equality_map.polarity == DY_CORE_POLARITY_NEGATIVE) {
                 return (struct dy_core_expr){
                     .tag = DY_CORE_EXPR_END,
-                    .end_polarity = DY_CORE_POLARITY_NEGATIVE
+                    .end_polarity = DY_CORE_POLARITY_POSITIVE
                 };
             } else {
                 struct dy_core_expr type_map = {
@@ -1021,7 +1021,7 @@ struct dy_core_expr remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t i
         if (dy_core_expr_is_bound(id, subtype)) {
             return (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_END,
-                .end_polarity = DY_CORE_POLARITY_NEGATIVE
+                .end_polarity = DY_CORE_POLARITY_POSITIVE
             };
         } else {
             return subtype;
@@ -1037,7 +1037,7 @@ struct dy_core_expr remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t i
         if (subtype.variable.id == id) {
             return (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_END,
-                .end_polarity = DY_CORE_POLARITY_NEGATIVE
+                .end_polarity = DY_CORE_POLARITY_POSITIVE
             };
         } else {
             return subtype;
@@ -1046,7 +1046,7 @@ struct dy_core_expr remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t i
         if (subtype.inference_variable.id == id) {
             return (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_END,
-                .end_polarity = DY_CORE_POLARITY_NEGATIVE
+                .end_polarity = DY_CORE_POLARITY_POSITIVE
             };
         } else {
             return subtype;
@@ -1069,7 +1069,7 @@ struct dy_core_expr remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t
             if (supertype.equality_map.polarity == DY_CORE_POLARITY_POSITIVE) {
                 return (struct dy_core_expr){
                     .tag = DY_CORE_EXPR_END,
-                    .end_polarity = DY_CORE_POLARITY_POSITIVE
+                    .end_polarity = DY_CORE_POLARITY_NEGATIVE
                 };
             } else {
                 struct dy_core_expr type_map = {
@@ -1111,7 +1111,7 @@ struct dy_core_expr remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t
         if (dy_core_expr_is_bound(id, supertype)) {
             return (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_END,
-                .end_polarity = DY_CORE_POLARITY_POSITIVE
+                .end_polarity = DY_CORE_POLARITY_NEGATIVE
             };
         } else {
             return supertype;
@@ -1127,7 +1127,7 @@ struct dy_core_expr remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t
         if (supertype.variable.id == id) {
             return (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_END,
-                .end_polarity = DY_CORE_POLARITY_POSITIVE
+                .end_polarity = DY_CORE_POLARITY_NEGATIVE
             };
         } else {
             return supertype;
@@ -1136,7 +1136,7 @@ struct dy_core_expr remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t
         if (supertype.inference_variable.id == id) {
             return (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_END,
-                .end_polarity = DY_CORE_POLARITY_POSITIVE
+                .end_polarity = DY_CORE_POLARITY_NEGATIVE
             };
         } else {
             return supertype;
