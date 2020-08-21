@@ -564,12 +564,20 @@ struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_c
 
     struct dy_core_expr type_of_body = dy_type_of(ctx, new_expr);
 
+    dy_core_expr_release(new_expr);
+
     new_unknown.variable.type = dy_core_expr_new(type_of_body);
 
-    expr = substitute(ctx, expr, recursion.id, new_unknown);
+    new_expr = substitute(ctx, expr, recursion.id, new_unknown);
+
+    dy_core_expr_release(expr);
+
+    dy_core_expr_release(new_unknown);
 
     have_c2 = false;
-    new_expr = dy_check_expr(ctx, expr, &c2, &have_c2);
+    expr = dy_check_expr(ctx, new_expr, &c2, &have_c2);
+
+    dy_core_expr_release(new_expr);
 
     if (have_c2) {
         struct dy_constraint c3 = remove_mentions_in_constraint(ctx, recursion.id, c2);
@@ -578,7 +586,7 @@ struct dy_core_recursion dy_check_recursion(struct dy_core_ctx *ctx, struct dy_c
     }
 
     //recursion.type = dy_core_expr_retain_ptr(new_unknown.variable.type);
-    recursion.expr = dy_core_expr_new(new_expr);
+    recursion.expr = dy_core_expr_new(expr);
 
     if (have_c1 && have_c2) {
         *constraint = (struct dy_constraint){

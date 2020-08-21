@@ -92,7 +92,11 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
 
         struct dy_core_expr new_body = substitute(ctx, *expr.recursion.expr, expr.recursion.id, self);
 
+        dy_core_expr_release(self);
+
         struct dy_core_expr type = dy_type_of(ctx, new_body);
+
+        dy_core_expr_release(new_body);
 
         if (dy_core_expr_is_bound(expr.recursion.id, type)) {
             expr.recursion.type = dy_core_expr_new(any);
