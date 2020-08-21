@@ -159,14 +159,6 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         return is_subtype_of_negative_recursion(ctx, subtype, supertype.recursion, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr, subtype_implicits);
     }
 
-    if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
-        return DY_MAYBE;
-    }
-
-    if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_POSITIVE) {
-        return DY_NO;
-    }
-
     if (supertype.tag == DY_CORE_EXPR_JUNCTION && supertype.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
         return is_subtype_of_positive_junction(ctx, subtype, supertype.junction, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr, subtype_implicits);
     }
@@ -183,44 +175,39 @@ dy_ternary_t dy_is_subtype_sub(struct dy_core_ctx *ctx, struct dy_core_expr subt
         return negative_junction_is_subtype(ctx, subtype.junction, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr, subtype_implicits);
     }
 
-    if (supertype.tag == DY_CORE_EXPR_EQUALITY_MAP_ELIM || supertype.tag == DY_CORE_EXPR_TYPE_MAP_ELIM || supertype.tag == DY_CORE_EXPR_VARIABLE || supertype.tag == DY_CORE_EXPR_ALTERNATIVE) {
+    if (supertype.tag == DY_CORE_EXPR_EQUALITY_MAP_ELIM || supertype.tag == DY_CORE_EXPR_TYPE_MAP_ELIM || supertype.tag == DY_CORE_EXPR_VARIABLE || supertype.tag == DY_CORE_EXPR_ALTERNATIVE || supertype.tag == DY_CORE_EXPR_SYMBOL) {
         return dy_are_equal(ctx, subtype, supertype);
+    }
+
+    if (subtype.tag == DY_CORE_EXPR_EQUALITY_MAP_ELIM || subtype.tag == DY_CORE_EXPR_TYPE_MAP_ELIM || subtype.tag == DY_CORE_EXPR_VARIABLE || subtype.tag == DY_CORE_EXPR_ALTERNATIVE || subtype.tag == DY_CORE_EXPR_SYMBOL) {
+        return dy_are_equal(ctx, subtype, supertype);
+    }
+
+    if (subtype.tag == DY_CORE_EXPR_END && subtype.end_polarity == DY_CORE_POLARITY_NEGATIVE) {
+        return DY_MAYBE;
+    }
+
+    if (supertype.tag == DY_CORE_EXPR_END && supertype.end_polarity == DY_CORE_POLARITY_POSITIVE) {
+        return DY_NO;
+    }
+
+    if (subtype.tag == DY_CORE_EXPR_EQUALITY_MAP) {
+        return equality_map_is_subtype(ctx, subtype.equality_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr, subtype_implicits);
+    }
+
+    if (subtype.tag == DY_CORE_EXPR_TYPE_MAP) {
+        return type_map_is_subtype(ctx, subtype.type_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr, subtype_implicits);
+    }
+
+    if (subtype.tag == DY_CORE_EXPR_CUSTOM) {
+        return subtype.custom.is_subtype(subtype.custom.data, ctx, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, subtype_implicits);
     }
 
     if (supertype.tag == DY_CORE_EXPR_CUSTOM) {
         return supertype.custom.is_supertype(supertype.custom.data, ctx, subtype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, subtype_implicits);
     }
 
-    switch (subtype.tag) {
-    case DY_CORE_EXPR_EQUALITY_MAP:
-        return equality_map_is_subtype(ctx, subtype.equality_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr, subtype_implicits);
-    case DY_CORE_EXPR_TYPE_MAP:
-        return type_map_is_subtype(ctx, subtype.type_map, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, did_transform_subtype_expr, subtype_implicits);
-    case DY_CORE_EXPR_END:
-        // fallthrough
-    case DY_CORE_EXPR_RECURSION:
-        // fallthrough
-    case DY_CORE_EXPR_JUNCTION:
-        // fallthrough
-    case DY_CORE_EXPR_INFERENCE_VARIABLE:
-        // fallthrough
-    case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        dy_bail("Should not be reached");
-    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
-        // fallthrough
-    case DY_CORE_EXPR_TYPE_MAP_ELIM:
-        // fallthrough
-    case DY_CORE_EXPR_ALTERNATIVE:
-        // fallthrough
-    case DY_CORE_EXPR_VARIABLE:
-        // fallthrough
-    case DY_CORE_EXPR_SYMBOL:
-        return dy_are_equal(ctx, subtype, supertype);
-    case DY_CORE_EXPR_CUSTOM:
-        return subtype.custom.is_subtype(subtype.custom.data, ctx, supertype, constraint, did_generate_constraint, subtype_expr, new_subtype_expr, subtype_implicits);
-    }
-
-    dy_bail("Impossible object type.");
+    dy_bail("Should be unreachable!");
 }
 
 dy_ternary_t equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr, dy_array_t *subtype_implicits)
