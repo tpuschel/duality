@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "substitute.h"
 #include "../support/bail.h"
 
 /**
@@ -34,9 +33,7 @@ static inline dy_ternary_t type_map_is_equal(struct dy_core_ctx *ctx, struct dy_
 
 static inline dy_ternary_t type_map_is_equal_to_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map1, struct dy_core_type_map type_map2);
 
-static inline dy_ternary_t variable_is_equal(struct dy_core_ctx *ctx, struct dy_core_variable variable, struct dy_core_expr expr);
-
-static inline dy_ternary_t inference_variable_is_equal(struct dy_core_ctx *ctx, struct dy_core_inference_variable variable, struct dy_core_expr expr);
+static inline dy_ternary_t variable_is_equal(struct dy_core_ctx *ctx, size_t variable_id, struct dy_core_expr expr);
 
 static inline dy_ternary_t equality_map_elim_is_equal(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim, struct dy_core_expr expr);
 
@@ -69,11 +66,7 @@ dy_ternary_t dy_are_equal(struct dy_core_ctx *ctx, struct dy_core_expr e1, struc
     }
 
     if (e2.tag == DY_CORE_EXPR_VARIABLE) {
-        return variable_is_equal(ctx, e2.variable, e1);
-    }
-
-    if (e2.tag == DY_CORE_EXPR_INFERENCE_VARIABLE) {
-        return inference_variable_is_equal(ctx, e2.inference_variable, e1);
+        return variable_is_equal(ctx, e2.variable_id, e1);
     }
 
     if (e2.tag == DY_CORE_EXPR_EQUALITY_MAP_ELIM) {
@@ -102,9 +95,7 @@ dy_ternary_t dy_are_equal(struct dy_core_ctx *ctx, struct dy_core_expr e1, struc
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         return type_map_elim_is_equal(ctx, e1.type_map_elim, e2);
     case DY_CORE_EXPR_VARIABLE:
-        return variable_is_equal(ctx, e1.variable, e2);
-    case DY_CORE_EXPR_INFERENCE_VARIABLE:
-        return inference_variable_is_equal(ctx, e1.inference_variable, e2);
+        return variable_is_equal(ctx, e1.variable_id, e2);
     case DY_CORE_EXPR_ALTERNATIVE:
         return alternative_is_equal(ctx, e1.alternative, e2);
     case DY_CORE_EXPR_END:
@@ -243,17 +234,15 @@ dy_ternary_t type_map_is_equal_to_type_map(struct dy_core_ctx *ctx, struct dy_co
     if (type_map1.polarity != type_map2.polarity || type_map1.is_implicit != type_map2.is_implicit) {
         return DY_NO;
     }
+    
+    dy_array_add(&ctx->equal_variables, &(struct dy_equal_variables){
+        .id1 = type_map1.id,
+        .id2 = type_map2.id
+    });
 
-    struct dy_core_expr id_expr = {
-        .tag = DY_CORE_EXPR_VARIABLE,
-        .variable = type_map1.binding
-    };
+    dy_ternary_t result = dy_are_equal(ctx, *type_map1.expr, *type_map2.expr);
 
-    struct dy_core_expr e = substitute(ctx, *type_map2.expr, type_map2.binding.id, id_expr);
-
-    dy_ternary_t result = dy_are_equal(ctx, *type_map1.expr, e);
-
-    dy_core_expr_release(e);
+    --ctx->equal_variables.num_elems;
 
     return result;
 }
@@ -281,30 +270,30 @@ dy_ternary_t alternative_is_equal(struct dy_core_ctx *ctx, struct dy_core_altern
     return DY_YES;
 }
 
-dy_ternary_t variable_is_equal(struct dy_core_ctx *ctx, struct dy_core_variable variable, struct dy_core_expr expr)
+dy_ternary_t variable_is_equal(struct dy_core_ctx *ctx, size_t variable_id, struct dy_core_expr expr)
 {
     if (expr.tag != DY_CORE_EXPR_VARIABLE) {
         return DY_MAYBE;
     }
 
-    if (variable.id == expr.variable.id) {
+    if (variable_id == expr.variable_id) {
         return DY_YES;
-    } else {
-        return DY_MAYBE;
     }
-}
-
-dy_ternary_t inference_variable_is_equal(struct dy_core_ctx *ctx, struct dy_core_inference_variable variable, struct dy_core_expr expr)
-{
-    if (expr.tag != DY_CORE_EXPR_INFERENCE_VARIABLE) {
-        return DY_MAYBE;
+    
+    for (size_t i = 0, size = ctx->equal_variables.num_elems; i < size; ++i) {
+        struct dy_equal_variables v;
+        dy_array_get(ctx->equal_variables, i, &v);
+        
+        if (v.id1 == variable_id && v.id2 == expr.variable_id) {
+            return true;
+        }
+        
+        if (v.id1 == expr.variable_id && v.id2 == variable_id) {
+            return true;
+        }
     }
-
-    if (variable.id == expr.inference_variable.id) {
-        return DY_YES;
-    } else {
-        return DY_MAYBE;
-    }
+    
+    return DY_MAYBE;
 }
 
 dy_ternary_t equality_map_elim_is_equal(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim, struct dy_core_expr expr)
@@ -355,26 +344,14 @@ dy_ternary_t type_map_elim_is_equal(struct dy_core_ctx *ctx, struct dy_core_type
 
 dy_ternary_t dy_recursion_is_equal(struct dy_core_ctx *ctx, struct dy_core_recursion rec1, struct dy_core_recursion rec2)
 {
-    struct dy_core_expr any = {
-        .tag = DY_CORE_EXPR_END,
-        .end_polarity = DY_CORE_POLARITY_NEGATIVE
-    };
+    dy_array_add(&ctx->equal_variables, &(struct dy_equal_variables){
+        .id1 = rec1.id,
+        .id2 = rec2.id
+    });
 
-    struct dy_core_expr binding = {
-        .tag = DY_CORE_EXPR_VARIABLE,
-        .variable = {
-            .id = rec1.id,
-            .type = dy_core_expr_new(any),
-        },
-    };
+    dy_ternary_t result = dy_are_equal(ctx, *rec1.expr, *rec2.expr);
 
-    struct dy_core_expr new_rec2_expr = substitute(ctx, *rec2.expr, rec2.id, binding);
-
-    dy_core_expr_release(any);
-
-    dy_ternary_t result = dy_are_equal(ctx, *rec1.expr, new_rec2_expr);
-
-    dy_core_expr_release(new_rec2_expr);
+    --ctx->equal_variables.num_elems;
 
     return result;
 }

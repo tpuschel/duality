@@ -22,21 +22,19 @@ static struct dy_core_expr dy_def_type_of(void *data, struct dy_core_ctx *ctx);
 
 static dy_ternary_t dy_def_is_equal(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr);
 
-static struct dy_core_expr dy_def_check(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint);
+static bool dy_def_check(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr *result);
 
-static struct dy_core_expr dy_def_remove_mentions_in_subtype(void *data, struct dy_core_ctx *ctx, size_t id);
+static bool dy_def_remove_mentions_in_subtype(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr *result);
 
-static struct dy_core_expr dy_def_remove_mentions_in_supertype(void *data, struct dy_core_ctx *ctx, size_t id);
+static bool dy_def_remove_mentions_in_supertype(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr *result);
 
 static struct dy_core_expr dy_def_eval(void *data, struct dy_core_ctx *ctx, bool *is_value);
 
-static struct dy_core_expr dy_def_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub);
+static bool dy_def_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub, struct dy_core_expr *result);
 
-static struct dy_core_expr dy_def_rename_id(void *data, struct dy_core_ctx *ctx, size_t id, size_t sub_id);
+static dy_ternary_t dy_def_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
-static dy_ternary_t dy_def_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, dy_array_t *subtype_implicits);
-
-static dy_ternary_t dy_def_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, dy_array_t *subtype_implicits);
+static dy_ternary_t dy_def_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
 static struct dy_core_expr dy_def_eliminate(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value);
 
@@ -76,7 +74,6 @@ struct dy_core_custom dy_def_create_no_alloc(const struct dy_def_data *data)
         .remove_mentions_in_supertype = dy_def_remove_mentions_in_supertype,
         .eval = dy_def_eval,
         .substitute = dy_def_substitute,
-        .rename_id = dy_def_rename_id,
         .is_subtype = dy_def_is_subtype,
         .is_supertype = dy_def_is_supertype,
         .eliminate = dy_def_eliminate,
@@ -93,7 +90,10 @@ struct dy_core_expr dy_def_type_of(void *data, struct dy_core_ctx *ctx)
 {
     struct dy_def_data *def = data;
 
-    struct dy_core_expr new_body = substitute(ctx, def->body, def->id, def->arg);
+    struct dy_core_expr new_body;
+    if (!substitute(ctx, def->body, def->id, def->arg, &new_body)) {
+        new_body = dy_core_expr_retain(def->body);
+    }
 
     struct dy_core_expr ret = dy_type_of(ctx, new_body);
 
@@ -107,13 +107,16 @@ dy_ternary_t dy_def_is_equal(void *data, struct dy_core_ctx *ctx, struct dy_core
     return DY_MAYBE;
 }
 
-struct dy_core_expr dy_def_check(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint)
+bool dy_def_check(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr *result)
 {
     struct dy_def_data *def = data;
 
     struct dy_constraint c1;
     bool have_c1 = false;
-    struct dy_core_expr new_arg = dy_check_expr(ctx, def->arg, &c1, &have_c1);
+    struct dy_core_expr new_arg;
+    if (!dy_check_expr(ctx, def->arg, &c1, &have_c1, &new_arg)) {
+        new_arg = dy_core_expr_retain(def->arg);
+    }
 
     bool arg_is_value = false;
     struct dy_core_expr evaled_arg = dy_eval_expr(ctx, new_arg, &arg_is_value);
@@ -121,71 +124,43 @@ struct dy_core_expr dy_def_check(void *data, struct dy_core_ctx *ctx, struct dy_
     dy_core_expr_release(new_arg);
 
     if (arg_is_value) {
-        struct dy_core_expr new_body = substitute(ctx, def->body, def->id, evaled_arg);
+        struct dy_core_expr new_body;
+        if (!substitute(ctx, def->body, def->id, evaled_arg, &new_body)) {
+            new_body = dy_core_expr_retain(def->body);
+        }
 
         struct dy_constraint c2;
         bool have_c2 = false;
-        struct dy_core_expr checked_body = dy_check_expr(ctx, new_body, &c2, &have_c2);
-
-        dy_core_expr_release(new_body);
-
-        if (have_c1 && have_c2) {
-            *constraint = (struct dy_constraint){
-                .tag = DY_CONSTRAINT_MULTIPLE,
-                .multiple = {
-                    .c1 = alloc_constraint(c1),
-                    .c2 = alloc_constraint(c2),
-                    .polarity = DY_CORE_POLARITY_POSITIVE,
-                }
-            };
-            *did_generate_constraint = true;
-        } else if (have_c1) {
-            *constraint = c1;
-            *did_generate_constraint = true;
-        } else if (have_c2) {
-            *constraint = c2;
-            *did_generate_constraint = true;
+        struct dy_core_expr checked_body;
+        if (dy_check_expr(ctx, new_body, &c2, &have_c2, &checked_body)) {
+            dy_core_expr_release(new_body);
+            new_body = checked_body;
         }
 
-        return checked_body;
+        dy_join_constraints(c1, have_c1, DY_CORE_POLARITY_POSITIVE, c2, have_c2, constraint, did_generate_constraint);
+
+        *result = new_body;
+        
+        return true;
     } else {
         struct dy_core_expr type_of_arg = dy_type_of(ctx, evaled_arg);
-
-        struct dy_core_expr var_expr = {
-            .tag = DY_CORE_EXPR_VARIABLE,
-            .variable = {
-                .id = def->id,
-                .type = dy_core_expr_new(type_of_arg),
-            }
-        };
-
-        struct dy_core_expr new_body = substitute(ctx, def->body, def->id, var_expr);
-
-        dy_core_expr_release(var_expr);
+        
+        dy_array_add(&ctx->bindings, &(struct dy_core_binding){
+            .id = def->id,
+            .type = type_of_arg,
+            .is_inference_var = false
+        });
 
         struct dy_constraint c2;
         bool have_c2 = false;
-        struct dy_core_expr checked_body = dy_check_expr(ctx, new_body, &c2, &have_c2);
-
-        dy_core_expr_release(new_body);
-
-        if (have_c1 && have_c2) {
-            *constraint = (struct dy_constraint){
-                .tag = DY_CONSTRAINT_MULTIPLE,
-                .multiple = {
-                    .c1 = alloc_constraint(c1),
-                    .c2 = alloc_constraint(c2),
-                    .polarity = DY_CORE_POLARITY_POSITIVE,
-                }
-            };
-            *did_generate_constraint = true;
-        } else if (have_c1) {
-            *constraint = c1;
-            *did_generate_constraint = true;
-        } else if (have_c2) {
-            *constraint = c2;
-            *did_generate_constraint = true;
+        struct dy_core_expr checked_body;
+        if (!dy_check_expr(ctx, def->body, &c2, &have_c2, &checked_body)) {
+            checked_body = dy_core_expr_retain(def->body);
         }
+        
+        --ctx->bindings.num_elems;
+
+        dy_join_constraints(c1, have_c1, DY_CORE_POLARITY_POSITIVE, c2, have_c2, constraint, did_generate_constraint);
 
         struct dy_def_data new_data = {
             .id = def->id,
@@ -193,27 +168,39 @@ struct dy_core_expr dy_def_check(void *data, struct dy_core_ctx *ctx, struct dy_
             .body = checked_body
         };
 
-        return (struct dy_core_expr){
+        *result = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_CUSTOM,
             .custom = dy_def_create(new_data)
         };
+        
+        return true;
     }
 }
 
-struct dy_core_expr dy_def_remove_mentions_in_subtype(void *data, struct dy_core_ctx *ctx, size_t id)
+bool dy_def_remove_mentions_in_subtype(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr *result)
 {
-    return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_END,
-        .end_polarity = DY_CORE_POLARITY_POSITIVE
-    };
+    if (dy_def_is_bound(data, id)) {
+        *result = (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_END,
+            .end_polarity = DY_CORE_POLARITY_POSITIVE
+        };
+        return true;
+    } else {
+        return false;
+    }
 }
 
-struct dy_core_expr dy_def_remove_mentions_in_supertype(void *data, struct dy_core_ctx *ctx, size_t id)
+bool dy_def_remove_mentions_in_supertype(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr *result)
 {
-    return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_END,
-        .end_polarity = DY_CORE_POLARITY_NEGATIVE
-    };
+    if (dy_def_is_bound(data, id)) {
+        *result = (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_END,
+            .end_polarity = DY_CORE_POLARITY_NEGATIVE
+        };
+        return true;
+    } else {
+        return false;
+    }
 }
 
 struct dy_core_expr dy_def_eval(void *data, struct dy_core_ctx *ctx, bool *is_value)
@@ -236,7 +223,10 @@ struct dy_core_expr dy_def_eval(void *data, struct dy_core_ctx *ctx, bool *is_va
         };
     }
 
-    struct dy_core_expr new_body = substitute(ctx, def->body, def->id, evaled_arg);
+    struct dy_core_expr new_body;
+    if (!substitute(ctx, def->body, def->id, evaled_arg, &new_body)) {
+        new_body = dy_core_expr_retain(def->body);
+    }
 
     dy_core_expr_release(evaled_arg);
 
@@ -247,86 +237,71 @@ struct dy_core_expr dy_def_eval(void *data, struct dy_core_ctx *ctx, bool *is_va
     return ret;
 }
 
-struct dy_core_expr dy_def_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub)
+bool dy_def_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub, struct dy_core_expr *result)
 {
     struct dy_def_data *def = data;
 
-    struct dy_core_expr new_arg = substitute(ctx, def->arg, id, sub);
+    struct dy_core_expr arg;
+    bool arg_is_new = substitute(ctx, def->arg, id, sub, &arg);
 
     if (id == def->id) {
+        if (!arg_is_new) {
+            return false;
+        }
+        
         struct dy_def_data new_data = {
             .id = def->id,
-            .arg = new_arg,
+            .arg = arg,
             .body = dy_core_expr_retain(def->body)
         };
 
-        return (struct dy_core_expr){
+        *result = (struct dy_core_expr){
             .tag = DY_CORE_EXPR_CUSTOM,
             .custom = dy_def_create(new_data)
         };
+        
+        return true;
     }
 
     if (dy_core_expr_is_bound(def->id, sub)) {
         dy_bail("shit");
     }
 
-    struct dy_core_expr new_body = substitute(ctx, def->body, id, sub);
-
+    struct dy_core_expr body;
+    bool body_is_new = substitute(ctx, def->body, id, sub, &body);
+    
+    if (!arg_is_new && !body_is_new) {
+        return false;
+    }
+    
+    if (!arg_is_new) {
+        arg = dy_core_expr_retain(def->arg);
+    }
+    
+    if (!body_is_new) {
+        body = dy_core_expr_retain(def->body);
+    }
+    
     struct dy_def_data new_data = {
         .id = def->id,
-        .arg = new_arg,
-        .body = new_body
+        .arg = arg,
+        .body = body
     };
 
-    return (struct dy_core_expr){
+    *result = (struct dy_core_expr){
         .tag = DY_CORE_EXPR_CUSTOM,
         .custom = dy_def_create(new_data)
     };
+    
+    return true;
 }
 
-struct dy_core_expr dy_def_rename_id(void *data, struct dy_core_ctx *ctx, size_t id, size_t sub_id)
-{
-    struct dy_def_data *def = data;
-
-    struct dy_core_expr new_arg = rename_id(ctx, def->arg, id, sub_id);
-
-    if (id == def->id) {
-        struct dy_def_data new_data = {
-            .id = def->id,
-            .arg = new_arg,
-            .body = dy_core_expr_retain(def->body)
-        };
-
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_CUSTOM,
-            .custom = dy_def_create(new_data)
-        };
-    }
-
-    if (def->id == sub_id) {
-        dy_bail("shit");
-    }
-
-    struct dy_core_expr new_body = rename_id(ctx, def->body, id, sub_id);
-
-    struct dy_def_data new_data = {
-        .id = def->id,
-        .arg = new_arg,
-        .body = new_body
-    };
-
-    return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_CUSTOM,
-        .custom = dy_def_create(new_data)
-    };
-}
-
-dy_ternary_t dy_def_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, dy_array_t *subtype_implicits)
+dy_ternary_t dy_def_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
     return DY_MAYBE;
 }
 
-dy_ternary_t dy_def_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, dy_array_t *subtype_implicits)
+dy_ternary_t dy_def_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
     return DY_MAYBE;
 }

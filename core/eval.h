@@ -51,9 +51,6 @@ struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr ex
     case DY_CORE_EXPR_VARIABLE:
         *is_value = true;
         return dy_core_expr_retain(expr);
-    case DY_CORE_EXPR_INFERENCE_VARIABLE:
-        *is_value = true;
-        return dy_core_expr_retain(expr);
     case DY_CORE_EXPR_END:
         *is_value = true;
         return dy_core_expr_retain(expr);
@@ -84,7 +81,7 @@ struct dy_core_expr dy_eval_equality_map(struct dy_core_ctx *ctx, struct dy_core
 
 struct dy_core_expr dy_eval_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map, bool *is_value)
 {
-    type_map.binding.type = dy_core_expr_new(dy_eval_expr(ctx, *type_map.binding.type, is_value));
+    type_map.type = dy_core_expr_new(dy_eval_expr(ctx, *type_map.type, is_value));
     dy_core_expr_retain_ptr(type_map.expr);
 
     return (struct dy_core_expr){
@@ -177,7 +174,10 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
 
         dy_core_expr_release(equality_map);
 
-        struct dy_core_expr e = substitute(ctx, *left.type_map.expr, left.type_map.binding.id, right);
+        struct dy_core_expr e;
+        if (!substitute(ctx, *left.type_map.expr, left.type_map.id, right, &e)) {
+            e = dy_core_expr_retain(*left.type_map.expr);
+        }
 
         dy_core_expr_release(left);
         dy_core_expr_release(right);
@@ -291,7 +291,10 @@ struct dy_core_expr dy_eval_recursion(struct dy_core_ctx *ctx, struct dy_core_re
         .recursion = recursion
     };
 
-    struct dy_core_expr substituted_body = substitute(ctx, evaled_body, recursion.id, rec_expr);
+    struct dy_core_expr substituted_body;
+    if (!substitute(ctx, evaled_body, recursion.id, rec_expr, &substituted_body)) {
+        substituted_body = dy_core_expr_retain(evaled_body);
+    }
 
     dy_core_expr_release_ptr(recursion.expr);
 

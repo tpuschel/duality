@@ -10,6 +10,7 @@
 #include "parser.h"
 #include "unbound_variable.h"
 #include "def.h"
+#include "string.h"
 
 #include "../core/core.h"
 
@@ -24,7 +25,6 @@
 struct dy_ast_to_core_bound_var {
     dy_string_t name;
     size_t replacement_id;
-    struct dy_core_expr type;
 };
 
 struct dy_ast_to_core_ctx {
@@ -86,10 +86,6 @@ static inline struct dy_core_expr do_block_def_to_core(struct dy_ast_to_core_ctx
 
 static inline struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_recursion rec, enum dy_core_polarity polarity);
 
-static inline struct dy_core_expr peel_inf_maps(struct dy_core_expr expr, struct dy_core_recursion rec);
-
-static inline struct dy_core_inference_variable create_inference_var(struct dy_ast_to_core_ctx *ctx, enum dy_core_polarity polarity);
-
 struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr expr)
 {
     switch (expr.tag) {
@@ -135,6 +131,16 @@ struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct d
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_SYMBOL
         };
+    case DY_AST_EXPR_STRING: {
+        struct dy_string_data data = {
+            .value = expr.string.value
+        };
+
+        return (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_CUSTOM,
+            .custom = dy_string_create(data)
+        };
+    }
     }
 
     dy_bail("Impossible ast type.");
@@ -149,10 +155,7 @@ struct dy_core_expr dy_ast_variable_to_core(struct dy_ast_to_core_ctx *ctx, stru
         if (dy_string_are_equal(variable.value, bound_var.name)) {
             return (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_VARIABLE,
-                .variable = {
-                    .id = bound_var.replacement_id,
-                    .type = dy_core_expr_new(dy_core_expr_retain(bound_var.type)),
-                }
+                .variable_id = bound_var.replacement_id,
             };
         }
     }
@@ -179,7 +182,6 @@ struct dy_core_expr ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct 
             struct dy_ast_to_core_bound_var bound_var = {
                 .name = type_map.arg.name.value,
                 .replacement_id = id,
-                .type = type
             };
 
             old_size = dy_array_add(&ctx->bound_vars, &bound_var);
@@ -194,21 +196,17 @@ struct dy_core_expr ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct 
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_TYPE_MAP,
             .type_map = {
-                .binding = {
-                    .id = id,
-                    .type = dy_core_expr_new(dy_core_expr_retain(type)),
-                },
+                .id = id,
+                .type = dy_core_expr_new(type),
                 .expr = dy_core_expr_new(e),
                 .polarity = polarity,
                 .is_implicit = type_map.is_implicit,
             }
         };
     } else {
-        struct dy_core_inference_variable variable = create_inference_var(ctx, DY_CORE_POLARITY_NEGATIVE);
-
         struct dy_core_expr type = {
-            .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-            .inference_variable = variable
+            .tag = DY_CORE_EXPR_VARIABLE,
+            .variable_id = ctx->running_id++
         };
 
         size_t id = ctx->running_id++;
@@ -218,7 +216,6 @@ struct dy_core_expr ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct 
             struct dy_ast_to_core_bound_var bound_var = {
                 .name = type_map.arg.name.value,
                 .replacement_id = id,
-                .type = type
             };
 
             old_size = dy_array_add(&ctx->bound_vars, &bound_var);
@@ -233,23 +230,24 @@ struct dy_core_expr ast_type_map_to_core(struct dy_ast_to_core_ctx *ctx, struct 
         struct dy_core_expr result_type_map = {
             .tag = DY_CORE_EXPR_TYPE_MAP,
             .type_map = {
-                .binding = {
-                    .id = id,
-                    .type = dy_core_expr_new(dy_core_expr_retain(type)),
-                },
+                .id = id,
+                .type = dy_core_expr_new(type),
                 .expr = dy_core_expr_new(e),
                 .polarity = polarity,
                 .is_implicit = type_map.is_implicit,
             }
         };
+        
+        struct dy_core_expr any = {
+            .tag = DY_CORE_EXPR_END,
+            .end_polarity = DY_CORE_POLARITY_NEGATIVE
+        };
 
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
             .inference_type_map = {
-                .binding = {
-                    .id = variable.id,
-                    .type = dy_core_expr_retain_ptr(variable.type),
-                },
+                .id = type.variable_id,
+                .type = dy_core_expr_new(any),
                 .expr = dy_core_expr_new(result_type_map),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
             }
@@ -377,15 +375,9 @@ struct dy_core_expr do_block_def_to_core(struct dy_ast_to_core_ctx *ctx, struct 
 
     size_t id = ctx->running_id++;
 
-    struct dy_core_expr arg_type = {
-        .tag = DY_CORE_EXPR_END,
-        .end_polarity = DY_CORE_POLARITY_NEGATIVE
-    };
-
     struct dy_ast_to_core_bound_var bound_var = {
         .name = def.name.value,
-        .replacement_id = id,
-        .type = arg_type
+        .replacement_id = id
     };
 
     size_t old_size = dy_array_add(&ctx->bound_vars, &bound_var);
@@ -425,8 +417,8 @@ struct dy_core_expr do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, st
     };
 
     struct dy_core_expr result_type = {
-        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = create_inference_var(ctx, DY_CORE_POLARITY_POSITIVE)
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable_id = ctx->running_id++
     };
 
     struct dy_core_expr elim = {
@@ -442,14 +434,17 @@ struct dy_core_expr do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, st
             .check_result = DY_MAYBE,
         }
     };
+    
+    struct dy_core_expr any = {
+        .tag = DY_CORE_EXPR_END,
+        .end_polarity = DY_CORE_POLARITY_NEGATIVE
+    };
 
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
         .inference_type_map = {
-            .binding = {
-                .id = result_type.variable.id,
-                .type = result_type.variable.type,
-            },
+            .id = result_type.variable_id,
+            .type = dy_core_expr_new(any),
             .expr = dy_core_expr_new(elim),
             .polarity = DY_CORE_POLARITY_POSITIVE,
         }
@@ -462,17 +457,14 @@ struct dy_core_expr do_block_inverted_let_to_core(struct dy_ast_to_core_ctx *ctx
 
     size_t id = ctx->running_id++;
 
-    struct dy_core_inference_variable variable = create_inference_var(ctx, DY_CORE_POLARITY_NEGATIVE);
-
     struct dy_core_expr arg_type = {
-        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = variable
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable_id = ctx->running_id++
     };
 
     struct dy_ast_to_core_bound_var bound_var = {
         .name = inverted_let.arg_name.value,
         .replacement_id = id,
-        .type = arg_type
     };
 
     size_t old_size = dy_array_add(&ctx->bound_vars, &bound_var);
@@ -484,31 +476,32 @@ struct dy_core_expr do_block_inverted_let_to_core(struct dy_ast_to_core_ctx *ctx
     struct dy_core_expr positive_type_map = {
         .tag = DY_CORE_EXPR_TYPE_MAP,
         .type_map = {
-            .binding = {
-                .id = id,
-                .type = dy_core_expr_new(dy_core_expr_retain(arg_type)),
-            },
+            .id = id,
+            .type = dy_core_expr_new(arg_type),
             .expr = dy_core_expr_new(rest),
             .polarity = DY_CORE_POLARITY_POSITIVE,
             .is_implicit = false,
         }
     };
+    
+    struct dy_core_expr any = {
+        .tag = DY_CORE_EXPR_END,
+        .end_polarity = DY_CORE_POLARITY_NEGATIVE
+    };
 
     struct dy_core_expr result_inference_type_map = {
         .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
         .inference_type_map = {
-            .binding = {
-                .id = variable.id,
-                .type = dy_core_expr_retain_ptr(variable.type),
-            },
+            .id = arg_type.variable_id,
+            .type = dy_core_expr_new(any),
             .expr = dy_core_expr_new(positive_type_map),
             .polarity = DY_CORE_POLARITY_NEGATIVE,
         }
     };
 
     struct dy_core_expr result_type = {
-        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = create_inference_var(ctx, DY_CORE_POLARITY_POSITIVE)
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable_id = ctx->running_id++
     };
 
     struct dy_core_expr elim = {
@@ -528,10 +521,8 @@ struct dy_core_expr do_block_inverted_let_to_core(struct dy_ast_to_core_ctx *ctx
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
         .inference_type_map = {
-            .binding = {
-                .id = result_type.variable.id,
-                .type = result_type.variable.type,
-            },
+            .id = result_type.variable_id,
+            .type = dy_core_expr_new(dy_core_expr_retain(any)),
             .expr = dy_core_expr_new(elim),
             .polarity = DY_CORE_POLARITY_POSITIVE,
         }
@@ -544,17 +535,14 @@ struct dy_core_expr do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct 
 
     size_t id = ctx->running_id++;
 
-    struct dy_core_inference_variable variable = create_inference_var(ctx, DY_CORE_POLARITY_NEGATIVE);
-
     struct dy_core_expr arg_type = {
-        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = variable
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable_id = ctx->running_id++
     };
 
     struct dy_ast_to_core_bound_var bound_var = {
         .name = let.arg_name.value,
         .replacement_id = id,
-        .type = arg_type
     };
 
     size_t old_size = dy_array_add(&ctx->bound_vars, &bound_var);
@@ -566,31 +554,32 @@ struct dy_core_expr do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct 
     struct dy_core_expr positive_type_map = {
         .tag = DY_CORE_EXPR_TYPE_MAP,
         .type_map = {
-            .binding = {
-                .id = id,
-                .type = dy_core_expr_new(dy_core_expr_retain(arg_type)),
-            },
+            .id = id,
+            .type = dy_core_expr_new(arg_type),
             .expr = dy_core_expr_new(rest),
             .polarity = DY_CORE_POLARITY_POSITIVE,
             .is_implicit = false,
         }
     };
+    
+    struct dy_core_expr any = {
+        .tag = DY_CORE_EXPR_END,
+        .end_polarity = DY_CORE_POLARITY_NEGATIVE
+    };
 
     struct dy_core_expr result_inference_type_map = {
         .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
         .inference_type_map = {
-            .binding = {
-                .id = variable.id,
-                .type = dy_core_expr_retain_ptr(variable.type),
-            },
+            .id = arg_type.variable_id,
+            .type = dy_core_expr_new(any),
             .expr = dy_core_expr_new(positive_type_map),
             .polarity = DY_CORE_POLARITY_NEGATIVE,
         }
     };
 
     struct dy_core_expr result_type = {
-        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = create_inference_var(ctx, DY_CORE_POLARITY_POSITIVE)
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable_id = ctx->running_id++
     };
 
     struct dy_core_expr elim = {
@@ -610,10 +599,8 @@ struct dy_core_expr do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct 
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
         .inference_type_map = {
-            .binding = {
-                .id = result_type.variable.id,
-                .type = result_type.variable.type,
-            },
+            .id = result_type.variable_id,
+            .type = dy_core_expr_new(dy_core_expr_retain(any)),
             .expr = dy_core_expr_new(elim),
             .polarity = DY_CORE_POLARITY_POSITIVE,
         }
@@ -626,11 +613,9 @@ struct dy_core_expr do_block_inverted_ignored_expr_to_core(struct dy_ast_to_core
 
     size_t id = ctx->running_id++;
 
-    struct dy_core_inference_variable variable = create_inference_var(ctx, DY_CORE_POLARITY_NEGATIVE);
-
     struct dy_core_expr arg_type = {
-        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = variable
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable_id = ctx->running_id++
     };
 
     struct dy_core_expr rest = ast_do_block_body_to_core(ctx, *ignored_expr.rest);
@@ -638,31 +623,32 @@ struct dy_core_expr do_block_inverted_ignored_expr_to_core(struct dy_ast_to_core
     struct dy_core_expr positive_type_map = {
         .tag = DY_CORE_EXPR_TYPE_MAP,
         .type_map = {
-            .binding = {
-                .id = id,
-                .type = dy_core_expr_new(dy_core_expr_retain(arg_type)),
-            },
+            .id = id,
+            .type = dy_core_expr_new(arg_type),
             .expr = dy_core_expr_new(rest),
             .polarity = DY_CORE_POLARITY_POSITIVE,
             .is_implicit = false,
         }
     };
+    
+    struct dy_core_expr any = {
+        .tag = DY_CORE_EXPR_END,
+        .end_polarity = DY_CORE_POLARITY_NEGATIVE
+    };
 
     struct dy_core_expr result_inference_type_map = {
         .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
         .inference_type_map = {
-            .binding = {
-                .id = variable.id,
-                .type = dy_core_expr_retain_ptr(variable.type),
-            },
+            .id = arg_type.variable_id,
+            .type = dy_core_expr_new(any),
             .expr = dy_core_expr_new(positive_type_map),
             .polarity = DY_CORE_POLARITY_NEGATIVE,
         }
     };
 
     struct dy_core_expr result_type = {
-        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = create_inference_var(ctx, DY_CORE_POLARITY_POSITIVE)
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable_id = ctx->running_id++
     };
 
     struct dy_core_expr elim = {
@@ -682,10 +668,8 @@ struct dy_core_expr do_block_inverted_ignored_expr_to_core(struct dy_ast_to_core
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
         .inference_type_map = {
-            .binding = {
-                .id = result_type.variable.id,
-                .type = result_type.variable.type,
-            },
+            .id = result_type.variable_id,
+            .type = dy_core_expr_new(dy_core_expr_retain(any)),
             .expr = dy_core_expr_new(elim),
             .polarity = DY_CORE_POLARITY_POSITIVE,
         }
@@ -698,41 +682,40 @@ struct dy_core_expr do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx
 
     struct dy_core_expr rest = ast_do_block_body_to_core(ctx, *ignored_expr.rest);
 
-    struct dy_core_inference_variable variable = create_inference_var(ctx, DY_CORE_POLARITY_NEGATIVE);
-
     struct dy_core_expr inference_var_expr = {
-        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = variable
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable_id = ctx->running_id++
     };
 
     struct dy_core_expr positive_type_map = {
         .tag = DY_CORE_EXPR_TYPE_MAP,
         .type_map = {
-            .binding = {
-                .id = ctx->running_id++,
-                .type = dy_core_expr_new(inference_var_expr),
-            },
+            .id = ctx->running_id++,
+            .type = dy_core_expr_new(inference_var_expr),
             .expr = dy_core_expr_new(rest),
             .polarity = DY_CORE_POLARITY_POSITIVE,
             .is_implicit = false,
         }
     };
+    
+    struct dy_core_expr any = {
+        .tag = DY_CORE_EXPR_END,
+        .end_polarity = DY_CORE_POLARITY_NEGATIVE
+    };
 
     struct dy_core_expr result_inference_type_map = {
         .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
         .inference_type_map = {
-            .binding = {
-                .id = variable.id,
-                .type = dy_core_expr_retain_ptr(variable.type),
-            },
+            .id = inference_var_expr.variable_id,
+            .type = dy_core_expr_new(any),
             .expr = dy_core_expr_new(positive_type_map),
             .polarity = DY_CORE_POLARITY_NEGATIVE,
         }
     };
 
     struct dy_core_expr result_type = {
-        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = create_inference_var(ctx, DY_CORE_POLARITY_POSITIVE)
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable_id = ctx->running_id++
     };
 
     struct dy_core_expr elim = {
@@ -752,10 +735,8 @@ struct dy_core_expr do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
         .inference_type_map = {
-            .binding = {
-                .id = result_type.inference_variable.id,
-                .type = dy_core_expr_retain_ptr(result_type.inference_variable.type),
-            },
+            .id = result_type.variable_id,
+            .type = dy_core_expr_new(dy_core_expr_retain(any)),
             .expr = dy_core_expr_new(elim),
             .polarity = DY_CORE_POLARITY_POSITIVE,
         }
@@ -804,11 +785,9 @@ struct dy_core_expr dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx,
 
     struct dy_core_expr right = dy_ast_expr_to_core(ctx, *juxtaposition.right);
 
-    struct dy_core_inference_variable variable = create_inference_var(ctx, DY_CORE_POLARITY_POSITIVE);
-
     struct dy_core_expr inference_var_expr = {
-        .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-        .inference_variable = variable
+        .tag = DY_CORE_EXPR_VARIABLE,
+        .variable_id = ctx->running_id++
     };
 
     struct dy_core_expr elim = {
@@ -824,14 +803,17 @@ struct dy_core_expr dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx,
             .check_result = DY_MAYBE,
         }
     };
+    
+    struct dy_core_expr any = {
+        .tag = DY_CORE_EXPR_END,
+        .end_polarity = DY_CORE_POLARITY_NEGATIVE
+    };
 
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
         .inference_type_map = {
-            .binding = {
-                .id = variable.id,
-                .type = dy_core_expr_retain_ptr(variable.type),
-            },
+            .id = inference_var_expr.variable_id,
+            .type = dy_core_expr_new(any),
             .expr = dy_core_expr_new(elim),
             .polarity = DY_CORE_POLARITY_POSITIVE,
         }
@@ -850,96 +832,29 @@ struct dy_core_expr dy_ast_negative_recursion_to_core(struct dy_ast_to_core_ctx 
 
 struct dy_core_expr recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_recursion rec, enum dy_core_polarity polarity)
 {
-    if (rec.has_type) {
-        struct dy_core_expr type = dy_ast_expr_to_core(ctx, *rec.type);
+    struct dy_core_expr type = dy_ast_expr_to_core(ctx, *rec.type);
 
-        size_t id = ctx->running_id++;
+    size_t id = ctx->running_id++;
 
-        struct dy_ast_to_core_bound_var bound_var = {
-            .name = rec.name.value,
-            .replacement_id = id,
-            .type = type
-        };
-
-        size_t old_size = dy_array_add(&ctx->bound_vars, &bound_var);
-
-        struct dy_core_expr body = dy_ast_expr_to_core(ctx, *rec.expr);
-
-        ctx->bound_vars.num_elems = old_size;
-
-        struct dy_core_recursion ret = {
-            .id = id,
-            .type = dy_core_expr_new(type),
-            .polarity = polarity,
-        };
-
-        return peel_inf_maps(body, ret);
-    } else {
-        size_t id = ctx->running_id++;
-
-        struct dy_core_inference_variable var = create_inference_var(ctx, DY_CORE_POLARITY_NEGATIVE);
-
-        struct dy_ast_to_core_bound_var bound_var = {
-            .name = rec.name.value,
-            .replacement_id = id,
-            .type = {
-                .tag = DY_CORE_EXPR_INFERENCE_VARIABLE,
-                .inference_variable = var,
-            }
-        };
-
-        size_t old_size = dy_array_add(&ctx->bound_vars, &bound_var);
-
-        struct dy_core_expr body = dy_ast_expr_to_core(ctx, *rec.expr);
-
-        ctx->bound_vars.num_elems = old_size;
-
-        struct dy_core_recursion recursion = {
-            .id = id,
-            .type = dy_core_expr_new(bound_var.type),
-            .polarity = polarity,
-        };
-
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_INFERENCE_TYPE_MAP,
-            .inference_type_map = {
-                .binding = {
-                    .id = var.id,
-                    .type = var.type,
-                },
-                .expr = dy_core_expr_new(peel_inf_maps(body, recursion)),
-                .polarity = DY_CORE_POLARITY_NEGATIVE,
-            }
-        };
-    }
-}
-
-struct dy_core_expr peel_inf_maps(struct dy_core_expr expr, struct dy_core_recursion rec)
-{
-    if (expr.tag != DY_CORE_EXPR_INFERENCE_TYPE_MAP) {
-        rec.expr = dy_core_expr_new(expr);
-
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_RECURSION,
-            .recursion = rec,
-        };
-    }
-
-    expr.inference_type_map.expr = dy_core_expr_new(peel_inf_maps(*expr.inference_type_map.expr, rec));
-
-    return expr;
-}
-
-struct dy_core_inference_variable create_inference_var(struct dy_ast_to_core_ctx *ctx, enum dy_core_polarity polarity)
-{
-    struct dy_core_expr any = {
-        .tag = DY_CORE_EXPR_END,
-        .end_polarity = DY_CORE_POLARITY_NEGATIVE
+    struct dy_ast_to_core_bound_var bound_var = {
+        .name = rec.name.value,
+        .replacement_id = id,
     };
 
-    return (struct dy_core_inference_variable){
-        .id = ctx->running_id++,
-        .type = dy_core_expr_new(any),
-        .polarity = polarity
+    size_t old_size = dy_array_add(&ctx->bound_vars, &bound_var);
+
+    struct dy_core_expr body = dy_ast_expr_to_core(ctx, *rec.expr);
+
+    ctx->bound_vars.num_elems = old_size;
+    
+    return (struct dy_core_expr){
+        .tag = DY_CORE_EXPR_RECURSION,
+        .recursion = {
+            .id = id,
+            .type = dy_core_expr_new(type),
+            .expr = dy_core_expr_new(body),
+            .polarity = polarity,
+            .check_result = DY_MAYBE
+        }
     };
 }

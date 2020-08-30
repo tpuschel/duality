@@ -25,7 +25,7 @@ static inline bool parse_nonempty_object(struct dy_stream *stream, struct dy_jso
 static inline bool parse_object_members(struct dy_stream *stream, struct dy_json_object *object);
 static inline bool parse_object_members_storage(struct dy_stream *stream, dy_array_t *member_storage);
 static inline bool parse_object_member(struct dy_stream *stream, struct dy_json_member *member);
-static inline bool parse_string(struct dy_stream *stream, dy_string_t *string);
+static inline bool dy_json_parse_string(struct dy_stream *stream, dy_string_t *string);
 static inline bool parse_characters(struct dy_stream *stream, dy_string_t *characters);
 static inline bool parse_array(struct dy_stream *stream, struct dy_json_array *array);
 static inline bool parse_empty_array(struct dy_stream *stream, struct dy_json_array *array);
@@ -108,7 +108,7 @@ bool parse_value(struct dy_stream *stream, struct dy_json_value *value)
     }
 
     dy_string_t string;
-    if (parse_string(stream, &string)) {
+    if (dy_json_parse_string(stream, &string)) {
         *value = (struct dy_json_value){
             .tag = DY_JSON_VALUE_STRING,
             .string = string
@@ -248,7 +248,7 @@ bool parse_object_member(struct dy_stream *stream, struct dy_json_member *member
     parse_whitespace(stream);
 
     dy_string_t string;
-    if (!parse_string(stream, &string)) {
+    if (!dy_json_parse_string(stream, &string)) {
         stream->current_index = start_index;
         return false;
     }
@@ -274,7 +274,7 @@ bool parse_object_member(struct dy_stream *stream, struct dy_json_member *member
     return true;
 }
 
-bool parse_string(struct dy_stream *stream, dy_string_t *string)
+bool dy_json_parse_string(struct dy_stream *stream, dy_string_t *string)
 {
     size_t start_index = stream->current_index;
 

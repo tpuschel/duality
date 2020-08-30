@@ -55,19 +55,29 @@ const char *process_code(const char *text, size_t text_length_in_bytes)
         .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), DY_ALIGNOF(struct dy_bound_constraint), 64),
         .already_visited_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 64),
         .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
-        .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64)
+        .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
+        .bindings = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
+        .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
+        .subtype_implicits = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
+        .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8)
     };
 
     struct dy_constraint constraint;
     bool have_constraint = false;
-    struct dy_core_expr checked_program = dy_check_expr(&core_ctx, program, &constraint, &have_constraint);
+    struct dy_core_expr checked_program;
+    if (dy_check_expr(&core_ctx, program, &constraint, &have_constraint, &checked_program)) {
+        dy_core_expr_release(program);
+        program = checked_program;
+    }
     assert(!have_constraint);
 
     bool is_value = false;
-    struct dy_core_expr result = dy_eval_expr(&core_ctx, checked_program, &is_value);
+    struct dy_core_expr result = dy_eval_expr(&core_ctx, program, &is_value);
 
     dy_array_t stringified_expr = dy_array_create(sizeof(char), DY_ALIGNOF(char), 64);
     dy_core_expr_to_string(result, &stringified_expr);
+    
+    dy_core_expr_release(result);
 
     dy_array_add(&stringified_expr, &(char){ '\0' });
 

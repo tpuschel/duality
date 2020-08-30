@@ -18,8 +18,7 @@
  */
 
 /**
- * Context passed to functions who need to generate new type maps
- * or need access to currently bound constraints.
+ * Context passed to pretty much all functions in core.
  */
 struct dy_core_ctx {
     size_t running_id;
@@ -31,6 +30,14 @@ struct dy_core_ctx {
     dy_array_t subtype_assumption_cache;
 
     dy_array_t supertype_assumption_cache;
+
+    dy_array_t bindings;
+    
+    dy_array_t equal_variables;
+    
+    dy_array_t subtype_implicits;
+    
+    dy_array_t free_ids_arrays;
 };
 
 /** Hopefully self-explanatory :) */
@@ -53,17 +60,6 @@ enum dy_core_polarity {
     DY_CORE_POLARITY_NEGATIVE
 };
 
-struct dy_core_variable {
-    size_t id;
-    const struct dy_core_expr *type;
-};
-
-struct dy_core_inference_variable {
-    size_t id;
-    const struct dy_core_expr *type;
-    enum dy_core_polarity polarity;
-};
-
 struct dy_core_equality_map {
     const struct dy_core_expr *e1;
     const struct dy_core_expr *e2;
@@ -72,14 +68,16 @@ struct dy_core_equality_map {
 };
 
 struct dy_core_type_map {
-    struct dy_core_variable binding;
+    size_t id;
+    const struct dy_core_expr *type;
     const struct dy_core_expr *expr;
     enum dy_core_polarity polarity;
     bool is_implicit;
 };
 
 struct dy_core_inference_type_map {
-    struct dy_core_variable binding;
+    size_t id;
+    const struct dy_core_expr *type;
     const struct dy_core_expr *expr;
     enum dy_core_polarity polarity;
 };
@@ -118,6 +116,7 @@ struct dy_core_recursion {
     const struct dy_core_expr *type;
     const struct dy_core_expr *expr;
     enum dy_core_polarity polarity;
+    dy_ternary_t check_result;
 };
 
 struct dy_core_custom {
@@ -129,21 +128,19 @@ struct dy_core_custom {
 
     dy_ternary_t (*is_equal)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr);
 
-    struct dy_core_expr (*check)(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint);
+    bool (*check)(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr *result);
 
-    struct dy_core_expr (*remove_mentions_in_subtype)(void *data, struct dy_core_ctx *ctx, size_t id);
+    bool (*remove_mentions_in_subtype)(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr *result);
 
-    struct dy_core_expr (*remove_mentions_in_supertype)(void *data, struct dy_core_ctx *ctx, size_t id);
+    bool (*remove_mentions_in_supertype)(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr *result);
 
     struct dy_core_expr (*eval)(void *data, struct dy_core_ctx *ctx, bool *is_value);
 
-    struct dy_core_expr (*substitute)(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub);
+    bool (*substitute)(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub, struct dy_core_expr *result);
 
-    struct dy_core_expr (*rename_id)(void *data, struct dy_core_ctx *ctx, size_t id, size_t new_id);
+    dy_ternary_t (*is_subtype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
-    dy_ternary_t (*is_subtype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, dy_array_t *subtype_implicits);
-
-    dy_ternary_t (*is_supertype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, dy_array_t *subtype_implicits);
+    dy_ternary_t (*is_supertype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
     struct dy_core_expr (*eliminate)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value);
 
@@ -170,7 +167,6 @@ enum dy_core_expr_tag {
     DY_CORE_EXPR_VARIABLE,
     DY_CORE_EXPR_END,
     DY_CORE_EXPR_RECURSION,
-    DY_CORE_EXPR_INFERENCE_VARIABLE,
     DY_CORE_EXPR_INFERENCE_TYPE_MAP,
     DY_CORE_EXPR_SYMBOL,
     DY_CORE_EXPR_CUSTOM
@@ -184,8 +180,7 @@ struct dy_core_expr {
         struct dy_core_type_map_elim type_map_elim;
         struct dy_core_junction junction;
         struct dy_core_alternative alternative;
-        struct dy_core_variable variable;
-        struct dy_core_inference_variable inference_variable;
+        size_t variable_id;
         struct dy_core_inference_type_map inference_type_map;
         struct dy_core_recursion recursion;
         enum dy_core_polarity end_polarity;
@@ -205,6 +200,18 @@ struct dy_bound_constraint {
 struct dy_subtype_assumption {
     struct dy_core_expr type;
     size_t rec_binding_id;
+};
+
+struct dy_equal_variables {
+    size_t id1;
+    size_t id2;
+};
+
+struct dy_core_binding {
+    size_t id;
+    struct dy_core_expr type;
+    bool is_inference_var;
+    enum dy_core_polarity polarity;
 };
 
 static inline enum dy_core_polarity flip_polarity(enum dy_core_polarity polarity);
@@ -260,7 +267,7 @@ bool dy_core_expr_is_computation(struct dy_core_expr expr)
     case DY_CORE_EXPR_EQUALITY_MAP:
         return dy_core_expr_is_computation(*expr.equality_map.e1) || dy_core_expr_is_computation(*expr.equality_map.e2);
     case DY_CORE_EXPR_TYPE_MAP:
-        return dy_core_expr_is_computation(*expr.type_map.binding.type) || dy_core_expr_is_computation(*expr.type_map.expr);
+        return dy_core_expr_is_computation(*expr.type_map.type) || dy_core_expr_is_computation(*expr.type_map.expr);
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
         return true;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
@@ -270,8 +277,6 @@ bool dy_core_expr_is_computation(struct dy_core_expr expr)
     case DY_CORE_EXPR_ALTERNATIVE:
         return dy_core_expr_is_computation(*expr.alternative.first) || dy_core_expr_is_computation(*expr.alternative.second);
     case DY_CORE_EXPR_VARIABLE:
-        return false;
-    case DY_CORE_EXPR_INFERENCE_VARIABLE:
         return false;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
@@ -294,11 +299,11 @@ bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr)
     case DY_CORE_EXPR_EQUALITY_MAP:
         return dy_core_expr_is_bound(id, *expr.equality_map.e1) || dy_core_expr_is_bound(id, *expr.equality_map.e2);
     case DY_CORE_EXPR_TYPE_MAP: {
-        if (dy_core_expr_is_bound(id, *expr.type_map.binding.type)) {
+        if (dy_core_expr_is_bound(id, *expr.type_map.type)) {
             return true;
         }
 
-        if (id == expr.type_map.binding.id) {
+        if (id == expr.type_map.id) {
             return false;
         }
 
@@ -307,11 +312,11 @@ bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr)
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
         return dy_core_expr_is_bound(id, *expr.equality_map_elim.expr) || dy_core_expr_is_bound(id, *expr.equality_map_elim.map.e1) || dy_core_expr_is_bound(id, *expr.equality_map_elim.map.e2);
     case DY_CORE_EXPR_TYPE_MAP_ELIM: {
-        if (dy_core_expr_is_bound(id, *expr.type_map_elim.expr) || dy_core_expr_is_bound(id, *expr.type_map_elim.map.binding.type)) {
+        if (dy_core_expr_is_bound(id, *expr.type_map_elim.expr) || dy_core_expr_is_bound(id, *expr.type_map_elim.map.type)) {
             return true;
         }
 
-        if (id == expr.type_map_elim.map.binding.id) {
+        if (id == expr.type_map_elim.map.id) {
             return false;
         }
 
@@ -322,9 +327,7 @@ bool dy_core_expr_is_bound(size_t id, struct dy_core_expr expr)
     case DY_CORE_EXPR_ALTERNATIVE:
         return dy_core_expr_is_bound(id, *expr.alternative.first) || dy_core_expr_is_bound(id, *expr.alternative.second);
     case DY_CORE_EXPR_VARIABLE:
-        return expr.variable.id == id;
-    case DY_CORE_EXPR_INFERENCE_VARIABLE:
-        return expr.inference_variable.id == id;
+        return expr.variable_id == id;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION: {
@@ -356,7 +359,7 @@ void dy_core_appears_in_polarity(size_t id, struct dy_core_expr expr, enum dy_co
         dy_core_appears_in_polarity(id, *expr.equality_map.e2, current_polarity, in_positive, in_negative);
         return;
     case DY_CORE_EXPR_TYPE_MAP:
-        dy_core_appears_in_polarity(id, *expr.type_map.binding.type, flip_polarity(current_polarity), in_positive, in_negative);
+        dy_core_appears_in_polarity(id, *expr.type_map.type, flip_polarity(current_polarity), in_positive, in_negative);
         if (*in_negative && *in_positive) {
             return;
         }
@@ -380,22 +383,7 @@ void dy_core_appears_in_polarity(size_t id, struct dy_core_expr expr, enum dy_co
     case DY_CORE_EXPR_ALTERNATIVE:
         return;
     case DY_CORE_EXPR_VARIABLE:
-        if (expr.variable.id == id) {
-            switch (current_polarity) {
-            case DY_CORE_POLARITY_POSITIVE:
-                *in_positive = true;
-                return;
-            case DY_CORE_POLARITY_NEGATIVE:
-                *in_negative = true;
-                return;
-            }
-
-            dy_bail("Impossible polarity.");
-        }
-
-        return;
-    case DY_CORE_EXPR_INFERENCE_VARIABLE:
-        if (expr.inference_variable.id == id) {
+        if (expr.variable_id == id) {
             switch (current_polarity) {
             case DY_CORE_POLARITY_POSITIVE:
                 *in_positive = true;
@@ -450,7 +438,7 @@ struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
 
         return expr;
     case DY_CORE_EXPR_TYPE_MAP:
-        dy_core_expr_retain_ptr(expr.type_map.binding.type);
+        dy_core_expr_retain_ptr(expr.type_map.type);
         dy_core_expr_retain_ptr(expr.type_map.expr);
 
         return expr;
@@ -462,7 +450,7 @@ struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
         return expr;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         dy_core_expr_retain_ptr(expr.type_map_elim.expr);
-        dy_core_expr_retain_ptr(expr.type_map_elim.map.binding.type);
+        dy_core_expr_retain_ptr(expr.type_map_elim.map.type);
         dy_core_expr_retain_ptr(expr.type_map_elim.map.expr);
 
         return expr;
@@ -477,15 +465,9 @@ struct dy_core_expr dy_core_expr_retain(struct dy_core_expr expr)
 
         return expr;
     case DY_CORE_EXPR_VARIABLE:
-        dy_core_expr_retain_ptr(expr.variable.type);
-
-        return expr;
-    case DY_CORE_EXPR_INFERENCE_VARIABLE:
-        dy_core_expr_retain_ptr(expr.inference_variable.type);
-
         return expr;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        dy_core_expr_retain_ptr(expr.inference_type_map.binding.type);
+        dy_core_expr_retain_ptr(expr.inference_type_map.type);
         dy_core_expr_retain_ptr(expr.inference_type_map.expr);
 
         return expr;
@@ -523,7 +505,7 @@ void dy_core_expr_release(struct dy_core_expr expr)
 
         return;
     case DY_CORE_EXPR_TYPE_MAP:
-        dy_core_expr_release_ptr(expr.type_map.binding.type);
+        dy_core_expr_release_ptr(expr.type_map.type);
         dy_core_expr_release_ptr(expr.type_map.expr);
 
         return;
@@ -535,7 +517,7 @@ void dy_core_expr_release(struct dy_core_expr expr)
         return;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         dy_core_expr_release_ptr(expr.type_map_elim.expr);
-        dy_core_expr_release_ptr(expr.type_map_elim.map.binding.type);
+        dy_core_expr_release_ptr(expr.type_map_elim.map.type);
         dy_core_expr_release_ptr(expr.type_map_elim.map.expr);
 
         return;
@@ -550,15 +532,9 @@ void dy_core_expr_release(struct dy_core_expr expr)
 
         return;
     case DY_CORE_EXPR_VARIABLE:
-        dy_core_expr_release_ptr(expr.variable.type);
-
-        return;
-    case DY_CORE_EXPR_INFERENCE_VARIABLE:
-        dy_core_expr_release_ptr(expr.inference_variable.type);
-
         return;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        dy_core_expr_release_ptr(expr.inference_type_map.binding.type);
+        dy_core_expr_release_ptr(expr.inference_type_map.type);
         dy_core_expr_release_ptr(expr.inference_type_map.expr);
 
         return;
@@ -602,9 +578,9 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         add_string(string, DY_STR_LIT("("));
 
         add_string(string, DY_STR_LIT("["));
-        add_size_t_decimal(string, expr.type_map.binding.id);
+        add_size_t_decimal(string, expr.type_map.id);
         add_string(string, DY_STR_LIT(" "));
-        dy_core_expr_to_string(*expr.type_map.binding.type, string);
+        dy_core_expr_to_string(*expr.type_map.type, string);
         add_string(string, DY_STR_LIT("]"));
         if (expr.type_map.is_implicit) {
             add_string(string, DY_STR_LIT(" @"));
@@ -623,9 +599,9 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         add_string(string, DY_STR_LIT("("));
 
         add_string(string, DY_STR_LIT("?["));
-        add_size_t_decimal(string, expr.inference_type_map.binding.id);
+        add_size_t_decimal(string, expr.inference_type_map.id);
         add_string(string, DY_STR_LIT(" "));
-        dy_core_expr_to_string(*expr.inference_type_map.binding.type, string);
+        dy_core_expr_to_string(*expr.inference_type_map.type, string);
         add_string(string, DY_STR_LIT("]"));
         if (expr.inference_type_map.polarity == DY_CORE_POLARITY_POSITIVE) {
             add_string(string, DY_STR_LIT(" -> "));
@@ -640,13 +616,13 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         dy_core_expr_to_string(*expr.equality_map_elim.expr, string);
         switch (expr.equality_map_elim.check_result) {
         case DY_YES:
-            add_string(string, DY_STR_LIT(" \x1b[32m!\x1b[0m "));
+            add_string(string, DY_STR_LIT(" O! "));
             break;
         case DY_MAYBE:
-            add_string(string, DY_STR_LIT(" \x1b[33m!\x1b[0m "));
+            add_string(string, DY_STR_LIT(" M! "));
             break;
         case DY_NO:
-            add_string(string, DY_STR_LIT(" \x1b[31m!\x1b[0m "));
+            add_string(string, DY_STR_LIT(" X! "));
             break;
         }
         dy_core_expr_to_string(*expr.equality_map_elim.map.e1, string);
@@ -663,9 +639,9 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         add_string(string, DY_STR_LIT("("));
         dy_core_expr_to_string(*expr.type_map_elim.expr, string);
         add_string(string, DY_STR_LIT(" ! ["));
-        add_size_t_decimal(string, expr.type_map_elim.map.binding.id);
+        add_size_t_decimal(string, expr.type_map_elim.map.id);
         add_string(string, DY_STR_LIT(" "));
-        dy_core_expr_to_string(*expr.type_map_elim.map.binding.type, string);
+        dy_core_expr_to_string(*expr.type_map_elim.map.type, string);
         add_string(string, DY_STR_LIT("]"));
         if (expr.type_map_elim.map.is_implicit) {
             add_string(string, DY_STR_LIT(" @"));
@@ -677,19 +653,7 @@ void dy_core_expr_to_string(struct dy_core_expr expr, dy_array_t *string)
         add_string(string, DY_STR_LIT(")"));
         return;
     case DY_CORE_EXPR_VARIABLE:
-        add_size_t_decimal(string, expr.variable.id);
-
-        return;
-    case DY_CORE_EXPR_INFERENCE_VARIABLE:
-        add_string(string, DY_STR_LIT("?"));
-
-        add_size_t_decimal(string, expr.inference_variable.id);
-
-        if (expr.inference_variable.polarity == DY_CORE_POLARITY_POSITIVE) {
-            add_string(string, DY_STR_LIT("+"));
-        } else {
-            add_string(string, DY_STR_LIT("-"));
-        }
+        add_size_t_decimal(string, expr.variable_id);
         return;
     case DY_CORE_EXPR_END:
         if (expr.end_polarity == DY_CORE_POLARITY_POSITIVE) {

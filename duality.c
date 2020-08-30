@@ -83,21 +83,33 @@ int main(int argc, const char *argv[])
         .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), DY_ALIGNOF(struct dy_bound_constraint), 64),
         .already_visited_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 64),
         .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
-        .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64)
+        .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
+        .bindings = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
+        .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
+        .subtype_implicits = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
+        .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8)
     };
-
+    
     struct dy_constraint constraint;
     bool have_constraint = false;
-    struct dy_core_expr checked_program = dy_check_expr(&core_ctx, program, &constraint, &have_constraint);
+    struct dy_core_expr checked_program;
+    if (dy_check_expr(&core_ctx, program, &constraint, &have_constraint, &checked_program)) {
+        dy_core_expr_release(program);
+        program = checked_program;
+    }
     assert(!have_constraint);
+    
+    /*fprintf(stderr, "Checked program:\n");
+    print_core_expr(stderr, program);
+    fprintf(stderr, "\n\n");*/
 
-    if (core_has_error(checked_program)) {
-        print_core_errors(stderr, checked_program, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
+    if (core_has_error(program)) {
+        print_core_errors(stderr, program, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
         return -1;
     }
 
     bool is_value = false;
-    struct dy_core_expr result = dy_eval_expr(&core_ctx, checked_program, &is_value);
+    struct dy_core_expr result = dy_eval_expr(&core_ctx, program, &is_value);
 
     print_core_expr(stdout, result);
     printf("\n");
@@ -149,7 +161,7 @@ bool core_has_error(struct dy_core_expr expr)
     case DY_CORE_EXPR_EQUALITY_MAP:
         return core_has_error(*expr.equality_map.e1) || core_has_error(*expr.equality_map.e2);
     case DY_CORE_EXPR_TYPE_MAP:
-        return core_has_error(*expr.type_map.binding.type) || core_has_error(*expr.type_map.expr);
+        return core_has_error(*expr.type_map.type) || core_has_error(*expr.type_map.expr);
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
         if (expr.equality_map_elim.check_result == DY_NO) {
             return true;
@@ -162,7 +174,7 @@ bool core_has_error(struct dy_core_expr expr)
             return true;
         }
 
-        return core_has_error(*expr.type_map_elim.expr) || core_has_error(*expr.type_map_elim.map.binding.type)
+        return core_has_error(*expr.type_map_elim.expr) || core_has_error(*expr.type_map_elim.map.type)
                || core_has_error(*expr.type_map_elim.map.expr);
     case DY_CORE_EXPR_JUNCTION:
         return core_has_error(*expr.junction.e1) || core_has_error(*expr.junction.e2);
@@ -185,12 +197,10 @@ bool core_has_error(struct dy_core_expr expr)
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
-        return core_has_error(*expr.recursion.expr);
+        return core_has_error(*expr.recursion.type) || core_has_error(*expr.recursion.expr);
     case DY_CORE_EXPR_END:
         // fallthrough
     case DY_CORE_EXPR_SYMBOL:
-        // fallthrough
-    case DY_CORE_EXPR_INFERENCE_VARIABLE:
         return false;
     }
 
@@ -205,7 +215,7 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
         print_core_errors(file, *expr.equality_map.e2, text, text_size);
         return;
     case DY_CORE_EXPR_TYPE_MAP:
-        print_core_errors(file, *expr.type_map.binding.type, text, text_size);
+        print_core_errors(file, *expr.type_map.type, text, text_size);
         print_core_errors(file, *expr.type_map.expr, text, text_size);
         return;
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
@@ -225,7 +235,7 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
         return;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         print_core_errors(file, *expr.type_map_elim.expr, text, text_size);
-        print_core_errors(file, *expr.type_map_elim.map.binding.type, text, text_size);
+        print_core_errors(file, *expr.type_map_elim.map.type, text, text_size);
         print_core_errors(file, *expr.type_map_elim.map.expr, text, text_size);
 
         if (expr.type_map_elim.check_result == DY_NO) {
@@ -251,7 +261,13 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
+        print_core_errors(file, *expr.recursion.type, text, text_size);
         print_core_errors(file, *expr.recursion.expr, text, text_size);
+        
+        if (expr.recursion.check_result == DY_NO) {
+            fprintf(file, "Error without source attribution.\n");
+            return;
+        }
         return;
     case DY_CORE_EXPR_END:
         return;
@@ -270,8 +286,6 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
             print_core_errors(file, data->body, text, text_size);
         }
 
-        return;
-    case DY_CORE_EXPR_INFERENCE_VARIABLE:
         return;
     case DY_CORE_EXPR_SYMBOL:
         return;

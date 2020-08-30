@@ -110,6 +110,8 @@ static inline bool parse_do_block_def(struct dy_parser_ctx *ctx, struct dy_ast_d
 
 static inline bool skip_semicolon_or_newline(struct dy_parser_ctx *ctx);
 
+static inline bool dy_parse_string(struct dy_parser_ctx *ctx, struct dy_ast_literal *string);
+
 bool dy_parse_literal(struct dy_parser_ctx *ctx, dy_string_t s)
 {
     size_t start_index = ctx->stream.current_index;
@@ -427,6 +429,16 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx *ctx, struct dy_ast_expr
         return true;
     }
 
+    struct dy_ast_literal string;
+    if (dy_parse_string(ctx, &string)) {
+        *expr = (struct dy_ast_expr){
+            .tag = DY_AST_EXPR_STRING,
+            .string = string
+        };
+
+        return true;
+    }
+
     if (parse_expr_parenthesized(ctx, expr)) {
         return true;
     }
@@ -478,6 +490,46 @@ bool parse_expr_non_left_recursive(struct dy_parser_ctx *ctx, struct dy_ast_expr
     }
 
     return false;
+}
+
+bool dy_parse_string(struct dy_parser_ctx *ctx, struct dy_ast_literal *string)
+{
+    size_t start_index = ctx->stream.current_index;
+
+    if (!dy_parse_literal(ctx, DY_STR_LIT("\""))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_array_t string_storage = dy_array_create(sizeof(char), DY_ALIGNOF(char), 8);
+    dy_array_add(&ctx->string_arrays, &string_storage);
+
+    for (;;) {
+        char c;
+        if (!get_char(ctx, &c)) {
+            ctx->stream.current_index = start_index;
+            return false;
+        }
+
+        if (c == '\"') {
+            break;
+        }
+
+        dy_array_add(&string_storage, &c);
+    }
+
+    *string = (struct dy_ast_literal){
+        .text_range = {
+            .start = start_index,
+            .end = ctx->stream.current_index,
+        },
+        .value = {
+            .ptr = string_storage.buffer,
+            .size = string_storage.num_elems,
+        }
+    };
+
+    return true;
 }
 
 enum infix_op parse_infix_op(struct dy_parser_ctx *ctx)
@@ -1126,7 +1178,10 @@ bool parse_recursion(struct dy_parser_ctx *ctx, dy_string_t rec_lit, struct dy_a
     skip_whitespace_except_newline(ctx);
 
     struct dy_ast_expr type;
-    bool has_type = dy_parse_expr(ctx, &type);
+    if (!dy_parse_expr(ctx, &type)) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
 
     skip_whitespace_except_newline(ctx);
 
@@ -1150,7 +1205,6 @@ bool parse_recursion(struct dy_parser_ctx *ctx, dy_string_t rec_lit, struct dy_a
         },
         .name = self_name,
         .type = dy_ast_expr_new(type),
-        .has_type = has_type,
         .expr = dy_ast_expr_new(expr)
     };
 

@@ -7,7 +7,6 @@
 #pragma once
 
 #include "core.h"
-#include "are_equal.h"
 
 /**
  * This file deals with collecting/resolving constraints.
@@ -51,6 +50,18 @@ struct dy_constraint {
  * Returns both the subtype and supertype (if any) of 'id' build from 'constraint'.
  */
 static inline bool dy_constraint_collect(struct dy_constraint constraint, size_t id, enum dy_core_polarity polarity, struct dy_core_expr *result);
+
+static inline const struct dy_constraint *dy_constraint_new(struct dy_constraint constraint);
+
+static inline struct dy_constraint dy_constraint_retain(struct dy_constraint constraint);
+
+static inline const struct dy_constraint *dy_constraint_retain_ptr(const struct dy_constraint *constraint);
+
+static inline void dy_constraint_release(struct dy_constraint constraint);
+
+static inline void dy_constraint_release_ptr(const struct dy_constraint *constraint);
+
+static inline void dy_join_constraints(struct dy_constraint c1, bool have_c1, enum dy_core_polarity polarity, struct dy_constraint c2, bool have_c2, struct dy_constraint *c3, bool *have_c3);
 
 bool dy_constraint_collect(struct dy_constraint constraint, size_t id, enum dy_core_polarity polarity, struct dy_core_expr *result)
 {
@@ -130,3 +141,76 @@ bool dy_constraint_collect(struct dy_constraint constraint, size_t id, enum dy_c
 
     dy_bail("Impossible constraint type");
 }
+
+static const size_t dy_constraint_pre_padding = DY_RC_PRE_PADDING(struct dy_constraint);
+static const size_t dy_constraint_post_padding = DY_RC_POST_PADDING(struct dy_constraint);
+
+const struct dy_constraint *dy_constraint_new(struct dy_constraint constraint)
+{
+    return dy_rc_new(&constraint, sizeof(struct dy_constraint), dy_constraint_pre_padding, dy_constraint_post_padding);
+}
+
+struct dy_constraint dy_constraint_retain(struct dy_constraint constraint)
+{
+    switch (constraint.tag) {
+    case DY_CONSTRAINT_SINGLE:
+        dy_core_expr_retain(constraint.single.expr);
+        return constraint;
+    case DY_CONSTRAINT_MULTIPLE:
+        dy_constraint_retain_ptr(constraint.multiple.c1);
+        dy_constraint_retain_ptr(constraint.multiple.c2);
+        return constraint;
+    }
+    
+    dy_bail("Impossible constraint type.");
+}
+
+const struct dy_constraint *dy_constraint_retain_ptr(const struct dy_constraint *constraint)
+{
+    return dy_rc_retain(constraint, dy_constraint_pre_padding, dy_constraint_post_padding);
+}
+
+void dy_constraint_release(struct dy_constraint constraint)
+{
+    switch (constraint.tag) {
+    case DY_CONSTRAINT_SINGLE:
+        dy_core_expr_release(constraint.single.expr);
+        return;
+    case DY_CONSTRAINT_MULTIPLE:
+        dy_constraint_release_ptr(constraint.multiple.c1);
+        dy_constraint_release_ptr(constraint.multiple.c2);
+        return;
+    }
+    
+    dy_bail("Impossible constraint type.");
+}
+
+void dy_constraint_release_ptr(const struct dy_constraint *constraint)
+{
+    struct dy_constraint shallow_copy = *constraint;
+    if (dy_rc_release(constraint, dy_constraint_pre_padding, dy_constraint_post_padding) == 0) {
+        dy_constraint_release(shallow_copy);
+    }
+}
+
+void dy_join_constraints(struct dy_constraint c1, bool have_c1, enum dy_core_polarity polarity, struct dy_constraint c2, bool have_c2, struct dy_constraint *c3, bool *have_c3)
+{
+    if (have_c1 && have_c2) {
+        *c3 = (struct dy_constraint){
+            .tag = DY_CONSTRAINT_MULTIPLE,
+            .multiple = {
+                .c1 = dy_constraint_new(c1),
+                .c2 = dy_constraint_new(c2),
+                .polarity = polarity,
+            }
+        };
+        *have_c3 = true;
+    } else if (have_c1) {
+        *c3 = c1;
+        *have_c3 = true;
+    } else if (have_c2) {
+        *c3 = c2;
+        *have_c3 = true;
+    }
+}
+

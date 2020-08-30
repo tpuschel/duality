@@ -826,20 +826,26 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
         .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), DY_ALIGNOF(struct dy_bound_constraint), 1),
         .already_visited_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 64),
         .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
-        .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64)
+        .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
+        .bindings = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
+        .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
+        .subtype_implicits = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
+        .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8)
     };
 
     struct dy_constraint c;
     bool have_c = false;
-    struct dy_core_expr new_core = dy_check_expr(&core_ctx, core, &c, &have_c);
-
-    dy_core_expr_release(core);
+    struct dy_core_expr new_core;
+    if (dy_check_expr(&core_ctx, core, &c, &have_c, &new_core)) {
+        dy_core_expr_release(core);
+        core = new_core;
+    }
 
     doc->core_is_present = true;
-    doc->core = new_core;
+    doc->core = core;
 
     dy_array_t diagnostics = dy_array_create(sizeof(dy_json_t), DY_ALIGNOF(dy_json_t), 8);
-    produce_diagnostics(&core_ctx, new_core, doc->text, &diagnostics);
+    produce_diagnostics(&core_ctx, core, doc->text, &diagnostics);
 
     dy_json_t diag_json = {
         .tag = DY_JSON_VALUE_ARRAY,
@@ -925,7 +931,7 @@ void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_s
         produce_diagnostics(ctx, *expr.equality_map.e2, text, diagnostics);
         return;
     case DY_CORE_EXPR_TYPE_MAP:
-        produce_diagnostics(ctx, *expr.type_map.binding.type, text, diagnostics);
+        produce_diagnostics(ctx, *expr.type_map.type, text, diagnostics);
         produce_diagnostics(ctx, *expr.type_map.expr, text, diagnostics);
         return;
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
@@ -948,7 +954,7 @@ void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_s
         return;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         produce_diagnostics(ctx, *expr.type_map_elim.expr, text, diagnostics);
-        produce_diagnostics(ctx, *expr.type_map_elim.map.binding.type, text, diagnostics);
+        produce_diagnostics(ctx, *expr.type_map_elim.map.type, text, diagnostics);
         produce_diagnostics(ctx, *expr.type_map_elim.map.expr, text, diagnostics);
 
         if (expr.type_map_elim.check_result != DY_YES && expr.type_map_elim.has_text_range) {
@@ -983,8 +989,6 @@ void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_s
         return;
     case DY_CORE_EXPR_CUSTOM:
         // TODO: Add diagnostics callback to custom exprs.
-        return;
-    case DY_CORE_EXPR_INFERENCE_VARIABLE:
         return;
     case DY_CORE_EXPR_SYMBOL:
         return;

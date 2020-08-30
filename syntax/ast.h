@@ -130,7 +130,6 @@ struct dy_ast_recursion {
     struct dy_range text_range;
     struct dy_ast_literal name;
     const struct dy_ast_expr *type;
-    bool has_type;
     const struct dy_ast_expr *expr;
 };
 
@@ -151,7 +150,8 @@ enum dy_ast_expr_tag {
     DY_AST_EXPR_JUXTAPOSITION,
     DY_AST_EXPR_POSITIVE_RECURSION,
     DY_AST_EXPR_NEGATIVE_RECURSION,
-    DY_AST_EXPR_SYMBOL
+    DY_AST_EXPR_SYMBOL,
+    DY_AST_EXPR_STRING
 };
 
 struct dy_ast_expr {
@@ -306,6 +306,8 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
         return expr;
     case DY_AST_EXPR_SYMBOL:
         return expr;
+    case DY_AST_EXPR_STRING:
+        return expr;
     }
 
     dy_bail("Impossible ast type.");
@@ -383,6 +385,8 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
     case DY_AST_EXPR_ANY:
         return;
     case DY_AST_EXPR_SYMBOL:
+        return;
+    case DY_AST_EXPR_STRING:
         return;
     }
 
