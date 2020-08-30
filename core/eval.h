@@ -130,11 +130,10 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
     if (elim.check_result == DY_MAYBE) {
         struct dy_core_expr type_of_left = dy_type_of(ctx, left);
 
-        struct dy_constraint constraint;
-        bool have_constraint = false;
-        elim.check_result = dy_is_subtype_no_transformation(ctx, type_of_left, equality_map, &constraint, &have_constraint);
+        size_t x = ctx->constraints.num_elems;
+        elim.check_result = dy_is_subtype_no_transformation(ctx, type_of_left, equality_map);
 
-        assert(!have_constraint);
+        assert(x == ctx->constraints.num_elems);
 
         dy_core_expr_release(type_of_left);
     }
@@ -194,11 +193,9 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
     if (left.tag == DY_CORE_EXPR_JUNCTION) {
         struct dy_core_expr type_of_junction_e1 = dy_type_of(ctx, *left.junction.e1);
 
-        struct dy_constraint c1;
-        bool have_c1 = false;
-        dy_ternary_t res1 = dy_is_subtype_no_transformation(ctx, type_of_junction_e1, equality_map, &c1, &have_c1);
-
-        assert(!have_c1);
+        size_t x = ctx->constraints.num_elems;
+        dy_ternary_t res1 = dy_is_subtype_no_transformation(ctx, type_of_junction_e1, equality_map);
+        assert(x == ctx->constraints.num_elems);
 
         if (res1 == DY_YES) {
             struct dy_core_equality_map_elim new_elim = {

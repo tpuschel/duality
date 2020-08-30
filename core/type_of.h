@@ -81,8 +81,8 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
             }
         }
             
-        for (size_t i = 0, size = ctx->bound_constraints.num_elems; i < size; ++i) {
-            const struct dy_bound_constraint *bc = dy_array_pos(ctx->bound_constraints, i);
+        for (size_t i = 0, size = ctx->bound_inference_vars.num_elems; i < size; ++i) {
+            const struct dy_bound_inference_var *bc = dy_array_pos(ctx->bound_inference_vars, i);
             if (bc->id == expr.variable_id) {
                 return dy_core_expr_retain(bc->type);
             }

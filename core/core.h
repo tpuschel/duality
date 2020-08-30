@@ -23,7 +23,7 @@
 struct dy_core_ctx {
     size_t running_id;
 
-    dy_array_t bound_constraints;
+    dy_array_t bound_inference_vars;
 
     dy_array_t already_visited_ids;
 
@@ -38,6 +38,8 @@ struct dy_core_ctx {
     dy_array_t subtype_implicits;
     
     dy_array_t free_ids_arrays;
+
+    dy_array_t constraints;
 };
 
 /** Hopefully self-explanatory :) */
@@ -128,7 +130,7 @@ struct dy_core_custom {
 
     dy_ternary_t (*is_equal)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr);
 
-    bool (*check)(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr *result);
+    bool (*check)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr *result);
 
     bool (*remove_mentions_in_subtype)(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr *result);
 
@@ -138,9 +140,9 @@ struct dy_core_custom {
 
     bool (*substitute)(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub, struct dy_core_expr *result);
 
-    dy_ternary_t (*is_subtype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+    dy_ternary_t (*is_subtype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
-    dy_ternary_t (*is_supertype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+    dy_ternary_t (*is_supertype)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
     struct dy_core_expr (*eliminate)(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value);
 
@@ -190,7 +192,7 @@ struct dy_core_expr {
     enum dy_core_expr_tag tag;
 };
 
-struct dy_bound_constraint {
+struct dy_bound_inference_var {
     size_t id;
     struct dy_core_expr type;
     enum dy_core_polarity polarity;

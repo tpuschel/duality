@@ -52,14 +52,15 @@ const char *process_code(const char *text, size_t text_length_in_bytes)
 
     struct dy_core_ctx core_ctx = {
         .running_id = ast_to_core_ctx.running_id,
-        .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), DY_ALIGNOF(struct dy_bound_constraint), 64),
+        .bound_inference_vars = dy_array_create(sizeof(struct dy_bound_inference_var), DY_ALIGNOF(struct dy_bound_inference_var), 64),
         .already_visited_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 64),
         .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
         .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
         .bindings = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
         .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
         .subtype_implicits = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
-        .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8)
+        .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8),
+        .constraints = dy_array_create(sizeof(struct dy_constraint), DY_ALIGNOF(struct dy_constraint), 64)
     };
 
     struct dy_constraint constraint;

@@ -80,28 +80,28 @@ int main(int argc, const char *argv[])
 
     struct dy_core_ctx core_ctx = {
         .running_id = ast_to_core_ctx.running_id,
-        .bound_constraints = dy_array_create(sizeof(struct dy_bound_constraint), DY_ALIGNOF(struct dy_bound_constraint), 64),
+        .bound_inference_vars = dy_array_create(sizeof(struct dy_bound_inference_var), DY_ALIGNOF(struct dy_bound_inference_var), 64),
         .already_visited_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 64),
         .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
         .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
         .bindings = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
         .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
         .subtype_implicits = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
-        .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8)
+        .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8),
+        .constraints = dy_array_create(sizeof(struct dy_constraint), DY_ALIGNOF(struct dy_constraint), 64)
     };
-    
-    struct dy_constraint constraint;
-    bool have_constraint = false;
+
+    size_t constraint_start = core_ctx.constraints.num_elems;
     struct dy_core_expr checked_program;
-    if (dy_check_expr(&core_ctx, program, &constraint, &have_constraint, &checked_program)) {
+    if (dy_check_expr(&core_ctx, program, &checked_program)) {
         dy_core_expr_release(program);
         program = checked_program;
     }
-    assert(!have_constraint);
+    assert(constraint_start == core_ctx.constraints.num_elems);
     
-    /*fprintf(stderr, "Checked program:\n");
+    fprintf(stderr, "Checked program:\n");
     print_core_expr(stderr, program);
-    fprintf(stderr, "\n\n");*/
+    fprintf(stderr, "\n\n");
 
     if (core_has_error(program)) {
         print_core_errors(stderr, program, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);

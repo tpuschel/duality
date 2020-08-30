@@ -19,7 +19,7 @@ static struct dy_core_expr dy_uv_type_of(void *data, struct dy_core_ctx *ctx);
 
 static dy_ternary_t dy_uv_is_equal(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr);
 
-static bool dy_uv_check(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr *result);
+static bool dy_uv_check(void *data, struct dy_core_ctx *ctx, struct dy_core_expr *result);
 
 static bool dy_uv_remove_mentions_in_subtype(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr *result);
 
@@ -29,9 +29,9 @@ static struct dy_core_expr dy_uv_eval(void *data, struct dy_core_ctx *ctx, bool 
 
 static bool dy_uv_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_core_expr sub, struct dy_core_expr *result);
 
-static dy_ternary_t dy_uv_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+static dy_ternary_t dy_uv_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
-static dy_ternary_t dy_uv_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+static dy_ternary_t dy_uv_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
 static struct dy_core_expr dy_uv_eliminate(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value);
 
@@ -96,7 +96,7 @@ dy_ternary_t dy_uv_is_equal(void *data, struct dy_core_ctx *ctx, struct dy_core_
     return DY_NO;
 }
 
-bool dy_uv_check(void *data, struct dy_core_ctx *ctx, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr *result)
+bool dy_uv_check(void *data, struct dy_core_ctx *ctx, struct dy_core_expr *result)
 {
     return false;
 }
@@ -124,12 +124,12 @@ bool dy_uv_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy_
     return false;
 }
 
-dy_ternary_t dy_uv_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
+dy_ternary_t dy_uv_is_subtype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr supertype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
     return DY_NO;
 }
 
-dy_ternary_t dy_uv_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_constraint *constraint, bool *did_generate_constraint, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
+dy_ternary_t dy_uv_is_supertype(void *data, struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
 {
     return DY_NO;
 }
