@@ -63,14 +63,11 @@ const char *process_code(const char *text, size_t text_length_in_bytes)
         .constraints = dy_array_create(sizeof(struct dy_constraint), DY_ALIGNOF(struct dy_constraint), 64)
     };
 
-    struct dy_constraint constraint;
-    bool have_constraint = false;
     struct dy_core_expr checked_program;
-    if (dy_check_expr(&core_ctx, program, &constraint, &have_constraint, &checked_program)) {
+    if (dy_check_expr(&core_ctx, program, &checked_program)) {
         dy_core_expr_release(program);
         program = checked_program;
     }
-    assert(!have_constraint);
 
     bool is_value = false;
     struct dy_core_expr result = dy_eval_expr(&core_ctx, program, &is_value);
