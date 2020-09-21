@@ -9,7 +9,7 @@
 #include "../core/core.h"
 #include "ast.h"
 
-static const size_t dy_uv_id = 0;
+static size_t dy_uv_id;
 
 struct dy_uv_data {
     struct dy_ast_literal var;
@@ -35,34 +35,25 @@ static dy_ternary_t dy_uv_is_supertype(void *data, struct dy_core_ctx *ctx, stru
 
 static struct dy_core_expr dy_uv_eliminate(void *data, struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value);
 
-static bool dy_uv_is_computation(void *data);
+static bool dy_uv_is_computation(void *data, struct dy_core_ctx *ctx);
 
-static bool dy_uv_is_bound(void *data, size_t id);
+static bool dy_uv_is_bound(void *data, struct dy_core_ctx *ctx, size_t id);
 
-static void dy_uv_appears_in_polarity(void *data, size_t id, enum dy_core_polarity current_polarity, bool *in_positive, bool *in_negative);
+static void dy_uv_appears_in_polarity(void *data, struct dy_core_ctx *ctx, size_t id, enum dy_core_polarity current_polarity, bool *in_positive, bool *in_negative);
 
-static void *dy_uv_retain(void *data);
+static void *dy_uv_retain(void *data, struct dy_core_ctx *ctx);
 
-static void dy_uv_release(void *data);
+static void dy_uv_release(void *data, struct dy_core_ctx *ctx);
 
-static void dy_uv_to_string(void *data, dy_array_t *string);
+static void dy_uv_to_string(void *data, struct dy_core_ctx *ctx, dy_array_t *string);
 
 static inline struct dy_core_custom dy_uv_create(struct dy_uv_data data);
 
 static inline struct dy_core_custom dy_uv_create_no_alloc(const struct dy_uv_data *data);
 
-struct dy_core_custom dy_uv_create(struct dy_uv_data data)
+static inline void dy_uv_register(struct dy_core_ctx *ctx)
 {
-    static const size_t pre_padding = DY_RC_PRE_PADDING(struct dy_uv_data);
-    static const size_t post_padding = DY_RC_POST_PADDING(struct dy_uv_data);
-    return dy_uv_create_no_alloc(dy_rc_new(&data, sizeof data, pre_padding, post_padding));
-}
-
-struct dy_core_custom dy_uv_create_no_alloc(const struct dy_uv_data *data)
-{
-    return (struct dy_core_custom){
-        .id = dy_uv_id,
-        .data = dy_uv_retain(data),
+    struct dy_core_custom_shared s = {
         .can_be_eliminated = false,
         .type_of = dy_uv_type_of,
         .is_equal = dy_uv_is_equal,
@@ -80,6 +71,23 @@ struct dy_core_custom dy_uv_create_no_alloc(const struct dy_uv_data *data)
         .retain = dy_uv_retain,
         .release = dy_uv_release,
         .to_string = dy_uv_to_string
+    };
+
+    dy_uv_id = dy_array_add(&ctx->custom_shared, &s);
+}
+
+struct dy_core_custom dy_uv_create(struct dy_uv_data data)
+{
+    static const size_t pre_padding = DY_RC_PRE_PADDING(struct dy_uv_data);
+    static const size_t post_padding = DY_RC_POST_PADDING(struct dy_uv_data);
+    return dy_uv_create_no_alloc(dy_rc_new(&data, sizeof data, pre_padding, post_padding));
+}
+
+struct dy_core_custom dy_uv_create_no_alloc(const struct dy_uv_data *data)
+{
+    return (struct dy_core_custom){
+        .id = dy_uv_id,
+        .data = dy_uv_retain(data, NULL)
     };
 }
 
@@ -142,36 +150,36 @@ struct dy_core_expr dy_uv_eliminate(void *data, struct dy_core_ctx *ctx, struct 
     };
 }
 
-bool dy_uv_is_computation(void *data)
+bool dy_uv_is_computation(void *data, struct dy_core_ctx *ctx)
 {
     return DY_NO;
 }
 
-bool dy_uv_is_bound(void *data, size_t id)
+bool dy_uv_is_bound(void *data, struct dy_core_ctx *ctx, size_t id)
 {
     return false;
 }
 
-void dy_uv_appears_in_polarity(void *data, size_t id, enum dy_core_polarity current_polarity, bool *in_positive, bool *in_negative)
+void dy_uv_appears_in_polarity(void *data, struct dy_core_ctx *ctx, size_t id, enum dy_core_polarity current_polarity, bool *in_positive, bool *in_negative)
 {
     return;
 }
 
-void *dy_uv_retain(void *data)
+void *dy_uv_retain(void *data, struct dy_core_ctx *ctx)
 {
     static const size_t pre_padding = DY_RC_PRE_PADDING(struct dy_uv_data);
     static const size_t post_padding = DY_RC_POST_PADDING(struct dy_uv_data);
     return dy_rc_retain(data, pre_padding, post_padding);
 }
 
-void dy_uv_release(void *data)
+void dy_uv_release(void *data, struct dy_core_ctx *ctx)
 {
     static const size_t pre_padding = DY_RC_PRE_PADDING(struct dy_uv_data);
     static const size_t post_padding = DY_RC_POST_PADDING(struct dy_uv_data);
     dy_rc_release(data, pre_padding, post_padding);
 }
 
-void dy_uv_to_string(void *data, dy_array_t *string)
+void dy_uv_to_string(void *data, struct dy_core_ctx *ctx, dy_array_t *string)
 {
     struct dy_uv_data *d = data;
 

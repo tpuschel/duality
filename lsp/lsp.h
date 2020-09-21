@@ -52,7 +52,7 @@ static inline void dy_lsp_destroy(dy_lsp_ctx_t *ctx);
 struct document {
     dy_string_t uri; /** The URI is used as the identifier for a document. */
     dy_string_t text;
-    size_t running_id;
+    struct dy_core_ctx core_ctx;
     struct dy_core_expr core;
     bool core_is_present;
 };
@@ -457,9 +457,25 @@ void dy_lsp_did_open(dy_lsp_ctx_t *ctx, dy_string_t uri, dy_string_t text)
     struct document doc = {
         .uri = uri,
         .text = text,
-        .running_id = 0,
+        .core_ctx = {
+            .running_id = 0,
+            .bound_inference_vars = dy_array_create(sizeof(struct dy_bound_inference_var), DY_ALIGNOF(struct dy_bound_inference_var), 1),
+            .already_visited_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 64),
+            .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
+            .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
+            .bindings = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
+            .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
+            .subtype_implicits = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
+            .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8),
+            .constraints = dy_array_create(sizeof(struct dy_constraint), DY_ALIGNOF(struct dy_constraint), 64),
+            .custom_shared = dy_array_create(sizeof(struct dy_core_custom_shared), DY_ALIGNOF(struct dy_core_custom_shared), 3)
+        },
         .core_is_present = false
     };
+
+    dy_uv_register(&doc.core_ctx);
+    dy_def_register(&doc.core_ctx);
+    dy_string_register(&doc.core_ctx);
 
     process_document(ctx, &doc);
 
@@ -794,7 +810,7 @@ dy_json_t make_notification(dy_string_t method, dy_json_t params)
 void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
 {
     if (doc->core_is_present) {
-        dy_core_expr_release(doc->core);
+        dy_core_expr_release(&doc->core_ctx, doc->core);
         doc->core_is_present = false;
     }
 
@@ -813,30 +829,19 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
     }
 
     struct dy_ast_to_core_ctx ast_to_core_ctx = {
-        .running_id = 0,
+        .core_ctx = doc->core_ctx,
         .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), DY_ALIGNOF(struct dy_ast_to_core_bound_var), 64)
     };
 
     struct dy_core_expr core = dy_ast_do_block_to_core(&ast_to_core_ctx, ast);
 
+    doc->core_ctx = ast_to_core_ctx.core_ctx;
+
     dy_ast_do_block_release(ast.body);
 
-    struct dy_core_ctx core_ctx = {
-        .running_id = ast_to_core_ctx.running_id,
-        .bound_inference_vars = dy_array_create(sizeof(struct dy_bound_inference_var), DY_ALIGNOF(struct dy_bound_inference_var), 1),
-        .already_visited_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 64),
-        .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
-        .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
-        .bindings = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
-        .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
-        .subtype_implicits = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
-        .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8),
-        .constraints = dy_array_create(sizeof(struct dy_constraint), DY_ALIGNOF(struct dy_constraint), 64)
-    };
-
     struct dy_core_expr new_core;
-    if (dy_check_expr(&core_ctx, core, &new_core)) {
-        dy_core_expr_release(core);
+    if (dy_check_expr(&doc->core_ctx, core, &new_core)) {
+        dy_core_expr_release(&doc->core_ctx, core);
         core = new_core;
     }
 
@@ -844,7 +849,7 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
     doc->core = core;
 
     dy_array_t diagnostics = dy_array_create(sizeof(dy_json_t), DY_ALIGNOF(dy_json_t), 8);
-    produce_diagnostics(&core_ctx, core, doc->text, &diagnostics);
+    produce_diagnostics(&doc->core_ctx, core, doc->text, &diagnostics);
 
     dy_json_t diag_json = {
         .tag = DY_JSON_VALUE_ARRAY,

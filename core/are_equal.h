@@ -82,7 +82,8 @@ dy_ternary_t dy_are_equal(struct dy_core_ctx *ctx, struct dy_core_expr e1, struc
     }
 
     if (e2.tag == DY_CORE_EXPR_CUSTOM) {
-        return e2.custom.is_equal(e2.custom.data, ctx, e1);
+        const struct dy_core_custom_shared *s = dy_array_pos(ctx->custom_shared, e2.custom.id);
+        return s->is_equal(e2.custom.data, ctx, e1);
     }
 
     switch (e1.tag) {
@@ -104,8 +105,10 @@ dy_ternary_t dy_are_equal(struct dy_core_ctx *ctx, struct dy_core_expr e1, struc
         } else {
             return DY_NO;
         }
-    case DY_CORE_EXPR_CUSTOM:
-        return e1.custom.is_equal(e1.custom.data, ctx, e2);
+    case DY_CORE_EXPR_CUSTOM: {
+        const struct dy_core_custom_shared *s = dy_array_pos(ctx->custom_shared, e1.custom.id);
+        return s->is_equal(e1.custom.data, ctx, e2);
+    }
     case DY_CORE_EXPR_SYMBOL:
         if (e2.tag == DY_CORE_EXPR_SYMBOL) {
             return DY_YES;

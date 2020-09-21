@@ -98,7 +98,7 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
         if (dy_is_inference_var(ctx, subtype.variable_id, &polarity) && polarity == DY_CORE_POLARITY_NEGATIVE) {
             dy_array_add(&ctx->constraints, &(struct dy_constraint){
                 .id = subtype.variable_id,
-                .expr = dy_core_expr_retain(supertype),
+                .expr = dy_core_expr_retain(ctx, supertype),
                 .polarity = DY_CORE_POLARITY_NEGATIVE
             });
         }
@@ -115,7 +115,7 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
         if (dy_is_inference_var(ctx, supertype.variable_id, &polarity) && polarity == DY_CORE_POLARITY_POSITIVE) {
             dy_array_add(&ctx->constraints, &(struct dy_constraint){
                 .id = supertype.variable_id,
-                .expr = dy_core_expr_retain(subtype),
+                .expr = dy_core_expr_retain(ctx, subtype),
                 .polarity = DY_CORE_POLARITY_POSITIVE
             });
         }
@@ -156,11 +156,13 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
     }
 
     if (subtype.tag == DY_CORE_EXPR_CUSTOM) {
-        return subtype.custom.is_subtype(subtype.custom.data, ctx, supertype, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        const struct dy_core_custom_shared *s = dy_array_pos(ctx->custom_shared, subtype.custom.id);
+        return s->is_subtype(subtype.custom.data, ctx, supertype, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
 
     if (supertype.tag == DY_CORE_EXPR_CUSTOM) {
-        return supertype.custom.is_supertype(supertype.custom.data, ctx, subtype, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        const struct dy_core_custom_shared *s = dy_array_pos(ctx->custom_shared, supertype.custom.id);
+        return s->is_supertype(supertype.custom.data, ctx, subtype, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
 
     dy_bail("Should be unreachable!");
@@ -200,7 +202,7 @@ dy_ternary_t positive_equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy
         struct dy_core_expr subtype_expr_emap_e2 = {
             .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
             .equality_map_elim = {
-                .expr = dy_core_expr_new(dy_core_expr_retain(subtype_expr)),
+                .expr = dy_core_expr_new(dy_core_expr_retain(ctx, subtype_expr)),
                 .map = {
                     .e1 = dy_core_expr_retain_ptr(equality_map.e1),
                     .e2 = dy_core_expr_retain_ptr(equality_map.e2),
@@ -216,13 +218,13 @@ dy_ternary_t positive_equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy
         dy_ternary_t is_subtype = dy_is_subtype(ctx, *equality_map.e2, *supertype.equality_map.e2, subtype_expr_emap_e2, &new_subtype_expr_emap_e2, &did_transform_subtype_expr_emap_e2);
 
         if (did_transform_subtype_expr_emap_e2) {
-            dy_core_expr_release(subtype_expr_emap_e2);
+            dy_core_expr_release(ctx, subtype_expr_emap_e2);
         } else {
             new_subtype_expr_emap_e2 = subtype_expr_emap_e2;
         }
 
         if (is_subtype == DY_NO) {
-            dy_core_expr_release(new_subtype_expr_emap_e2);
+            dy_core_expr_release(ctx, new_subtype_expr_emap_e2);
             return DY_NO;
         }
 
@@ -239,7 +241,7 @@ dy_ternary_t positive_equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy
 
             *did_transform_subtype_expr = true;
         } else {
-            dy_core_expr_release(new_subtype_expr_emap_e2);
+            dy_core_expr_release(ctx, new_subtype_expr_emap_e2);
         }
 
         if (are_equal == DY_MAYBE || is_subtype == DY_MAYBE) {
@@ -269,20 +271,20 @@ dy_ternary_t positive_equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy
         struct dy_core_expr new_emap_e1;
         dy_ternary_t is_subtype_in = dy_is_subtype(ctx, type_of_equality_map_e1, *supertype.type_map.type, emap_e1, &new_emap_e1, &did_transform_emap_e1);
 
-        dy_core_expr_release(type_of_equality_map_e1);
+        dy_core_expr_release(ctx, type_of_equality_map_e1);
 
         if (is_subtype_in == DY_NO) {
             return DY_NO;
         }
 
         if (!did_transform_emap_e1) {
-            new_emap_e1 = dy_core_expr_retain(emap_e1);
+            new_emap_e1 = dy_core_expr_retain(ctx, emap_e1);
         }
 
         struct dy_core_expr emap_e2 = {
             .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
             .equality_map_elim = {
-                .expr = dy_core_expr_new(dy_core_expr_retain(subtype_expr)),
+                .expr = dy_core_expr_new(dy_core_expr_retain(ctx, subtype_expr)),
                 .map = {
                     .e1 = dy_core_expr_retain_ptr(equality_map.e1),
                     .e2 = dy_core_expr_retain_ptr(equality_map.e2),
@@ -307,13 +309,13 @@ dy_ternary_t positive_equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy
         --ctx->bindings.num_elems;
         
         if (is_subtype_out == DY_NO) {
-            dy_core_expr_release(new_emap_e1);
-            dy_core_expr_release(emap_e2);
+            dy_core_expr_release(ctx, new_emap_e1);
+            dy_core_expr_release(ctx, emap_e2);
             return DY_NO;
         }
 
         if (did_transform_emap_e2) {
-            dy_core_expr_release(emap_e2);
+            dy_core_expr_release(ctx, emap_e2);
         } else {
             new_emap_e2 = emap_e2;
         }
@@ -331,8 +333,8 @@ dy_ternary_t positive_equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy
 
             *did_transform_subtype_expr = true;
         } else {
-            dy_core_expr_release(new_emap_e1);
-            dy_core_expr_release(new_emap_e2);
+            dy_core_expr_release(ctx, new_emap_e1);
+            dy_core_expr_release(ctx, new_emap_e2);
         }
 
         dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
@@ -369,7 +371,7 @@ dy_ternary_t negative_equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy
         struct dy_core_expr emap_e2 = {
             .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
             .equality_map_elim = {
-                .expr = dy_core_expr_new(dy_core_expr_retain(subtype_expr)),
+                .expr = dy_core_expr_new(dy_core_expr_retain(ctx, subtype_expr)),
                 .map = {
                     .e1 = dy_core_expr_retain_ptr(equality_map.e1),
                     .e2 = dy_core_expr_retain_ptr(equality_map.e2),
@@ -385,12 +387,12 @@ dy_ternary_t negative_equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy
         dy_ternary_t is_subtype = dy_is_subtype(ctx, *equality_map.e2, *supertype.equality_map.e2, emap_e2, &new_emap_e2, &did_transform_emap_e2);
 
         if (is_subtype == DY_NO) {
-            dy_core_expr_release(emap_e2);
+            dy_core_expr_release(ctx, emap_e2);
             return DY_NO;
         }
 
         if (did_transform_emap_e2) {
-            dy_core_expr_release(emap_e2);
+            dy_core_expr_release(ctx, emap_e2);
         } else {
             new_emap_e2 = emap_e2;
         }
@@ -408,7 +410,7 @@ dy_ternary_t negative_equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy
 
             *did_transform_subtype_expr = true;
         } else {
-            dy_core_expr_release(new_emap_e2);
+            dy_core_expr_release(ctx, new_emap_e2);
         }
 
         if (are_equal == DY_MAYBE || is_subtype == DY_MAYBE) {
@@ -454,25 +456,25 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
         bool did_transform_supertype_e1 = false;
         dy_ternary_t is_subtype_in = dy_is_subtype(ctx, type_of_supertype_e1, *type_map.type, *supertype.equality_map.e1, &new_supertype_e1, &did_transform_supertype_e1);
 
-        dy_core_expr_release(type_of_supertype_e1);
+        dy_core_expr_release(ctx, type_of_supertype_e1);
 
         if (is_subtype_in == DY_NO) {
             return DY_NO;
         }
 
         if (!did_transform_supertype_e1) {
-            new_supertype_e1 = dy_core_expr_retain(*supertype.equality_map.e1);
+            new_supertype_e1 = dy_core_expr_retain(ctx, *supertype.equality_map.e1);
         }
 
         struct dy_core_expr new_type_map_expr;
         if (!substitute(ctx, *type_map.expr, type_map.id, new_supertype_e1, &new_type_map_expr)) {
-            new_type_map_expr = dy_core_expr_retain(*type_map.expr);
+            new_type_map_expr = dy_core_expr_retain(ctx, *type_map.expr);
         }
 
         struct dy_core_expr emap_e2 = {
             .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
             .equality_map_elim = {
-                .expr = dy_core_expr_new(dy_core_expr_retain(subtype_expr)),
+                .expr = dy_core_expr_new(dy_core_expr_retain(ctx, subtype_expr)),
                 .map = {
                     .e1 = dy_core_expr_new(new_supertype_e1),
                     .e2 = dy_core_expr_new(new_type_map_expr),
@@ -497,12 +499,12 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
         --ctx->bindings.num_elems;
         
         if (is_subtype_out == DY_NO) {
-            dy_core_expr_release(emap_e2);
+            dy_core_expr_release(ctx, emap_e2);
             return DY_NO;
         }
 
         if (did_transform_emap_e2) {
-            dy_core_expr_release(emap_e2);
+            dy_core_expr_release(ctx, emap_e2);
         } else {
             new_emap_e2 = emap_e2;
         }
@@ -520,7 +522,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
 
             *did_transform_subtype_expr = true;
         } else {
-            dy_core_expr_release(new_emap_e2);
+            dy_core_expr_release(ctx, new_emap_e2);
         }
 
         dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
@@ -558,13 +560,13 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
         }
 
         if (!did_transform_var_expr) {
-            new_var_expr = dy_core_expr_retain(var_expr);
+            new_var_expr = dy_core_expr_retain(ctx, var_expr);
         }
 
         struct dy_core_expr tmap_e2 = {
             .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
             .equality_map_elim = {
-                .expr = dy_core_expr_new(dy_core_expr_retain(subtype_expr)),
+                .expr = dy_core_expr_new(dy_core_expr_retain(ctx, subtype_expr)),
                 .map = {
                     .e1 = dy_core_expr_new(new_var_expr),
                     .e2 = dy_core_expr_retain_ptr(type_map.expr),
@@ -602,12 +604,12 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
         --ctx->bindings.num_elems;
         
         if (is_subtype_out == DY_NO) {
-            dy_core_expr_release(tmap_e2);
+            dy_core_expr_release(ctx, tmap_e2);
             return DY_NO;
         }
 
         if (did_transform_tmap_e2) {
-            dy_core_expr_release(tmap_e2);
+            dy_core_expr_release(ctx, tmap_e2);
         } else {
             new_tmap_e2 = tmap_e2;
         }
@@ -626,7 +628,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
 
             *did_transform_subtype_expr = true;
         } else {
-            dy_core_expr_release(new_tmap_e2);
+            dy_core_expr_release(ctx, new_tmap_e2);
         }
 
         dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
@@ -643,7 +645,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
         
         dy_array_add(&ctx->subtype_implicits, &(struct dy_core_binding){
             .id = id,
-            .type = dy_core_expr_retain(*type_map.type)
+            .type = dy_core_expr_retain(ctx, *type_map.type)
         });
 
         struct dy_core_expr unknown = {
@@ -655,7 +657,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
             .tag = DY_CORE_EXPR_EQUALITY_MAP,
             .equality_map = {
                 .e1 = dy_core_expr_new(unknown),
-                .e2 = dy_core_expr_new(dy_core_expr_retain(supertype)),
+                .e2 = dy_core_expr_new(dy_core_expr_retain(ctx, supertype)),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = true,
             }
@@ -666,7 +668,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
         dy_ternary_t res = positive_type_map_is_subtype(ctx, type_map, equality_map_expr, subtype_expr, &e, &did_transform_e);
 
         if (!did_transform_e) {
-            e = dy_core_expr_retain(subtype_expr);
+            e = dy_core_expr_retain(ctx, subtype_expr);
         }
         
         *new_subtype_expr = (struct dy_core_expr){
@@ -736,11 +738,11 @@ dy_ternary_t positive_junction_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
     }
 
     if (!did_transform_e1) {
-        e1 = dy_core_expr_retain(subtype_expr);
+        e1 = dy_core_expr_retain(ctx, subtype_expr);
     }
 
     if (!did_transform_e2) {
-        e2 = dy_core_expr_retain(subtype_expr);
+        e2 = dy_core_expr_retain(ctx, subtype_expr);
     }
 
     dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_NEGATIVE);
@@ -757,8 +759,8 @@ dy_ternary_t positive_junction_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
 
         *did_transform_subtype_expr = true;
     } else {
-        dy_core_expr_release(e1);
-        dy_core_expr_release(e2);
+        dy_core_expr_release(ctx, e1);
+        dy_core_expr_release(ctx, e2);
     }
 
     return DY_MAYBE;
@@ -793,11 +795,11 @@ dy_ternary_t negative_junction_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
     }
 
     if (!did_transform_e1) {
-        e1 = dy_core_expr_retain(subtype_expr);
+        e1 = dy_core_expr_retain(ctx, subtype_expr);
     }
 
     if (!did_transform_e2) {
-        e2 = dy_core_expr_retain(subtype_expr);
+        e2 = dy_core_expr_retain(ctx, subtype_expr);
     }
 
     dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
@@ -813,8 +815,8 @@ dy_ternary_t negative_junction_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
 
         *did_transform_subtype_expr = true;
     } else {
-        dy_core_expr_release(e1);
-        dy_core_expr_release(e2);
+        dy_core_expr_release(ctx, e1);
+        dy_core_expr_release(ctx, e2);
     }
 
     if (first_result == DY_YES && second_result == DY_YES) {
@@ -840,18 +842,18 @@ dy_ternary_t is_subtype_of_positive_junction(struct dy_core_ctx *ctx, struct dy_
     dy_ternary_t second_result = dy_is_subtype(ctx, expr, *junction.e2, subtype_expr, &e2, &did_transform_e2);
     if (second_result == DY_NO) {
         if (did_transform_e1) {
-            dy_core_expr_release(e1);
+            dy_core_expr_release(ctx, e1);
         }
 
         return DY_NO;
     }
 
     if (!did_transform_e1) {
-        e1 = dy_core_expr_retain(subtype_expr);
+        e1 = dy_core_expr_retain(ctx, subtype_expr);
     }
 
     if (!did_transform_e2) {
-        e2 = dy_core_expr_retain(subtype_expr);
+        e2 = dy_core_expr_retain(ctx, subtype_expr);
     }
 
     dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
@@ -868,8 +870,8 @@ dy_ternary_t is_subtype_of_positive_junction(struct dy_core_ctx *ctx, struct dy_
 
         *did_transform_subtype_expr = true;
     } else {
-        dy_core_expr_release(e1);
-        dy_core_expr_release(e2);
+        dy_core_expr_release(ctx, e1);
+        dy_core_expr_release(ctx, e2);
     }
 
     if (first_result == DY_MAYBE || second_result == DY_MAYBE) {
@@ -919,11 +921,11 @@ dy_ternary_t is_subtype_of_negative_junction(struct dy_core_ctx *ctx, struct dy_
     }
 
     if (!did_transform_e1) {
-        e1 = dy_core_expr_retain(subtype_expr);
+        e1 = dy_core_expr_retain(ctx, subtype_expr);
     }
 
     if (!did_transform_e2) {
-        e2 = dy_core_expr_retain(subtype_expr);
+        e2 = dy_core_expr_retain(ctx, subtype_expr);
     }
 
     dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_NEGATIVE);
@@ -940,8 +942,8 @@ dy_ternary_t is_subtype_of_negative_junction(struct dy_core_ctx *ctx, struct dy_
 
         *did_transform_subtype_expr = true;
     } else {
-        dy_core_expr_release(e1);
-        dy_core_expr_release(e2);
+        dy_core_expr_release(ctx, e1);
+        dy_core_expr_release(ctx, e2);
     }
 
     return DY_MAYBE;
@@ -978,12 +980,12 @@ dy_ternary_t positive_recursion_is_subtype(struct dy_core_ctx *ctx, struct dy_co
 
     struct dy_core_expr new_subtype;
     if (!substitute(ctx, *rec.expr, rec.id, rec_expr, &new_subtype)) {
-        new_subtype = dy_core_expr_retain(*rec.expr);
+        new_subtype = dy_core_expr_retain(ctx, *rec.expr);
     }
 
     dy_ternary_t result = dy_is_subtype(ctx, new_subtype, supertype, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
 
-    dy_core_expr_release(new_subtype);
+    dy_core_expr_release(ctx, new_subtype);
 
     ctx->supertype_assumption_cache.num_elems = old_size;
 
@@ -1021,12 +1023,12 @@ dy_ternary_t negative_recursion_is_subtype(struct dy_core_ctx *ctx, struct dy_co
 
     struct dy_core_expr new_expr;
     if (!substitute(ctx, *rec.expr, rec.id, rec_expr, &new_expr)) {
-        new_expr = dy_core_expr_retain(*rec.expr);
+        new_expr = dy_core_expr_retain(ctx, *rec.expr);
     }
 
     dy_ternary_t result = dy_is_subtype(ctx, new_expr, supertype, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
 
-    dy_core_expr_release(new_expr);
+    dy_core_expr_release(ctx, new_expr);
 
     ctx->supertype_assumption_cache.num_elems = old_size;
 
@@ -1064,12 +1066,12 @@ dy_ternary_t is_subtype_of_positive_recursion(struct dy_core_ctx *ctx, struct dy
 
     struct dy_core_expr new_expr;
     if (!substitute(ctx, *rec.expr, rec.id, rec_expr, &new_expr)) {
-        new_expr = dy_core_expr_retain(*rec.expr);
+        new_expr = dy_core_expr_retain(ctx, *rec.expr);
     }
 
     dy_ternary_t result = dy_is_subtype(ctx, subtype, new_expr, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
 
-    dy_core_expr_release(new_expr);
+    dy_core_expr_release(ctx, new_expr);
 
     ctx->subtype_assumption_cache.num_elems = old_size;
 
@@ -1107,12 +1109,12 @@ dy_ternary_t is_subtype_of_negative_recursion(struct dy_core_ctx *ctx, struct dy
 
     struct dy_core_expr new_expr;
     if (!substitute(ctx, *rec.expr, rec.id, rec_expr, &new_expr)) {
-        new_expr = dy_core_expr_retain(*rec.expr);
+        new_expr = dy_core_expr_retain(ctx, *rec.expr);
     }
 
     dy_ternary_t result = dy_is_subtype(ctx, subtype, new_expr, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
 
-    dy_core_expr_release(new_expr);
+    dy_core_expr_release(ctx, new_expr);
 
     ctx->subtype_assumption_cache.num_elems = old_size;
 
@@ -1131,7 +1133,7 @@ dy_ternary_t dy_is_subtype_no_transformation(struct dy_core_ctx *ctx, struct dy_
     dy_ternary_t result = dy_is_subtype(ctx, subtype, supertype, e, &e, &did_transform_e);
     if (did_transform_e || ctx->subtype_implicits.num_elems != size) {
         if (did_transform_e) {
-            dy_core_expr_release(e);
+            dy_core_expr_release(ctx, e);
         }
         return DY_NO;
     }

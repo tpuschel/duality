@@ -27,8 +27,10 @@ static inline bool substitute_recursion(struct dy_core_ctx *ctx, struct dy_core_
 bool substitute(struct dy_core_ctx *ctx, struct dy_core_expr expr, size_t id, struct dy_core_expr sub, struct dy_core_expr *result)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_CUSTOM:
-        return expr.custom.substitute(expr.custom.data, ctx, id, sub, result);
+    case DY_CORE_EXPR_CUSTOM: {
+        const struct dy_core_custom_shared *s = dy_array_pos(ctx->custom_shared, expr.custom.id);
+        return s->substitute(expr.custom.data, ctx, id, sub, result);
+    }
     case DY_CORE_EXPR_END:
         // fallthrough
     case DY_CORE_EXPR_SYMBOL:
@@ -49,7 +51,7 @@ bool substitute(struct dy_core_ctx *ctx, struct dy_core_expr expr, size_t id, st
         }
     case DY_CORE_EXPR_VARIABLE:
         if (expr.variable_id == id) {
-            *result = dy_core_expr_retain(sub);
+            *result = dy_core_expr_retain(ctx, sub);
             return true;
         }
         
@@ -224,7 +226,7 @@ bool substitute_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_m
     bool type_is_new = substitute(ctx, *type_map.type, id, sub, &type);
     
     if (id != type_map.id) {
-        if (dy_core_expr_is_bound(type_map.id, sub)) {
+        if (dy_core_expr_is_bound(ctx, type_map.id, sub)) {
             size_t new_id = ctx->running_id++;
             
             dy_array_add(&ctx->equal_variables, &(struct dy_equal_variables){
@@ -304,7 +306,7 @@ bool substitute_inference_type_map(struct dy_core_ctx *ctx, struct dy_core_infer
     bool type_is_new = substitute(ctx, *inference_type_map.type, id, sub, &type);
     
     if (id != inference_type_map.id) {
-        if (dy_core_expr_is_bound(inference_type_map.id, sub)) {
+        if (dy_core_expr_is_bound(ctx, inference_type_map.id, sub)) {
             size_t new_id = ctx->running_id++;
             
             dy_array_add(&ctx->equal_variables, &(struct dy_equal_variables){
@@ -384,7 +386,7 @@ bool substitute_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recu
     bool type_is_new = substitute(ctx, *recursion.type, id, sub, &type);
     
     if (id != recursion.id) {
-        if (dy_core_expr_is_bound(recursion.id, sub)) {
+        if (dy_core_expr_is_bound(ctx, recursion.id, sub)) {
             size_t new_id = ctx->running_id++;
             
             dy_array_add(&ctx->equal_variables, &(struct dy_equal_variables){

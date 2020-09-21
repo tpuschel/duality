@@ -33,7 +33,7 @@ bool dy_constraint_get(struct dy_core_ctx *ctx, size_t id, size_t start, struct 
     for (size_t i = start, size = ctx->constraints.num_elems; i < size; ++i) {
         const struct dy_constraint *c = dy_array_pos(ctx->constraints, i);
         if (c->id == id) {
-            *result = dy_core_expr_retain(c->expr);
+            *result = dy_core_expr_retain(ctx, c->expr);
             return true;
         }
     }
@@ -107,7 +107,7 @@ void dy_free_first_constraints(struct dy_core_ctx *ctx, size_t start1, size_t st
 {
     for (size_t i = start2; i-- > start1;) {
         const struct dy_constraint *c = dy_array_pos(ctx->constraints, i);
-        dy_core_expr_release(c->expr);
+        dy_core_expr_release(ctx, c->expr);
         dy_array_remove(&ctx->constraints, i);
     }
 }

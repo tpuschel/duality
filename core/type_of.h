@@ -17,7 +17,7 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
 {
     switch (expr.tag) {
     case DY_CORE_EXPR_EQUALITY_MAP:
-        if (dy_core_expr_is_computation(*expr.equality_map.e1)) {
+        if (dy_core_expr_is_computation(ctx, *expr.equality_map.e1)) {
             return (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_TYPE_MAP,
                 .type_map = {
@@ -49,9 +49,9 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
         
         return expr;
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
-        return dy_core_expr_retain(*expr.equality_map_elim.map.e2);
+        return dy_core_expr_retain(ctx, *expr.equality_map_elim.map.e2);
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
-        return dy_core_expr_retain(*expr.type_map_elim.map.expr);
+        return dy_core_expr_retain(ctx, *expr.type_map_elim.map.expr);
     case DY_CORE_EXPR_JUNCTION:
         expr.junction.e1 = dy_core_expr_new(dy_type_of(ctx, *expr.junction.e1));
         expr.junction.e2 = dy_core_expr_new(dy_type_of(ctx, *expr.junction.e2));
@@ -70,27 +70,29 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
         for (size_t i = 0, size = ctx->bindings.num_elems; i < size; ++i) {
             const struct dy_core_binding *b = dy_array_pos(ctx->bindings, i);
             if (b->id == expr.variable_id) {
-                return dy_core_expr_retain(b->type);
+                return dy_core_expr_retain(ctx, b->type);
             }
         }
             
         for (size_t i = 0, size = ctx->subtype_implicits.num_elems; i < size; ++i) {
             const struct dy_core_binding *b = dy_array_pos(ctx->subtype_implicits, i);
             if (b->id == expr.variable_id) {
-                return dy_core_expr_retain(b->type);
+                return dy_core_expr_retain(ctx, b->type);
             }
         }
             
         for (size_t i = 0, size = ctx->bound_inference_vars.num_elems; i < size; ++i) {
             const struct dy_bound_inference_var *bc = dy_array_pos(ctx->bound_inference_vars, i);
             if (bc->id == expr.variable_id) {
-                return dy_core_expr_retain(bc->type);
+                return dy_core_expr_retain(ctx, bc->type);
             }
         }
         
         dy_bail("Unbound variable!");
-    case DY_CORE_EXPR_CUSTOM:
-        return expr.custom.type_of(expr.custom.data, ctx);
+    case DY_CORE_EXPR_CUSTOM: {
+        const struct dy_core_custom_shared *s = dy_array_pos(ctx->custom_shared, expr.custom.id);
+        return s->type_of(expr.custom.data, ctx);
+    }
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("Should not happen\n");
     case DY_CORE_EXPR_RECURSION: {
@@ -114,7 +116,7 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
 
         --ctx->bindings.num_elems;
 
-        if (dy_core_expr_is_bound(expr.recursion.id, type)) {
+        if (dy_core_expr_is_bound(ctx, expr.recursion.id, type)) {
             expr.recursion.type = dy_core_expr_new(any);
             expr.recursion.expr = dy_core_expr_new(type);
             expr.recursion.polarity = DY_CORE_POLARITY_POSITIVE;

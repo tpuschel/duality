@@ -23,7 +23,7 @@ static void read_chunk(dy_array_t *buffer, void *env);
 
 static const size_t CHUNK_SIZE = 1024;
 
-static void print_core_expr(FILE *file, struct dy_core_expr expr);
+static void print_core_expr(struct dy_core_ctx *ctx, FILE *file, struct dy_core_expr expr);
 
 static bool core_has_error(struct dy_core_expr expr);
 
@@ -69,17 +69,8 @@ int main(int argc, const char *argv[])
         return -1;
     }
 
-    struct dy_ast_to_core_ctx ast_to_core_ctx = {
-        .running_id = 0,
-        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), DY_ALIGNOF(struct dy_ast_to_core_bound_var), 64)
-    };
-
-    struct dy_core_expr program = dy_ast_do_block_to_core(&ast_to_core_ctx, program_ast);
-
-    dy_ast_do_block_release(program_ast.body);
-
     struct dy_core_ctx core_ctx = {
-        .running_id = ast_to_core_ctx.running_id,
+        .running_id = 0,
         .bound_inference_vars = dy_array_create(sizeof(struct dy_bound_inference_var), DY_ALIGNOF(struct dy_bound_inference_var), 64),
         .already_visited_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 64),
         .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
@@ -88,20 +79,32 @@ int main(int argc, const char *argv[])
         .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
         .subtype_implicits = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
         .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8),
-        .constraints = dy_array_create(sizeof(struct dy_constraint), DY_ALIGNOF(struct dy_constraint), 64)
+        .constraints = dy_array_create(sizeof(struct dy_constraint), DY_ALIGNOF(struct dy_constraint), 64),
+        .custom_shared = dy_array_create(sizeof(struct dy_core_custom_shared), DY_ALIGNOF(struct dy_core_custom_shared), 3)
     };
+
+    dy_uv_register(&core_ctx);
+    dy_def_register(&core_ctx);
+    dy_string_register(&core_ctx);
+
+    struct dy_ast_to_core_ctx ast_to_core_ctx = {
+        .core_ctx = core_ctx,
+        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), DY_ALIGNOF(struct dy_ast_to_core_bound_var), 64)
+    };
+
+    struct dy_core_expr program = dy_ast_do_block_to_core(&ast_to_core_ctx, program_ast);
+
+    core_ctx = ast_to_core_ctx.core_ctx;
+
+    dy_ast_do_block_release(program_ast.body);
 
     size_t constraint_start = core_ctx.constraints.num_elems;
     struct dy_core_expr checked_program;
     if (dy_check_expr(&core_ctx, program, &checked_program)) {
-        dy_core_expr_release(program);
+        dy_core_expr_release(&core_ctx, program);
         program = checked_program;
     }
     assert(constraint_start == core_ctx.constraints.num_elems);
-    
-    fprintf(stderr, "Checked program:\n");
-    print_core_expr(stderr, program);
-    fprintf(stderr, "\n\n");
 
     if (core_has_error(program)) {
         print_core_errors(stderr, program, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
@@ -111,7 +114,7 @@ int main(int argc, const char *argv[])
     bool is_value = false;
     struct dy_core_expr result = dy_eval_expr(&core_ctx, program, &is_value);
 
-    print_core_expr(stdout, result);
+    print_core_expr(&core_ctx, stdout, result);
     printf("\n");
 
     if (!is_value) {
@@ -126,10 +129,10 @@ int main(int argc, const char *argv[])
     }
 }
 
-void print_core_expr(FILE *file, struct dy_core_expr expr)
+void print_core_expr(struct dy_core_ctx *ctx, FILE *file, struct dy_core_expr expr)
 {
     dy_array_t s = dy_array_create(sizeof(char), DY_ALIGNOF(char), 64);
-    dy_core_expr_to_string(expr, &s);
+    dy_core_expr_to_string(ctx, expr, &s);
 
     for (size_t i = 0; i < s.num_elems; ++i) {
         char c;
