@@ -90,7 +90,7 @@ struct dy_core_custom dy_def_create_no_alloc(const struct dy_def_data *data)
 {
     return (struct dy_core_custom){
         .id = dy_def_id,
-        .data = dy_def_retain(data, NULL)
+        .data = data
     };
 }
 
@@ -136,6 +136,8 @@ bool dy_def_check(void *data, struct dy_core_ctx *ctx, struct dy_core_expr *resu
             new_body = dy_core_expr_retain(ctx, def->body);
         }
 
+        dy_core_expr_release(ctx, evaled_arg);
+
         size_t constraint_start2 = ctx->constraints.num_elems;
         struct dy_core_expr checked_body;
         if (dy_check_expr(ctx, new_body, &checked_body)) {
@@ -166,6 +168,8 @@ bool dy_def_check(void *data, struct dy_core_ctx *ctx, struct dy_core_expr *resu
         --ctx->bindings.num_elems;
 
         dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
+
+        dy_core_expr_release(ctx, type_of_arg);
 
         struct dy_def_data new_data = {
             .id = def->id,
@@ -315,7 +319,7 @@ struct dy_core_expr dy_def_eliminate(void *data, struct dy_core_ctx *ctx, struct
 {
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_CUSTOM,
-        .custom = dy_def_create_no_alloc(data)
+        .custom = dy_def_create_no_alloc(dy_def_retain(data, ctx))
     };
 }
 

@@ -87,7 +87,7 @@ struct dy_core_custom dy_uv_create_no_alloc(const struct dy_uv_data *data)
 {
     return (struct dy_core_custom){
         .id = dy_uv_id,
-        .data = dy_uv_retain(data, NULL)
+        .data = data
     };
 }
 
@@ -123,7 +123,7 @@ struct dy_core_expr dy_uv_eval(void *data, struct dy_core_ctx *ctx, bool *is_val
 {
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_CUSTOM,
-        .custom = dy_uv_create_no_alloc(data)
+        .custom = dy_uv_create_no_alloc(dy_uv_retain(data, ctx))
     };
 }
 
@@ -146,7 +146,7 @@ struct dy_core_expr dy_uv_eliminate(void *data, struct dy_core_ctx *ctx, struct 
 {
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_CUSTOM,
-        .custom = dy_uv_create_no_alloc(data)
+        .custom = dy_uv_create_no_alloc(dy_uv_retain(data, ctx))
     };
 }
 

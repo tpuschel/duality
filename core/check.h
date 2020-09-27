@@ -207,6 +207,7 @@ bool dy_check_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map
     dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
     
     if (!type_is_new && !expr_is_new) {
+        dy_core_expr_release(ctx, type);
         return false;
     }
     

@@ -92,7 +92,7 @@ struct dy_core_custom dy_string_create_no_alloc(const struct dy_string_data *dat
 {
     return (struct dy_core_custom){
         .id = dy_string_id,
-        .data = dy_string_retain(data, NULL)
+        .data = data
     };
 }
 
@@ -150,7 +150,7 @@ struct dy_core_expr dy_string_eval(void *data, struct dy_core_ctx *ctx, bool *is
 
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_CUSTOM,
-        .custom = dy_string_create_no_alloc(data)
+        .custom = dy_string_create_no_alloc(dy_string_retain(data, ctx))
     };
 }
 
@@ -173,7 +173,7 @@ struct dy_core_expr dy_string_eliminate(void *data, struct dy_core_ctx *ctx, str
 {
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_CUSTOM,
-        .custom = dy_string_create_no_alloc(data)
+        .custom = dy_string_create_no_alloc(dy_string_retain(data, ctx))
     };
 }
 
