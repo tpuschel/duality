@@ -87,18 +87,12 @@ struct dy_core_inference_type_map {
 };
 
 struct dy_core_equality_map_elim {
-    struct dy_range text_range;
-    bool has_text_range;
-
     const struct dy_core_expr *expr;
     struct dy_core_equality_map map;
     dy_ternary_t check_result;
 };
 
 struct dy_core_type_map_elim {
-    struct dy_range text_range;
-    bool has_text_range;
-
     const struct dy_core_expr *expr;
     struct dy_core_type_map map;
     dy_ternary_t check_result;

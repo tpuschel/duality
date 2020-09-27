@@ -226,14 +226,7 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
         print_core_errors(file, *expr.equality_map_elim.map.e1, text, text_size);
         print_core_errors(file, *expr.equality_map_elim.map.e2, text, text_size);
 
-        if (expr.equality_map_elim.check_result == DY_NO) {
-            if (!expr.equality_map_elim.has_text_range) {
-                fprintf(file, "Error without source attribution.\n");
-                return;
-            }
-
-            print_error_fragment(file, expr.equality_map_elim.text_range, text, text_size);
-        }
+        fprintf(file, "Error without source attribution.\n");
 
         return;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
@@ -241,14 +234,7 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
         print_core_errors(file, *expr.type_map_elim.map.type, text, text_size);
         print_core_errors(file, *expr.type_map_elim.map.expr, text, text_size);
 
-        if (expr.type_map_elim.check_result == DY_NO) {
-            if (!expr.type_map_elim.has_text_range) {
-                fprintf(file, "Error without source attribution.\n");
-                return;
-            }
-
-            print_error_fragment(file, expr.type_map_elim.text_range, text, text_size);
-        }
+        fprintf(file, "Error without source attribution.\n");
 
         return;
     case DY_CORE_EXPR_JUNCTION:

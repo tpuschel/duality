@@ -943,35 +943,11 @@ void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_s
         produce_diagnostics(ctx, *expr.equality_map_elim.map.e1, text, diagnostics);
         produce_diagnostics(ctx, *expr.equality_map_elim.map.e2, text, diagnostics);
 
-        if (expr.equality_map_elim.check_result != DY_YES && expr.equality_map_elim.has_text_range) {
-            dy_json_t range = compute_lsp_range(text, expr.equality_map_elim.text_range);
-
-            dy_json_t msg = error_message(ctx, expr.equality_map_elim);
-
-            long severity = expr.equality_map_elim.check_result == DY_NO ? 1 : 2;
-
-            dy_json_t diagnostic = make_diagnostic(range, dy_json_integer(severity), msg);
-
-            dy_array_add(diagnostics, &diagnostic);
-        }
-
         return;
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
         produce_diagnostics(ctx, *expr.type_map_elim.expr, text, diagnostics);
         produce_diagnostics(ctx, *expr.type_map_elim.map.type, text, diagnostics);
         produce_diagnostics(ctx, *expr.type_map_elim.map.expr, text, diagnostics);
-
-        if (expr.type_map_elim.check_result != DY_YES && expr.type_map_elim.has_text_range) {
-            /*dy_json_t range = compute_lsp_range(text, expr.type_map_elim.text_range);
-
-            dy_json_t msg = error_message(ctx, expr.type_map_elim);
-
-            long severity = expr.equality_map_elim.check_result == DY_NO ? 1 : 2;
-
-            dy_json_t diagnostic = make_diagnostic(range, dy_json_integer(severity), msg);
-
-            dy_array_add(diagnostics, &diagnostic);*/
-        }
 
         return;
     case DY_CORE_EXPR_JUNCTION:
