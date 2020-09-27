@@ -309,6 +309,7 @@ dy_ternary_t positive_equality_map_is_subtype(struct dy_core_ctx *ctx, struct dy
         --ctx->bindings.num_elems;
         
         if (is_subtype_out == DY_NO) {
+            dy_free_first_constraints(ctx, constraint_start1, ctx->constraints.num_elems);
             dy_core_expr_release(ctx, new_emap_e1);
             dy_core_expr_release(ctx, emap_e2);
             return DY_NO;
@@ -499,6 +500,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
         --ctx->bindings.num_elems;
         
         if (is_subtype_out == DY_NO) {
+            dy_free_first_constraints(ctx, constraint_start1, ctx->constraints.num_elems);
             dy_core_expr_release(ctx, emap_e2);
             return DY_NO;
         }
@@ -604,6 +606,7 @@ dy_ternary_t positive_type_map_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
         --ctx->bindings.num_elems;
         
         if (is_subtype_out == DY_NO) {
+            dy_free_first_constraints(ctx, constraint_start1, ctx->constraints.num_elems);
             dy_core_expr_release(ctx, tmap_e2);
             return DY_NO;
         }
@@ -715,6 +718,9 @@ dy_ternary_t positive_junction_is_subtype(struct dy_core_ctx *ctx, struct dy_cor
     bool did_transform_e2 = false;
     dy_ternary_t second_res = dy_is_subtype(ctx, *junction.e2, expr, subtype_expr, &e2, &did_transform_e2);
     if (second_res == DY_YES) {
+        if (did_transform_e1) {
+            dy_core_expr_release(ctx, e1);
+        }
         dy_free_first_constraints(ctx, constraint_start1, constraint_start2);
         *new_subtype_expr = e2;
         *did_transform_subtype_expr = did_transform_e2;
@@ -841,6 +847,8 @@ dy_ternary_t is_subtype_of_positive_junction(struct dy_core_ctx *ctx, struct dy_
     bool did_transform_e2 = false;
     dy_ternary_t second_result = dy_is_subtype(ctx, expr, *junction.e2, subtype_expr, &e2, &did_transform_e2);
     if (second_result == DY_NO) {
+        dy_free_first_constraints(ctx, constraint_start1, ctx->constraints.num_elems);
+
         if (did_transform_e1) {
             dy_core_expr_release(ctx, e1);
         }
@@ -898,6 +906,9 @@ dy_ternary_t is_subtype_of_negative_junction(struct dy_core_ctx *ctx, struct dy_
     bool did_transform_e2 = false;
     dy_ternary_t second_res = dy_is_subtype(ctx, expr, *junction.e2, subtype_expr, &e2, &did_transform_e2);
     if (second_res == DY_YES) {
+        if (did_transform_e1) {
+            dy_core_expr_release(ctx, e1);
+        }
         dy_free_first_constraints(ctx, constraint_start1, constraint_start2);
         *new_subtype_expr = e2;
         *did_transform_subtype_expr = did_transform_e2;

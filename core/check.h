@@ -717,6 +717,8 @@ bool dy_resolve_inference_var(struct dy_core_ctx *ctx, size_t id, struct dy_core
 
             dy_core_appears_in_polarity(ctx, id, type_of_expr, DY_CORE_POLARITY_POSITIVE, &appears_in_positive_position, &appears_in_negative_position);
 
+            dy_core_expr_release(ctx, type_of_expr);
+
             if (appears_in_positive_position && appears_in_negative_position) {
                 expr = (struct dy_core_expr){
                     .tag = DY_CORE_EXPR_TYPE_MAP,
@@ -738,8 +740,6 @@ bool dy_resolve_inference_var(struct dy_core_ctx *ctx, size_t id, struct dy_core
                     expr = dy_core_expr_retain(ctx, expr);
                 }
             }
-
-            dy_core_expr_release(ctx, type_of_expr);
 
             struct dy_core_expr new_expr;
             if (dy_resolve_now_free_inference_vars(ctx, id, expr, constraint_start, &new_expr)) {
