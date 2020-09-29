@@ -235,7 +235,7 @@ dy_ternary_t equality_map_is_subtype_of_equality_map(struct dy_core_ctx *ctx, st
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = equality_map1.is_implicit,
             },
-            .check_result = DY_MAYBE,
+            .check_result = DY_YES,
         }
     };
 
@@ -318,7 +318,7 @@ dy_ternary_t positive_equality_map_is_subtype_of_negative_type_map(struct dy_cor
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = equality_map.is_implicit,
             },
-            .check_result = DY_MAYBE,
+            .check_result = DY_YES,
         }
     };
 
@@ -419,7 +419,7 @@ dy_ternary_t positive_type_map_is_subtype_of_negative_equality_map(struct dy_cor
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = type_map.is_implicit,
             },
-            .check_result = DY_MAYBE,
+            .check_result = is_subtype_in,
         }
     };
 
@@ -503,30 +503,24 @@ dy_ternary_t type_map_is_subtype_of_type_map(struct dy_core_ctx *ctx, struct dy_
         new_var_expr = dy_core_expr_retain(ctx, var_expr);
     }
 
+    struct dy_core_expr new_type_map_1_e2;
+    if (!substitute(ctx, *type_map1.expr, type_map1.id, new_var_expr, &new_type_map_1_e2)) {
+        new_type_map_1_e2 = dy_core_expr_retain(ctx, *type_map1.expr);
+    }
+
     struct dy_core_expr tmap_e2 = {
         .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
         .equality_map_elim = {
             .expr = dy_core_expr_new(dy_core_expr_retain(ctx, subtype_expr)),
             .map = {
                 .e1 = dy_core_expr_new(new_var_expr),
-                .e2 = dy_core_expr_retain_ptr(type_map1.expr),
+                .e2 = dy_core_expr_new(new_type_map_1_e2),
                 .polarity = DY_CORE_POLARITY_NEGATIVE,
                 .is_implicit = type_map1.is_implicit,
             },
-            .check_result = DY_MAYBE,
+            .check_result = is_subtype_in,
         }
     };
-
-    dy_array_add(&ctx->equal_variables, &(struct dy_equal_variables){
-        .id1 = type_map1.id,
-        .id2 = type_map2.id
-    });
-
-    dy_array_add(&ctx->bindings, &(struct dy_core_binding){
-        .id = type_map1.id,
-        .type = *type_map1.type,
-        .is_inference_var = false
-    });
 
     dy_array_add(&ctx->bindings, &(struct dy_core_binding){
         .id = type_map2.id,
@@ -537,10 +531,8 @@ dy_ternary_t type_map_is_subtype_of_type_map(struct dy_core_ctx *ctx, struct dy_
     size_t constraint_start2 = ctx->constraints.num_elems;
     struct dy_core_expr new_tmap_e2;
     bool did_transform_tmap_e2 = false;
-    dy_ternary_t is_subtype_out = dy_is_subtype(ctx, *type_map1.expr, *type_map2.expr, tmap_e2, &new_tmap_e2, &did_transform_tmap_e2);
+    dy_ternary_t is_subtype_out = dy_is_subtype(ctx, new_type_map_1_e2, *type_map2.expr, tmap_e2, &new_tmap_e2, &did_transform_tmap_e2);
 
-    --ctx->equal_variables.num_elems;
-    --ctx->bindings.num_elems;
     --ctx->bindings.num_elems;
 
     if (is_subtype_out == DY_NO) {
