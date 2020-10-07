@@ -90,6 +90,7 @@ struct dy_core_equality_map_elim {
     const struct dy_core_expr *expr;
     struct dy_core_equality_map map;
     dy_ternary_t check_result;
+    size_t id;
 };
 
 struct dy_core_type_map_elim {

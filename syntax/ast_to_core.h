@@ -27,9 +27,15 @@ struct dy_ast_to_core_bound_var {
     size_t replacement_id;
 };
 
+struct dy_ast_to_core_text_source {
+    size_t id;
+    struct dy_range text_range;
+};
+
 struct dy_ast_to_core_ctx {
     struct dy_core_ctx core_ctx;
     dy_array_t bound_vars;
+    dy_array_t text_sources;
 };
 
 static inline struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_expr expr);
@@ -432,6 +438,7 @@ struct dy_core_expr do_block_equality_to_core(struct dy_ast_to_core_ctx *ctx, st
                 .is_implicit = false,
             },
             .check_result = DY_MAYBE,
+            .id = ctx->core_ctx.running_id++
         }
     };
     
@@ -515,6 +522,7 @@ struct dy_core_expr do_block_inverted_let_to_core(struct dy_ast_to_core_ctx *ctx
                 .is_implicit = false,
             },
             .check_result = DY_MAYBE,
+            .id = ctx->core_ctx.running_id++
         }
     };
 
@@ -593,6 +601,7 @@ struct dy_core_expr do_block_let_to_core(struct dy_ast_to_core_ctx *ctx, struct 
                 .is_implicit = false,
             },
             .check_result = DY_MAYBE,
+            .id = ctx->core_ctx.running_id++
         }
     };
 
@@ -662,6 +671,7 @@ struct dy_core_expr do_block_inverted_ignored_expr_to_core(struct dy_ast_to_core
                 .is_implicit = false,
             },
             .check_result = DY_MAYBE,
+            .id = ctx->core_ctx.running_id++
         }
     };
 
@@ -729,6 +739,7 @@ struct dy_core_expr do_block_ignored_expr_to_core(struct dy_ast_to_core_ctx *ctx
                 .is_implicit = false,
             },
             .check_result = DY_MAYBE,
+            .id = ctx->core_ctx.running_id++
         }
     };
 
@@ -751,12 +762,20 @@ struct dy_core_expr dy_ast_equality_map_elim_to_core(struct dy_ast_to_core_ctx *
 
     assert(e2.tag == DY_CORE_EXPR_EQUALITY_MAP);
 
+    size_t id = ctx->core_ctx.running_id++;
+
+    dy_array_add(&ctx->text_sources, &(struct dy_ast_to_core_text_source){
+        .id = id,
+        .text_range = elim.text_range
+    });
+
     return (struct dy_core_expr){
         .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
         .equality_map_elim = {
             .expr = dy_core_expr_new(e1),
             .map = e2.equality_map,
             .check_result = DY_MAYBE,
+            .id = id
         }
     };
 }
@@ -790,6 +809,13 @@ struct dy_core_expr dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx,
         .variable_id = ctx->core_ctx.running_id++
     };
 
+    size_t id = ctx->core_ctx.running_id++;
+
+    dy_array_add(&ctx->text_sources, &(struct dy_ast_to_core_text_source){
+        .id = id,
+        .text_range = juxtaposition.text_range
+    });
+
     struct dy_core_expr elim = {
         .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
         .equality_map_elim = {
@@ -801,6 +827,7 @@ struct dy_core_expr dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx,
                 .is_implicit = false,
             },
             .check_result = DY_MAYBE,
+            .id = id
         }
     };
     

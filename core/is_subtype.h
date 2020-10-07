@@ -236,6 +236,7 @@ dy_ternary_t equality_map_is_subtype_of_equality_map(struct dy_core_ctx *ctx, st
                 .is_implicit = equality_map1.is_implicit,
             },
             .check_result = DY_YES,
+            .id = ctx->running_id++
         }
     };
 
@@ -319,6 +320,7 @@ dy_ternary_t positive_equality_map_is_subtype_of_negative_type_map(struct dy_cor
                 .is_implicit = equality_map.is_implicit,
             },
             .check_result = DY_YES,
+            .id = ctx->running_id++
         }
     };
 
@@ -420,6 +422,7 @@ dy_ternary_t positive_type_map_is_subtype_of_negative_equality_map(struct dy_cor
                 .is_implicit = type_map.is_implicit,
             },
             .check_result = is_subtype_in,
+            .id = ctx->running_id++
         }
     };
 
@@ -519,6 +522,7 @@ dy_ternary_t type_map_is_subtype_of_type_map(struct dy_core_ctx *ctx, struct dy_
                 .is_implicit = type_map1.is_implicit,
             },
             .check_result = is_subtype_in,
+            .id = ctx->running_id++
         }
     };
 
@@ -621,7 +625,7 @@ dy_ternary_t positive_implicit_type_map_is_subtype(struct dy_core_ctx *ctx, stru
 
     *did_transform_subtype_expr = true;
 
-    return res;
+    return DY_MAYBE;
 }
 
 dy_ternary_t positive_junction_is_subtype(struct dy_core_ctx *ctx, struct dy_core_junction junction, struct dy_core_expr expr, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)

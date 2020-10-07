@@ -88,11 +88,13 @@ static inline void process_document(struct dy_lsp_ctx *ctx, struct document *doc
 static inline struct dy_stream stream_from_string(dy_string_t s);
 static inline void null_stream(dy_array_t *buffer, void *env);
 static inline bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, size_t *byte_offset);
-static inline void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_string_t text, dy_array_t *diagnostics);
+static inline bool produce_diagnostics(struct dy_core_ctx *ctx, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *diagnostics);
 static inline dy_json_t compute_lsp_range(dy_string_t text, struct dy_range range);
 static inline dy_json_t error_message(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim);
 static inline dy_json_t make_diagnostic(dy_json_t range, dy_json_t severity, dy_json_t message);
 static inline dy_json_t make_diagnostics_params(dy_string_t uri, dy_json_t diagnostics);
+static inline const struct dy_range *get_text_range(dy_array_t text_sources, size_t id);
+
 
 static inline bool json_force_object(dy_json_t json, struct dy_json_object *object);
 static inline bool json_force_string(dy_json_t json, dy_string_t *value);
@@ -830,7 +832,8 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
 
     struct dy_ast_to_core_ctx ast_to_core_ctx = {
         .core_ctx = doc->core_ctx,
-        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), DY_ALIGNOF(struct dy_ast_to_core_bound_var), 64)
+        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), DY_ALIGNOF(struct dy_ast_to_core_bound_var), 64),
+        .text_sources = dy_array_create(sizeof(struct dy_ast_to_core_text_source), DY_ALIGNOF(struct dy_ast_to_core_text_source), 64)
     };
 
     struct dy_core_expr core = dy_ast_do_block_to_core(&ast_to_core_ctx, ast);
@@ -849,7 +852,7 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
     doc->core = core;
 
     dy_array_t diagnostics = dy_array_create(sizeof(dy_json_t), DY_ALIGNOF(dy_json_t), 8);
-    produce_diagnostics(&doc->core_ctx, core, doc->text, &diagnostics);
+    produce_diagnostics(&doc->core_ctx, ast_to_core_ctx.text_sources, core, doc->text, &diagnostics);
 
     dy_json_t diag_json = {
         .tag = DY_JSON_VALUE_ARRAY,
@@ -927,54 +930,74 @@ bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, 
     return true;
 }
 
-void produce_diagnostics(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_string_t text, dy_array_t *diagnostics)
+bool produce_diagnostics(struct dy_core_ctx *ctx, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *diagnostics)
 {
     switch (expr.tag) {
     case DY_CORE_EXPR_EQUALITY_MAP:
-        produce_diagnostics(ctx, *expr.equality_map.e1, text, diagnostics);
-        produce_diagnostics(ctx, *expr.equality_map.e2, text, diagnostics);
-        return;
+        return produce_diagnostics(ctx, text_sources, *expr.equality_map.e1, text, diagnostics) && produce_diagnostics(ctx, text_sources, *expr.equality_map.e2, text, diagnostics);
     case DY_CORE_EXPR_TYPE_MAP:
-        produce_diagnostics(ctx, *expr.type_map.type, text, diagnostics);
-        produce_diagnostics(ctx, *expr.type_map.expr, text, diagnostics);
-        return;
-    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
-        produce_diagnostics(ctx, *expr.equality_map_elim.expr, text, diagnostics);
-        produce_diagnostics(ctx, *expr.equality_map_elim.map.e1, text, diagnostics);
-        produce_diagnostics(ctx, *expr.equality_map_elim.map.e2, text, diagnostics);
+        return produce_diagnostics(ctx, text_sources, *expr.type_map.type, text, diagnostics) && produce_diagnostics(ctx, text_sources, *expr.type_map.expr, text, diagnostics);
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM: {
+        bool err1 = produce_diagnostics(ctx, text_sources, *expr.equality_map_elim.expr, text, diagnostics);
+        bool err2 = produce_diagnostics(ctx, text_sources, *expr.equality_map_elim.map.e1, text, diagnostics);
+        bool err3 = produce_diagnostics(ctx, text_sources, *expr.equality_map_elim.map.e2, text, diagnostics);
 
-        return;
+        if (expr.equality_map_elim.check_result == DY_NO || !err1) {
+            const struct dy_range *r = get_text_range(text_sources, expr.equality_map_elim.id);
+            if (r == NULL) {
+                return false;
+            }
+
+            dy_json_t range = compute_lsp_range(text, *r);
+
+            dy_json_t msg = error_message(ctx, expr.equality_map_elim);
+
+            dy_json_t diagnostic = make_diagnostic(range, dy_json_integer(1), msg);
+
+            dy_array_add(diagnostics, &diagnostic);
+        }
+
+        return err2 && err3;
+    }
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
-        produce_diagnostics(ctx, *expr.type_map_elim.expr, text, diagnostics);
-        produce_diagnostics(ctx, *expr.type_map_elim.map.type, text, diagnostics);
-        produce_diagnostics(ctx, *expr.type_map_elim.map.expr, text, diagnostics);
-
-        return;
+        return produce_diagnostics(ctx, text_sources, *expr.type_map_elim.expr, text, diagnostics) &&
+        produce_diagnostics(ctx, text_sources, *expr.type_map_elim.map.type, text, diagnostics) &&
+        produce_diagnostics(ctx, text_sources, *expr.type_map_elim.map.expr, text, diagnostics);
     case DY_CORE_EXPR_JUNCTION:
-        produce_diagnostics(ctx, *expr.junction.e1, text, diagnostics);
-        produce_diagnostics(ctx, *expr.junction.e2, text, diagnostics);
-        return;
+        return produce_diagnostics(ctx, text_sources, *expr.junction.e1, text, diagnostics) &&
+        produce_diagnostics(ctx, text_sources, *expr.junction.e2, text, diagnostics);
     case DY_CORE_EXPR_ALTERNATIVE:
-        produce_diagnostics(ctx, *expr.alternative.first, text, diagnostics);
-        produce_diagnostics(ctx, *expr.alternative.second, text, diagnostics);
-        return;
+        return produce_diagnostics(ctx, text_sources, *expr.alternative.first, text, diagnostics) &&
+        produce_diagnostics(ctx, text_sources, *expr.alternative.second, text, diagnostics);
     case DY_CORE_EXPR_VARIABLE:
-        return;
+        return true;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
-        produce_diagnostics(ctx, *expr.recursion.expr, text, diagnostics);
-        return;
+        return produce_diagnostics(ctx, text_sources, *expr.recursion.type, text, diagnostics) &&
+        produce_diagnostics(ctx, text_sources, *expr.recursion.expr, text, diagnostics);
     case DY_CORE_EXPR_END:
-        return;
+        return true;
     case DY_CORE_EXPR_CUSTOM:
         // TODO: Add diagnostics callback to custom exprs.
-        return;
+        return true;
     case DY_CORE_EXPR_SYMBOL:
-        return;
+        return true;
     }
 
     dy_bail("Impossible core type.");
+}
+
+const struct dy_range *get_text_range(dy_array_t text_sources, size_t id)
+{
+    for (size_t i = 0, size = text_sources.num_elems; i < size; ++i) {
+        const struct dy_ast_to_core_text_source *p = dy_array_pos(text_sources, i);
+        if (p->id == id) {
+            return &p->text_range;
+        }
+    }
+
+    return NULL;
 }
 
 dy_json_t compute_lsp_range(dy_string_t text, struct dy_range range)

@@ -27,7 +27,7 @@ static void print_core_expr(struct dy_core_ctx *ctx, FILE *file, struct dy_core_
 
 static bool core_has_error(struct dy_core_expr expr);
 
-static void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, size_t text_size);
+static bool print_core_errors(dy_array_t text_sources, FILE *file, struct dy_core_expr expr, const char *text, size_t text_size);
 
 static void print_error_fragment(FILE *file, struct dy_range range, const char *text, size_t text_size);
 
@@ -89,7 +89,8 @@ int main(int argc, const char *argv[])
 
     struct dy_ast_to_core_ctx ast_to_core_ctx = {
         .core_ctx = core_ctx,
-        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), DY_ALIGNOF(struct dy_ast_to_core_bound_var), 64)
+        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), DY_ALIGNOF(struct dy_ast_to_core_bound_var), 64),
+        .text_sources = dy_array_create(sizeof(struct dy_ast_to_core_text_source), DY_ALIGNOF(struct dy_ast_to_core_text_source), 64),
     };
 
     struct dy_core_expr program = dy_ast_do_block_to_core(&ast_to_core_ctx, program_ast);
@@ -107,7 +108,8 @@ int main(int argc, const char *argv[])
     assert(constraint_start == core_ctx.constraints.num_elems);
 
     if (core_has_error(program)) {
-        print_core_errors(stderr, program, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
+        fprintf(stderr, "Errors:\n");
+        print_core_errors(ast_to_core_ctx.text_sources, stderr, program, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
         return -1;
     }
 
@@ -121,7 +123,8 @@ int main(int argc, const char *argv[])
         fprintf(stderr, "Unable to fully evaluate the program.\n");
 
         if (core_has_error(result)) {
-            print_core_errors(stderr, result, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
+            fprintf(stderr, "Errors:\n");
+            print_core_errors(ast_to_core_ctx.text_sources, stderr, result, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
         }
         return -1;
     } else {
@@ -210,56 +213,50 @@ bool core_has_error(struct dy_core_expr expr)
     dy_bail("Impossible object type.");
 }
 
-void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, size_t text_size)
+bool print_core_errors(dy_array_t text_sources, FILE *file, struct dy_core_expr expr, const char *text, size_t text_size)
 {
     switch (expr.tag) {
     case DY_CORE_EXPR_EQUALITY_MAP:
-        print_core_errors(file, *expr.equality_map.e1, text, text_size);
-        print_core_errors(file, *expr.equality_map.e2, text, text_size);
-        return;
+        return print_core_errors(text_sources, file, *expr.equality_map.e1, text, text_size)
+        && print_core_errors(text_sources, file, *expr.equality_map.e2, text, text_size);
     case DY_CORE_EXPR_TYPE_MAP:
-        print_core_errors(file, *expr.type_map.type, text, text_size);
-        print_core_errors(file, *expr.type_map.expr, text, text_size);
-        return;
-    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
-        print_core_errors(file, *expr.equality_map_elim.expr, text, text_size);
-        print_core_errors(file, *expr.equality_map_elim.map.e1, text, text_size);
-        print_core_errors(file, *expr.equality_map_elim.map.e2, text, text_size);
+        return print_core_errors(text_sources, file, *expr.type_map.type, text, text_size)
+        && print_core_errors(text_sources, file, *expr.type_map.expr, text, text_size);
+    case DY_CORE_EXPR_EQUALITY_MAP_ELIM: {
+        bool err1 = print_core_errors(text_sources, file, *expr.equality_map_elim.expr, text, text_size);
+        bool err2 = print_core_errors(text_sources, file, *expr.equality_map_elim.map.e1, text, text_size);
+        bool err3 = print_core_errors(text_sources, file, *expr.equality_map_elim.map.e2, text, text_size);
 
-        fprintf(file, "Error without source attribution.\n");
+        if (expr.equality_map_elim.check_result == DY_NO || !err1) {
+            const struct dy_range *r = get_text_range(text_sources, expr.equality_map_elim.id);
+            if (r == NULL) {
+                return false;
+            }
 
-        return;
+            print_error_fragment(stderr, *r, text, text_size);
+        }
+
+        return err2 && err3;
+    }
     case DY_CORE_EXPR_TYPE_MAP_ELIM:
-        print_core_errors(file, *expr.type_map_elim.expr, text, text_size);
-        print_core_errors(file, *expr.type_map_elim.map.type, text, text_size);
-        print_core_errors(file, *expr.type_map_elim.map.expr, text, text_size);
-
-        fprintf(file, "Error without source attribution.\n");
-
-        return;
+        return print_core_errors(text_sources, file, *expr.type_map_elim.expr, text, text_size)
+        && print_core_errors(text_sources, file, *expr.type_map_elim.map.type, text, text_size)
+        && print_core_errors(text_sources, file, *expr.type_map_elim.map.expr, text, text_size);
     case DY_CORE_EXPR_JUNCTION:
-        print_core_errors(file, *expr.junction.e1, text, text_size);
-        print_core_errors(file, *expr.junction.e2, text, text_size);
-        return;
+        return print_core_errors(text_sources, file, *expr.junction.e1, text, text_size)
+        && print_core_errors(text_sources, file, *expr.junction.e2, text, text_size);
     case DY_CORE_EXPR_ALTERNATIVE:
-        print_core_errors(file, *expr.alternative.first, text, text_size);
-        print_core_errors(file, *expr.alternative.second, text, text_size);
-        return;
+        return print_core_errors(text_sources, file, *expr.alternative.first, text, text_size)
+        && print_core_errors(text_sources, file, *expr.alternative.second, text, text_size);
     case DY_CORE_EXPR_VARIABLE:
-        return;
+        return true;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
-        print_core_errors(file, *expr.recursion.type, text, text_size);
-        print_core_errors(file, *expr.recursion.expr, text, text_size);
-        
-        if (expr.recursion.check_result == DY_NO) {
-            fprintf(file, "Error without source attribution.\n");
-            return;
-        }
-        return;
+        return print_core_errors(text_sources, file, *expr.recursion.type, text, text_size)
+        && print_core_errors(text_sources, file, *expr.recursion.expr, text, text_size);
     case DY_CORE_EXPR_END:
-        return;
+        return true;
     case DY_CORE_EXPR_CUSTOM:
         if (expr.custom.id == dy_uv_id) {
             struct dy_uv_data *data = expr.custom.data;
@@ -271,13 +268,13 @@ void print_core_errors(FILE *file, struct dy_core_expr expr, const char *text, s
         if (expr.custom.id == dy_def_id) {
             struct dy_def_data *data = expr.custom.data;
 
-            print_core_errors(file, data->arg, text, text_size);
-            print_core_errors(file, data->body, text, text_size);
+            print_core_errors(text_sources, file, data->arg, text, text_size);
+            print_core_errors(text_sources, file, data->body, text, text_size);
         }
 
-        return;
+        return true;
     case DY_CORE_EXPR_SYMBOL:
-        return;
+        return true;
     }
 
     dy_bail("Impossible object type.");

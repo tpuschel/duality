@@ -94,6 +94,13 @@ struct dy_core_expr dy_eval_type_map(struct dy_core_ctx *ctx, struct dy_core_typ
 
 struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim, bool *is_value)
 {
+    if (elim.check_result == DY_NO) {
+        return (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
+            .equality_map_elim = elim
+        };
+    }
+
     bool left_is_value = false;
     struct dy_core_expr left = dy_eval_expr(ctx, *elim.expr, &left_is_value);
 
@@ -109,7 +116,7 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
             .e1 = dy_core_expr_new(dy_core_expr_retain(ctx, right)),
             .e2 = dy_core_expr_new(dy_core_expr_retain(ctx, type)),
             .polarity = elim.map.polarity,
-            .is_implicit = elim.map.is_implicit,
+            .is_implicit = elim.map.is_implicit
         }
     };
 
@@ -123,6 +130,7 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
                 .expr = dy_core_expr_new(left),
                 .map = equality_map.equality_map,
                 .check_result = elim.check_result,
+                .id = elim.id
             }
         };
     }
@@ -149,6 +157,7 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
                 .expr = dy_core_expr_new(left),
                 .map = equality_map.equality_map,
                 .check_result = elim.check_result,
+                .id = elim.id
             }
         };
     }
@@ -231,6 +240,7 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
             .expr = dy_core_expr_new(left),
             .map = equality_map.equality_map,
             .check_result = elim.check_result,
+            .id = elim.id
         }
     };
 }
