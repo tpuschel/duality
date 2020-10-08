@@ -8,6 +8,7 @@
 
 #include "json.h"
 #include "array.h"
+#include "string.h"
 
 #include "../support/bail.h"
 
@@ -17,38 +18,35 @@
  * given JSON to a dynamic array.
  */
 
-static inline void dy_json_to_utf8(dy_json_t json, dy_array_t *utf8);
+static inline const uint8_t *dy_json_to_utf8(const uint8_t *json, dy_array_t *utf8);
 
 static inline void dy_utf8_literal(dy_string_t s, dy_array_t *utf8);
-static inline void dy_array_to_utf8(struct dy_json_array array, dy_array_t *utf8);
-static inline void dy_object_to_utf8(struct dy_json_object object, dy_array_t *utf8);
-static inline void dy_number_to_utf8(struct dy_json_number number, dy_array_t *utf8);
-static inline void dy_string_to_utf8(dy_string_t string, dy_array_t *utf8);
+static inline const uint8_t *dy_array_to_utf8(const uint8_t *json, dy_array_t *utf8);
+static inline const uint8_t *dy_object_to_utf8(const uint8_t *json, dy_array_t *utf8);
+static inline void dy_number_to_utf8(const uint8_t *json, dy_array_t *utf8);
+static inline const uint8_t *dy_string_to_utf8(const uint8_t *json, dy_array_t *utf8);
 
-void dy_json_to_utf8(dy_json_t json, dy_array_t *utf8)
+const uint8_t *dy_json_to_utf8(const uint8_t *json, dy_array_t *utf8)
 {
-    switch (json.tag) {
-    case DY_JSON_VALUE_TRUE:
+    switch (*json) {
+    case DY_JSON_TRUE:
         dy_utf8_literal(DY_STR_LIT("true"), utf8);
-        return;
-    case DY_JSON_VALUE_FALSE:
+        return json + 1;
+    case DY_JSON_FALSE:
         dy_utf8_literal(DY_STR_LIT("false"), utf8);
-        return;
-    case DY_JSON_VALUE_NULL:
+        return json + 1;
+    case DY_JSON_NULL:
         dy_utf8_literal(DY_STR_LIT("null"), utf8);
-        return;
-    case DY_JSON_VALUE_ARRAY:
-        dy_array_to_utf8(json.array, utf8);
-        return;
-    case DY_JSON_VALUE_OBJECT:
-        dy_object_to_utf8(json.object, utf8);
-        return;
-    case DY_JSON_VALUE_NUMBER:
-        dy_number_to_utf8(json.number, utf8);
-        return;
-    case DY_JSON_VALUE_STRING:
-        dy_string_to_utf8(json.string, utf8);
-        return;
+        return json + 1;
+    case DY_JSON_ARRAY:
+        return dy_array_to_utf8(json + 1, utf8);
+    case DY_JSON_OBJECT:
+        return dy_object_to_utf8(json + 1, utf8);
+    case DY_JSON_NUMBER:
+        dy_number_to_utf8(json + 1, utf8);
+        return json + 1 + sizeof(long);
+    case DY_JSON_STRING:
+        return dy_string_to_utf8(json + 1, utf8);
     }
 
     dy_bail("Invalid enum tag.");
@@ -67,53 +65,60 @@ void dy_utf8_literal(dy_string_t s, dy_array_t *utf8)
     }
 }
 
-void dy_array_to_utf8(struct dy_json_array array, dy_array_t *utf8)
+const uint8_t *dy_array_to_utf8(const uint8_t *json, dy_array_t *utf8)
 {
     dy_array_add(utf8, &(char){ '[' });
 
-    if (array.num_values >= 1) {
-        dy_json_to_utf8(array.values[0], utf8);
-    }
+    if (*json != DY_JSON_END) {
+        for (;;) {
+            json = dy_json_to_utf8(json, utf8);
 
-    for (size_t i = 1; i < array.num_values; ++i) {
-        dy_array_add(utf8, &(char){ ',' });
-        dy_json_to_utf8(array.values[i], utf8);
+            if (*json == DY_JSON_END) {
+                break;
+            } else {
+                dy_array_add(utf8, &(char){ ',' });
+            }
+        }
     }
 
     dy_array_add(utf8, &(char){ ']' });
+
+    return json + 1;
 }
 
-void dy_object_to_utf8(struct dy_json_object object, dy_array_t *utf8)
+const uint8_t *dy_object_to_utf8(const uint8_t *json, dy_array_t *utf8)
 {
     dy_array_add(utf8, &(char){ '{' });
 
-    if (object.num_members >= 1) {
-        dy_string_to_utf8(object.members[0].string, utf8);
-        dy_array_add(utf8, &(char){ ':' });
-        dy_json_to_utf8(object.members[0].value, utf8);
-    }
+    if (*json != DY_JSON_END) {
+        for (;;) {
+            json = dy_string_to_utf8(json + 1, utf8);
+            dy_array_add(utf8, &(char){ ':' });
+            json = dy_json_to_utf8(json, utf8);
 
-    for (size_t i = 1; i < object.num_members; ++i) {
-        dy_array_add(utf8, &(char){ ',' });
-        dy_string_to_utf8(object.members[i].string, utf8);
-        dy_array_add(utf8, &(char){ ':' });
-        dy_json_to_utf8(object.members[i].value, utf8);
+            if (*json == DY_JSON_END) {
+                break;
+            } else {
+                dy_array_add(utf8, &(char){ ',' });
+            }
+        }
     }
 
     dy_array_add(utf8, &(char){ '}' });
+
+    return json + 1;
 }
 
-void dy_number_to_utf8(struct dy_json_number number, dy_array_t *utf8)
+void dy_number_to_utf8(const uint8_t *json, dy_array_t *utf8)
 {
-    if (number.tag != DY_JSON_NUMBER_INTEGER) {
-        return;
-    }
+    long number;
+    memcpy(&number, json, sizeof(number));
 
-    if (number.integer < 0) {
+    if (number < 0) {
         dy_array_add(utf8, &(char){ '-' });
     }
 
-    long absolute = labs(number.integer);
+    long absolute = labs(number);
 
     dy_array_t local = dy_array_create(sizeof(char), DY_ALIGNOF(char), 4);
     for (;;) {
@@ -135,9 +140,22 @@ void dy_number_to_utf8(struct dy_json_number number, dy_array_t *utf8)
     dy_array_destroy(local);
 }
 
-void dy_string_to_utf8(dy_string_t string, dy_array_t *utf8)
+const uint8_t *dy_string_to_utf8(const uint8_t *json, dy_array_t *utf8)
 {
     dy_array_add(utf8, &(char){ '\"' });
-    dy_utf8_literal(string, utf8);
+
+    while (*json != DY_JSON_END) {
+        if (*json == '\"') {
+            dy_array_add(utf8, &(char){ '\\' });
+            dy_array_add(utf8, &(char){ '\"' });
+        } else {
+            dy_array_add(utf8, json);
+        }
+
+        ++json;
+    }
+
     dy_array_add(utf8, &(char){ '\"' });
+
+    return json + 1;
 }

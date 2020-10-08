@@ -28,7 +28,7 @@ struct dy_lsp_stream_env {
 
 static inline int dy_lsp_run_server(FILE *in, FILE *out);
 
-static inline bool dy_lsp_process_message(dy_lsp_ctx_t *ctx, struct dy_stream *stream);
+static inline bool dy_lsp_process_message(dy_lsp_ctx_t *ctx, struct dy_stream *stream, dy_array_t *json_buffer);
 
 static inline bool dy_lsp_read_content_length(struct dy_stream *stream, size_t *content_length_in_bytes);
 
@@ -37,7 +37,7 @@ struct send_env {
     FILE *file;
 };
 
-static void send_callback(dy_json_t message, void *env);
+static void send_callback(const uint8_t *message, void *env);
 static void stream_callback(dy_array_t *buffer, void *env);
 static void write_size_t(FILE *file, size_t x);
 static void set_file_to_binary(FILE *file);
@@ -66,16 +66,21 @@ int dy_lsp_run_server(FILE *in, FILE *out)
 
     dy_lsp_ctx_t *ctx = dy_lsp_create(send_callback, &send_env);
 
+    dy_array_t json_buffer = dy_array_create(1, 1, 128);
+
     for (;;) {
-        if (!dy_lsp_process_message(ctx, &stream)) {
+        if (!dy_lsp_process_message(ctx, &stream, &json_buffer)) {
             int ret = dy_lsp_exit_code(ctx);
             dy_lsp_destroy(ctx);
+            dy_array_destroy(json_buffer);
             return ret;
         }
+
+        json_buffer.num_elems = 0;
     }
 }
 
-bool dy_lsp_process_message(dy_lsp_ctx_t *ctx, struct dy_stream *stream)
+bool dy_lsp_process_message(dy_lsp_ctx_t *ctx, struct dy_stream *stream, dy_array_t *json_buffer)
 {
     struct dy_lsp_stream_env *env = stream->env;
 
@@ -93,14 +98,13 @@ bool dy_lsp_process_message(dy_lsp_ctx_t *ctx, struct dy_stream *stream)
     env->is_bounded = true;
     env->bound_size_in_bytes = content_length_in_bytes;
 
-    dy_json_t message;
-    if (!dy_utf8_to_json(stream, &message)) {
+    if (!dy_utf8_to_json(stream, json_buffer)) {
         return false;
     }
 
     dy_stream_reset(stream);
 
-    return dy_lsp_handle_message(ctx, message);
+    return dy_lsp_handle_message(ctx, json_buffer->buffer);
 }
 
 bool dy_lsp_read_content_length(struct dy_stream *stream, size_t *content_length_in_bytes)
@@ -128,7 +132,7 @@ bool dy_lsp_read_content_length(struct dy_stream *stream, size_t *content_length
     return true;
 }
 
-void send_callback(dy_json_t message, void *env)
+void send_callback(const uint8_t *message, void *env)
 {
     struct send_env *send_env = env;
 

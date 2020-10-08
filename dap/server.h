@@ -38,11 +38,11 @@ struct send_env {
 
 static inline int dy_dap_run_server(FILE *in, FILE *out);
 
-static inline bool dy_dap_process_message(struct dy_stream *stream);
+static inline bool dy_dap_process_message(struct dy_stream *stream, dy_array_t *json);
 
 static inline bool dy_dap_read_content_length(struct dy_stream *stream, size_t *content_length_in_bytes);
 
-static inline void send_callback(dy_json_t message, void *env);
+static inline void send_callback(const uint8_t *message, void *env);
 static inline void stream_callback(dy_array_t *buffer, void *env);
 static inline void write_size_t(FILE *file, size_t x);
 static inline void set_file_to_binary(FILE *file);
@@ -69,14 +69,17 @@ int dy_dap_run_server(FILE *in, FILE *out)
         .current_index = 0
     };
 
+    dy_array_t json = dy_array_create(1, 1, 128);
+
     for (;;) {
-        if (!dy_dap_process_message(&stream)) {
+        if (!dy_dap_process_message(&stream, &json)) {
+            dy_array_destroy(json);
             return -1;
         }
     }
 }
 
-bool dy_dap_process_message(struct dy_stream *stream)
+bool dy_dap_process_message(struct dy_stream *stream, dy_array_t *json)
 {
     struct dy_dap_stream_env *env = stream->env;
 
@@ -94,8 +97,7 @@ bool dy_dap_process_message(struct dy_stream *stream)
     env->is_bounded = true;
     env->bound_size_in_bytes = content_length_in_bytes;
 
-    dy_json_t message;
-    if (!dy_utf8_to_json(stream, &message)) {
+    if (!dy_utf8_to_json(stream, json)) {
         return false;
     }
 
@@ -129,7 +131,7 @@ bool dy_dap_read_content_length(struct dy_stream *stream, size_t *content_length
     return true;
 }
 
-void send_callback(dy_json_t message, void *env)
+void send_callback(const uint8_t *message, void *env)
 {
     struct send_env *send_env = env;
 

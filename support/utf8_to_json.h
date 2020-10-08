@@ -15,43 +15,33 @@
  * Floating-point values are not currently supported.
  */
 
-static inline bool dy_utf8_to_json(struct dy_stream *stream, dy_json_t *json);
+static inline bool dy_utf8_to_json(struct dy_stream *stream, dy_array_t *json);
 
 static inline void parse_whitespace(struct dy_stream *stream);
-static inline bool parse_value(struct dy_stream *stream, struct dy_json_value *value);
-static inline bool parse_object(struct dy_stream *stream, struct dy_json_object *object);
-static inline bool parse_empty_object(struct dy_stream *stream, struct dy_json_object *object);
-static inline bool parse_nonempty_object(struct dy_stream *stream, struct dy_json_object *object);
-static inline bool parse_object_members(struct dy_stream *stream, struct dy_json_object *object);
-static inline bool parse_object_members_storage(struct dy_stream *stream, dy_array_t *member_storage);
-static inline bool parse_object_member(struct dy_stream *stream, struct dy_json_member *member);
-static inline bool dy_json_parse_string(struct dy_stream *stream, dy_string_t *string);
-static inline bool parse_characters(struct dy_stream *stream, dy_string_t *characters);
-static inline bool parse_array(struct dy_stream *stream, struct dy_json_array *array);
-static inline bool parse_empty_array(struct dy_stream *stream, struct dy_json_array *array);
-static inline bool parse_nonempty_array(struct dy_stream *stream, struct dy_json_array *array);
-static inline bool parse_array_elements_storage(struct dy_stream *stream, dy_array_t *element_storage);
-static inline bool parse_array_elements(struct dy_stream *stream, struct dy_json_array *array);
-static inline bool parse_number(struct dy_stream *stream, struct dy_json_number *number);
-static inline bool parse_integer(struct dy_stream *stream, long *integer);
+static inline bool parse_value(struct dy_stream *stream, dy_array_t *json);
+static inline bool parse_object(struct dy_stream *stream, dy_array_t *json);
+static inline bool parse_empty_object(struct dy_stream *stream, dy_array_t *json);
+static inline bool parse_nonempty_object(struct dy_stream *stream, dy_array_t *json);
+static inline bool dy_json_parse_string(struct dy_stream *stream, dy_array_t *json);
+static inline bool parse_array(struct dy_stream *stream, dy_array_t *json);
+static inline bool parse_empty_array(struct dy_stream *stream, dy_array_t *json);
+static inline bool parse_nonempty_array(struct dy_stream *stream, dy_array_t *json);
+static inline bool parse_integer(struct dy_stream *stream, dy_array_t *json);
 
 static bool hex_char(char c, uint8_t *hex);
 
-bool dy_utf8_to_json(struct dy_stream *stream, dy_json_t *json)
+bool dy_utf8_to_json(struct dy_stream *stream, dy_array_t *json)
 {
     size_t start_index = stream->current_index;
 
     parse_whitespace(stream);
 
-    struct dy_json_value value;
-    if (!parse_value(stream, &value)) {
+    if (!parse_value(stream, json)) {
         stream->current_index = start_index;
         return false;
     }
 
     parse_whitespace(stream);
-
-    *json = value;
 
     return true;
 }
@@ -71,89 +61,56 @@ void parse_whitespace(struct dy_stream *stream)
     }
 }
 
-bool parse_value(struct dy_stream *stream, struct dy_json_value *value)
+bool parse_value(struct dy_stream *stream, dy_array_t *json)
 {
     if (dy_stream_parse_literal(stream, DY_STR_LIT("true"))) {
-        *value = (struct dy_json_value){
-            .tag = DY_JSON_VALUE_TRUE
-        };
-
+        dy_array_add(json, &(uint8_t){ DY_JSON_TRUE });
         return true;
     }
 
     if (dy_stream_parse_literal(stream, DY_STR_LIT("false"))) {
-        *value = (struct dy_json_value){
-            .tag = DY_JSON_VALUE_FALSE
-        };
-
+        dy_array_add(json, &(uint8_t){ DY_JSON_FALSE });
         return true;
     }
 
     if (dy_stream_parse_literal(stream, DY_STR_LIT("null"))) {
-        *value = (struct dy_json_value){
-            .tag = DY_JSON_VALUE_NULL
-        };
-
+        dy_array_add(json, &(uint8_t){ DY_JSON_NULL });
         return true;
     }
 
-    struct dy_json_object object;
-    if (parse_object(stream, &object)) {
-        *value = (struct dy_json_value){
-            .tag = DY_JSON_VALUE_OBJECT,
-            .object = object
-        };
-
+    if (parse_object(stream, json)) {
         return true;
     }
 
-    dy_string_t string;
-    if (dy_json_parse_string(stream, &string)) {
-        *value = (struct dy_json_value){
-            .tag = DY_JSON_VALUE_STRING,
-            .string = string
-        };
-
+    if (dy_json_parse_string(stream, json)) {
         return true;
     }
 
-    struct dy_json_array array;
-    if (parse_array(stream, &array)) {
-        *value = (struct dy_json_value){
-            .tag = DY_JSON_VALUE_ARRAY,
-            .array = array
-        };
-
+    if (parse_array(stream, json)) {
         return true;
     }
 
-    struct dy_json_number number;
-    if (parse_number(stream, &number)) {
-        *value = (struct dy_json_value){
-            .tag = DY_JSON_VALUE_NUMBER,
-            .number = number
-        };
-
+    if (parse_integer(stream, json)) {
         return true;
     }
 
     return false;
 }
 
-bool parse_object(struct dy_stream *stream, struct dy_json_object *object)
+bool parse_object(struct dy_stream *stream, dy_array_t *json)
 {
-    if (parse_empty_object(stream, object)) {
+    if (parse_empty_object(stream, json)) {
         return true;
     }
 
-    if (parse_nonempty_object(stream, object)) {
+    if (parse_nonempty_object(stream, json)) {
         return true;
     }
 
     return false;
 }
 
-bool parse_empty_object(struct dy_stream *stream, struct dy_json_object *object)
+bool parse_empty_object(struct dy_stream *stream, dy_array_t *json)
 {
     size_t start_index = stream->current_index;
 
@@ -169,208 +126,131 @@ bool parse_empty_object(struct dy_stream *stream, struct dy_json_object *object)
         return false;
     }
 
-    *object = (struct dy_json_object){
-        .members = NULL,
-        .num_members = 0
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 
     return true;
 }
 
-bool parse_nonempty_object(struct dy_stream *stream, struct dy_json_object *object)
+bool parse_nonempty_object(struct dy_stream *stream, dy_array_t *json)
 {
     size_t start_index = stream->current_index;
+    size_t write_index = json->num_elems;
 
     if (!dy_stream_parse_literal(stream, DY_STR_LIT("{"))) {
         return false;
     }
 
-    struct dy_json_object obj;
-    if (!parse_object_members(stream, &obj)) {
-        stream->current_index = start_index;
-        return false;
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
+
+    for (;;) {
+        parse_whitespace(stream);
+
+        if (!dy_json_parse_string(stream, json)) {
+            stream->current_index = start_index;
+            return false;
+        }
+
+        parse_whitespace(stream);
+
+        if (!dy_stream_parse_literal(stream, DY_STR_LIT(":"))) {
+            stream->current_index = start_index;
+            json->num_elems = write_index;
+            return false;
+        }
+
+        if (!dy_utf8_to_json(stream, json)) {
+            stream->current_index = start_index;
+            json->num_elems = write_index;
+            return false;
+        }
+
+        if (!dy_stream_parse_literal(stream, DY_STR_LIT(","))) {
+            break;
+        }
     }
 
     if (!dy_stream_parse_literal(stream, DY_STR_LIT("}"))) {
         stream->current_index = start_index;
+        json->num_elems = write_index;
         return false;
     }
 
-    *object = obj;
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 
     return true;
 }
 
-bool parse_object_members(struct dy_stream *stream, struct dy_json_object *object)
-{
-    dy_array_t member_storage = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 4);
-
-    if (!parse_object_members_storage(stream, &member_storage)) {
-        return false;
-    }
-
-    *object = (struct dy_json_object){
-        .members = member_storage.buffer,
-        .num_members = member_storage.num_elems
-    };
-
-    return true;
-}
-
-bool parse_object_members_storage(struct dy_stream *stream, dy_array_t *member_storage)
+bool dy_json_parse_string(struct dy_stream *stream, dy_array_t *json)
 {
     size_t start_index = stream->current_index;
-
-    struct dy_json_member member;
-    if (!parse_object_member(stream, &member)) {
-        stream->current_index = start_index;
-        return false;
-    }
-
-    dy_array_add(member_storage, &member);
-
-    if (!dy_stream_parse_literal(stream, DY_STR_LIT(","))) {
-        return true;
-    }
-
-    if (!parse_object_members_storage(stream, member_storage)) {
-        stream->current_index = start_index;
-        return false;
-    }
-
-    return true;
-}
-
-bool parse_object_member(struct dy_stream *stream, struct dy_json_member *member)
-{
-    size_t start_index = stream->current_index;
-
-    parse_whitespace(stream);
-
-    dy_string_t string;
-    if (!dy_json_parse_string(stream, &string)) {
-        stream->current_index = start_index;
-        return false;
-    }
-
-    parse_whitespace(stream);
-
-    if (!dy_stream_parse_literal(stream, DY_STR_LIT(":"))) {
-        stream->current_index = start_index;
-        return false;
-    }
-
-    struct dy_json_value value;
-    if (!dy_utf8_to_json(stream, &value)) {
-        stream->current_index = start_index;
-        return false;
-    }
-
-    *member = (struct dy_json_member){
-        .string = string,
-        .value = value
-    };
-
-    return true;
-}
-
-bool dy_json_parse_string(struct dy_stream *stream, dy_string_t *string)
-{
-    size_t start_index = stream->current_index;
+    size_t write_index = json->num_elems;
 
     if (!dy_stream_parse_literal(stream, DY_STR_LIT("\""))) {
         stream->current_index = start_index;
         return false;
     }
 
-    dy_string_t characters;
-    if (!parse_characters(stream, &characters)) {
-        stream->current_index = start_index;
-        return false;
-    }
-
-    if (!dy_stream_parse_literal(stream, DY_STR_LIT("\""))) {
-        stream->current_index = start_index;
-        return false;
-    }
-
-    *string = characters;
-
-    return true;
-}
-
-bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
-{
-    size_t start_index = stream->current_index;
-
-    dy_array_t characters_storage = dy_array_create(sizeof(char), DY_ALIGNOF(char), 8);
+    dy_array_add(json, &(uint8_t){ DY_JSON_STRING });
 
     for (;;) {
         char c;
         if (!dy_stream_get_char(stream, &c)) {
-            *characters = (dy_string_t){
-                .ptr = characters_storage.buffer,
-                .size = characters_storage.num_elems
-            };
-
-            return true;
+            stream->current_index = start_index;
+            json->num_elems = write_index;
+            return false;
         }
 
         if (c == '\"') {
-            dy_stream_put_last_char_back(stream);
-
-            *characters = (dy_string_t){
-                .ptr = characters_storage.buffer,
-                .size = characters_storage.num_elems
-            };
-
-            return true;
+            dy_array_add(json, &(uint8_t){ DY_JSON_END });
+            break;
         }
 
         if (c == '\\') {
             char c2;
             if (!dy_stream_get_char(stream, &c2)) {
                 stream->current_index = start_index;
+                json->num_elems = write_index;
                 return false;
             }
 
             if (c2 == '\"') {
-                dy_array_add(&characters_storage, &(char){ '\"' });
+                dy_array_add(json, &(char){ '\"' });
                 continue;
             }
 
             if (c2 == '\\') {
-                dy_array_add(&characters_storage, &(char){ '\\' });
+                dy_array_add(json, &(char){ '\\' });
                 continue;
             }
 
             if (c2 == '/') {
-                dy_array_add(&characters_storage, &(char){ '/' });
+                dy_array_add(json, &(char){ '/' });
                 continue;
             }
 
             if (c2 == 'b') {
-                dy_array_add(&characters_storage, &(char){ '\b' });
+                dy_array_add(json, &(char){ '\b' });
                 continue;
             }
 
             if (c2 == 'f') {
-                dy_array_add(&characters_storage, &(char){ '\f' });
+                dy_array_add(json, &(char){ '\f' });
                 continue;
             }
 
             if (c2 == 'n') {
-                dy_array_add(&characters_storage, &(char){ '\n' });
+                dy_array_add(json, &(char){ '\n' });
                 continue;
             }
 
             if (c2 == 'r') {
-                dy_array_add(&characters_storage, &(char){ '\r' });
+                dy_array_add(json, &(char){ '\r' });
                 continue;
             }
 
             if (c2 == 't') {
-                dy_array_add(&characters_storage, &(char){ '\t' });
+                dy_array_add(json, &(char){ '\t' });
                 continue;
             }
 
@@ -379,6 +259,7 @@ bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
                 uint8_t hex1;
                 if (!dy_stream_get_char(stream, &c3) || !hex_char(c3, &hex1)) {
                     stream->current_index = start_index;
+                    json->num_elems = write_index;
                     return false;
                 }
 
@@ -386,6 +267,7 @@ bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
                 uint8_t hex2;
                 if (!dy_stream_get_char(stream, &c4) || !hex_char(c4, &hex2)) {
                     stream->current_index = start_index;
+                    json->num_elems = write_index;
                     return false;
                 }
 
@@ -393,6 +275,7 @@ bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
                 uint8_t hex3;
                 if (!dy_stream_get_char(stream, &c5) || !hex_char(c5, &hex3)) {
                     stream->current_index = start_index;
+                    json->num_elems = write_index;
                     return false;
                 }
 
@@ -400,6 +283,7 @@ bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
                 uint8_t hex4;
                 if (!dy_stream_get_char(stream, &c6) || !hex_char(c6, &hex4)) {
                     stream->current_index = start_index;
+                    json->num_elems = write_index;
                     return false;
                 }
 
@@ -408,46 +292,48 @@ bool parse_characters(struct dy_stream *stream, dy_string_t *characters)
                 uint16_t hex = (uint16_t)((hex1 << 12) | (hex2 << 8) | (hex3 << 4) | hex4);
 
                 if (!(hex & 0xff80)) {
-                    dy_array_add(&characters_storage, &(char){ (char)hex });
+                    dy_array_add(json, &(char){ (char)hex });
                     continue;
                 }
 
                 if (!(hex & 0xf800)) {
-                    dy_array_add(&characters_storage, &(char){ (char)(0xc | (hex & 0x07c0) >> 6) });
-                    dy_array_add(&characters_storage, &(char){ (char)(0x8 | (hex & 0x003f)) });
+                    dy_array_add(json, &(char){ (char)(0xc | (hex & 0x07c0) >> 6) });
+                    dy_array_add(json, &(char){ (char)(0x8 | (hex & 0x003f)) });
                     continue;
                 }
 
-                dy_array_add(&characters_storage, &(char){ (char)(0xe | (hex & 0xf000) >> (6 + 6)) });
-                dy_array_add(&characters_storage, &(char){ (char)(0x8 | (hex & 0x0fc0) >> 6) });
-                dy_array_add(&characters_storage, &(char){ (char)(0x8 | (hex & 0x003f)) });
+                dy_array_add(json, &(char){ (char)(0xe | (hex & 0xf000) >> (6 + 6)) });
+                dy_array_add(json, &(char){ (char)(0x8 | (hex & 0x0fc0) >> 6) });
+                dy_array_add(json, &(char){ (char)(0x8 | (hex & 0x003f)) });
 
                 continue;
             }
 
             stream->current_index = start_index;
-
+            json->num_elems = write_index;
             return false;
         }
 
-        dy_array_add(&characters_storage, &c);
+        dy_array_add(json, &c);
     }
+
+    return true;
 }
 
-bool parse_array(struct dy_stream *stream, struct dy_json_array *array)
+bool parse_array(struct dy_stream *stream, dy_array_t *json)
 {
-    if (parse_empty_array(stream, array)) {
+    if (parse_empty_array(stream, json)) {
         return true;
     }
 
-    if (parse_nonempty_array(stream, array)) {
+    if (parse_nonempty_array(stream, json)) {
         return true;
     }
 
     return false;
 }
 
-bool parse_empty_array(struct dy_stream *stream, struct dy_json_array *array)
+bool parse_empty_array(struct dy_stream *stream, dy_array_t *json)
 {
     size_t start_index = stream->current_index;
 
@@ -463,95 +349,48 @@ bool parse_empty_array(struct dy_stream *stream, struct dy_json_array *array)
         return false;
     }
 
-    *array = (struct dy_json_array){
-        .values = NULL,
-        .num_values = 0
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_ARRAY });
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 
     return true;
 }
 
-bool parse_nonempty_array(struct dy_stream *stream, struct dy_json_array *array)
+bool parse_nonempty_array(struct dy_stream *stream, dy_array_t *json)
 {
     size_t start_index = stream->current_index;
+    size_t write_index = json->num_elems;
 
     if (!dy_stream_parse_literal(stream, DY_STR_LIT("["))) {
         stream->current_index = start_index;
         return false;
     }
 
-    struct dy_json_array arr;
-    if (!parse_array_elements(stream, &arr)) {
-        stream->current_index = start_index;
-        return false;
+    dy_array_add(json, &(uint8_t){ DY_JSON_ARRAY });
+
+    for (;;) {
+        if (!dy_utf8_to_json(stream, json)) {
+            stream->current_index = start_index;
+            json->num_elems = write_index;
+            return false;
+        }
+
+        if (!dy_stream_parse_literal(stream, DY_STR_LIT(","))) {
+            break;
+        }
     }
 
     if (!dy_stream_parse_literal(stream, DY_STR_LIT("]"))) {
         stream->current_index = start_index;
+        json->num_elems = write_index;
         return false;
     }
 
-    *array = arr;
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 
     return true;
 }
 
-bool parse_array_elements(struct dy_stream *stream, struct dy_json_array *array)
-{
-    dy_array_t element_storage = dy_array_create(sizeof(struct dy_json_value), DY_ALIGNOF(struct dy_json_value), 4);
-
-    if (!parse_array_elements_storage(stream, &element_storage)) {
-        return false;
-    }
-
-    *array = (struct dy_json_array){
-        .values = element_storage.buffer,
-        .num_values = element_storage.num_elems
-    };
-
-    return true;
-}
-
-bool parse_array_elements_storage(struct dy_stream *stream, dy_array_t *element_storage)
-{
-    size_t start_index = stream->current_index;
-
-    struct dy_json_value value;
-    if (!dy_utf8_to_json(stream, &value)) {
-        stream->current_index = start_index;
-        return false;
-    }
-
-    dy_array_add(element_storage, &value);
-
-    if (!dy_stream_parse_literal(stream, DY_STR_LIT(","))) {
-        return true;
-    }
-
-    if (!parse_array_elements_storage(stream, element_storage)) {
-        stream->current_index = start_index;
-        return false;
-    }
-
-    return true;
-}
-
-bool parse_number(struct dy_stream *stream, struct dy_json_number *number)
-{
-    long integer;
-    if (parse_integer(stream, &integer)) {
-        *number = (struct dy_json_number){
-            .tag = DY_JSON_NUMBER_INTEGER,
-            .integer = integer
-        };
-
-        return true;
-    }
-
-    return false;
-}
-
-bool parse_integer(struct dy_stream *stream, long *integer)
+bool parse_integer(struct dy_stream *stream, dy_array_t *json)
 {
     size_t start_index = stream->current_index;
 
@@ -601,7 +440,11 @@ bool parse_integer(struct dy_stream *stream, long *integer)
         }
     }
 
-    *integer = x;
+    dy_array_add(json, &(uint8_t){ DY_JSON_NUMBER });
+
+    for (size_t i = 0; i < sizeof(long); ++i) {
+        dy_array_add(json, (uint8_t *)&x + i);
+    }
 
     return true;
 }

@@ -20,25 +20,25 @@
 
 typedef struct dy_lsp_ctx dy_lsp_ctx_t;
 
-typedef void (*dy_lsp_send_fn)(dy_json_t message, void *env);
+typedef void (*dy_lsp_send_fn)(const uint8_t *message, void *env);
 
 static inline dy_lsp_ctx_t *dy_lsp_create(dy_lsp_send_fn send, void *env);
 
-static inline bool dy_lsp_handle_message(dy_lsp_ctx_t *ctx, dy_json_t message);
+static inline bool dy_lsp_handle_message(dy_lsp_ctx_t *ctx, const uint8_t *message);
 
-static inline bool dy_lsp_initialize(dy_lsp_ctx_t *ctx, dy_json_t *result, dy_json_t *error);
+static inline void dy_lsp_initialize(const uint8_t *id, dy_lsp_ctx_t *ctx, dy_array_t *json);
 
 static inline void dy_lsp_initialized(dy_lsp_ctx_t *ctx);
 
-static inline dy_json_t dy_lsp_shutdown(dy_lsp_ctx_t *ctx);
+static inline void dy_lsp_shutdown(dy_lsp_ctx_t *ctx);
 
 static inline void dy_lsp_did_open(dy_lsp_ctx_t *ctx, dy_string_t uri, dy_string_t text);
 
 static inline void dy_lsp_did_close(dy_lsp_ctx_t *ctx, dy_string_t uri);
 
-static inline void dy_lsp_did_change(dy_lsp_ctx_t *ctx, dy_string_t uri, struct dy_json_array content_changes);
+static inline void dy_lsp_did_change(dy_lsp_ctx_t *ctx, dy_string_t uri, const uint8_t *content_changes);
 
-static inline bool dy_lsp_hover(dy_lsp_ctx_t *ctx, dy_string_t uri, long line_number, long utf16_char_offset, dy_json_t *result, dy_json_t *error);
+static inline void dy_lsp_hover(dy_lsp_ctx_t *ctx, const uint8_t *id, dy_string_t uri, long line_number, long utf16_char_offset, dy_array_t *json);
 
 static inline void dy_lsp_exit(dy_lsp_ctx_t *ctx);
 
@@ -50,14 +50,16 @@ static inline void dy_lsp_destroy(dy_lsp_ctx_t *ctx);
  * Represents an open document.
  */
 struct document {
-    dy_string_t uri; /** The URI is used as the identifier for a document. */
-    dy_string_t text;
+    dy_array_t uri; /** The URI is used as the identifier for a document. */
+    dy_array_t text;
     struct dy_core_ctx core_ctx;
     struct dy_core_expr core;
     bool core_is_present;
 };
 
 struct dy_lsp_ctx {
+    dy_array_t output_buffer;
+
     dy_lsp_send_fn send;
     void *env;
 
@@ -70,42 +72,49 @@ struct dy_lsp_ctx {
 static const size_t dy_lsp_ctx_pre_padding = DY_RC_PRE_PADDING(struct dy_lsp_ctx);
 static const size_t dy_lsp_ctx_post_padding = DY_RC_POST_PADDING(struct dy_lsp_ctx);
 
-static inline dy_json_t invalid_request(dy_string_t message);
-static inline dy_json_t server_capabilities(void);
-static inline dy_json_t server_info(void);
-static inline dy_json_t text_document_sync_options(void);
-static inline dy_json_t initialize_response(void);
-static inline dy_json_t error_response(dy_json_t id, dy_json_t error);
-static inline dy_json_t method_not_found(dy_string_t message);
-static inline dy_json_t response_error(long code, dy_string_t message);
-static inline dy_json_t success_response(dy_json_t id, dy_json_t result);
-static inline dy_json_t hover_result(dy_string_t contents);
-static inline dy_json_t make_position(long line, long character);
-static inline dy_json_t make_range(dy_json_t start, dy_json_t end);
-static inline dy_json_t make_notification(dy_string_t method, dy_json_t params);
+static inline void dy_lsp_send(dy_lsp_ctx_t *ctx);
+
+static inline void invalid_request(const uint8_t *id, dy_string_t message, dy_array_t *json);
+static inline void server_capabilities(dy_array_t *json);
+static inline void server_info(dy_array_t *json);
+static inline void text_document_sync_options(dy_array_t *json);
+static inline void initialize_response(const uint8_t *id, dy_array_t *json);
+static inline void method_not_found(const uint8_t *id, dy_string_t message, dy_array_t *json);
+static inline void response_error(long code, dy_string_t message, dy_array_t *json);
+static inline void null_success_response(const uint8_t *id, dy_array_t *json);
+static inline void hover_result(dy_string_t contents, dy_array_t *json);
+static inline void make_position(long line, long character, dy_array_t *json);
+static inline void make_range(long start_line, long start_character, long end_line, long end_character, dy_array_t *json);
+static inline void publish_diagnostics(struct dy_core_ctx *ctx, dy_string_t uri, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json);
+static inline void compute_lsp_range(dy_string_t text, struct dy_range range, dy_array_t *json);
 
 static inline void process_document(struct dy_lsp_ctx *ctx, struct document *doc);
-static inline struct dy_stream stream_from_string(dy_string_t s);
 static inline void null_stream(dy_array_t *buffer, void *env);
 static inline bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, size_t *byte_offset);
-static inline bool produce_diagnostics(struct dy_core_ctx *ctx, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *diagnostics);
-static inline dy_json_t compute_lsp_range(dy_string_t text, struct dy_range range);
-static inline dy_json_t error_message(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim);
-static inline dy_json_t make_diagnostic(dy_json_t range, dy_json_t severity, dy_json_t message);
-static inline dy_json_t make_diagnostics_params(dy_string_t uri, dy_json_t diagnostics);
+static inline bool produce_diagnostics(struct dy_core_ctx *ctx, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json);
+static inline void compute_lsp_range(dy_string_t text, struct dy_range range, dy_array_t *json);
+static inline void make_diagnostic(dy_string_t text, struct dy_range range, long severity, dy_string_t message, dy_array_t *json);
+static inline void diagnostics_params(struct dy_core_ctx *ctx, dy_string_t uri, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json);
 static inline const struct dy_range *get_text_range(dy_array_t text_sources, size_t id);
 
+static inline dy_string_t convert_json_string(const uint8_t *p);
+static inline void put_string_literal(dy_string_t s, dy_array_t *json);
+static inline const uint8_t *copy_json_value(const uint8_t *src, dy_array_t *dst);
+static inline const uint8_t *copy_json_string(const uint8_t *src, dy_array_t *dst);
+static inline const uint8_t *skip_json_value(const uint8_t *json);
+static inline void put_number(long x, dy_array_t *json);
+static inline const uint8_t *skip_json_string(const uint8_t *p);
+static inline const uint8_t *json_get_member(const uint8_t *p, dy_string_t member);
 
-static inline bool json_force_object(dy_json_t json, struct dy_json_object *object);
-static inline bool json_force_string(dy_json_t json, dy_string_t *value);
-static inline bool json_get_member(struct dy_json_object object, dy_string_t member, dy_json_t *value);
-static inline bool json_force_array(dy_json_t json, struct dy_json_array *array);
-static inline bool json_force_integer(dy_json_t json, long *value);
+static inline dy_string_t array_view(dy_array_t x);
+static inline dy_array_t view_to_array(dy_string_t s);
+static inline void replace_storage_with_view(dy_array_t *x, dy_string_t s);
 
 dy_lsp_ctx_t *dy_lsp_create(dy_lsp_send_fn send, void *env)
 {
     struct dy_lsp_ctx *ctx = dy_rc_alloc(sizeof *ctx, dy_lsp_ctx_pre_padding, dy_lsp_ctx_post_padding);
     *ctx = (struct dy_lsp_ctx){
+        .output_buffer = dy_array_create(1, 1, 128),
         .send = send,
         .env = env,
         .is_initialized = false,
@@ -120,39 +129,44 @@ dy_lsp_ctx_t *dy_lsp_create(dy_lsp_send_fn send, void *env)
 void dy_lsp_destroy(dy_lsp_ctx_t *ctx)
 {
     dy_array_destroy(ctx->documents);
+    dy_array_destroy(ctx->output_buffer);
     dy_rc_release(ctx, dy_lsp_ctx_pre_padding, dy_lsp_ctx_post_padding);
 }
 
-bool dy_lsp_handle_message(dy_lsp_ctx_t *ctx, dy_json_t message)
+bool dy_lsp_handle_message(dy_lsp_ctx_t *ctx, const uint8_t *message)
 {
-    struct dy_json_object object;
-    if (!json_force_object(message, &object)) {
+    if (*message != DY_JSON_OBJECT) {
         return true;
     }
 
-    dy_json_t id;
-    bool have_id = json_get_member(object, DY_STR_LIT("id"), &id);
+    message++;
 
-    dy_json_t method;
-    if (!json_get_member(object, DY_STR_LIT("method"), &method)) {
-        if (have_id) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("Missing 'method' field."))), ctx->env);
+    const uint8_t *id = json_get_member(message, DY_STR_LIT("id"));
+
+    const uint8_t *method = json_get_member(message, DY_STR_LIT("method"));
+    if (method == NULL) {
+        if (id != NULL) {
+            invalid_request(id, DY_STR_LIT("Missing 'method' field."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
         }
 
         return true;
     }
 
-    dy_json_t params;
-    bool have_params = json_get_member(object, DY_STR_LIT("params"), &params);
+    const uint8_t *params = json_get_member(message, DY_STR_LIT("params"));
 
-    dy_string_t method_string;
-    if (!json_force_string(method, &method_string)) {
-        if (have_id) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("'method' field is not a string."))), ctx->env);
+    if (*method != DY_JSON_STRING) {
+        if (id != NULL) {
+            invalid_request(id, DY_STR_LIT("'method' field is not a string."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
         }
 
         return true;
     }
+
+    method++;
+
+    dy_string_t method_string = convert_json_string(method);
 
     if (dy_string_are_equal(method_string, DY_STR_LIT("exit"))) {
         dy_lsp_exit(ctx);
@@ -160,47 +174,62 @@ bool dy_lsp_handle_message(dy_lsp_ctx_t *ctx, dy_json_t message)
     }
 
     if (ctx->received_shutdown_request) {
-        if (have_id) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("Non-exit request after shutdown."))), ctx->env);
+        if (id != NULL) {
+            invalid_request(id, DY_STR_LIT("Non-exit request after shutdown."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
         }
 
         return true;
     }
 
     if (dy_string_are_equal(method_string, DY_STR_LIT("initialize"))) {
-        if (!have_id) {
+        if (id == NULL) {
             return true;
         }
 
-        if (!have_params) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("Missing 'params' field."))), ctx->env);
+        if (params == NULL) {
+            invalid_request(id, DY_STR_LIT("Missing 'params' field."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
             return true;
         }
 
-        dy_json_t result, error;
-        if (dy_lsp_initialize(ctx, &result, &error)) {
-            ctx->send(success_response(id, result), ctx->env);
-        } else {
-            ctx->send(error_response(id, error), ctx->env);
-        }
+        dy_lsp_initialize(id, ctx, &ctx->output_buffer);
+
+        dy_lsp_send(ctx);
 
         return true;
     }
 
     if (!ctx->is_initialized) {
-        if (have_id) {
-            ctx->send(error_response(id, response_error(-32002, DY_STR_LIT("Not yet initialized."))), ctx->env);
+        if (id != NULL) {
+            dy_array_add(&ctx->output_buffer, &(uint8_t){ DY_JSON_OBJECT });
+
+            put_string_literal(DY_STR_LIT("jsonrpc"), &ctx->output_buffer);
+            put_string_literal(DY_STR_LIT("2.0"), &ctx->output_buffer);
+
+            put_string_literal(DY_STR_LIT("id"), &ctx->output_buffer);
+            copy_json_value(id, &ctx->output_buffer);
+
+            put_string_literal(DY_STR_LIT("error"), &ctx->output_buffer);
+            response_error(-32002, DY_STR_LIT("Not yet initialized."), &ctx->output_buffer);
+
+            dy_array_add(&ctx->output_buffer, &(uint8_t){ DY_JSON_END });
+
+            dy_lsp_send(ctx);
         }
 
         return true;
     }
 
     if (dy_string_are_equal(method_string, DY_STR_LIT("shutdown"))) {
-        if (!have_id) {
+        if (id == NULL) {
             return true;
         }
 
-        ctx->send(success_response(id, dy_lsp_shutdown(ctx)), ctx->env);
+        dy_lsp_shutdown(ctx);
+
+        null_success_response(id, &ctx->output_buffer);
+        dy_lsp_send(ctx);
 
         return true;
     }
@@ -211,44 +240,42 @@ bool dy_lsp_handle_message(dy_lsp_ctx_t *ctx, dy_json_t message)
     }
 
     if (dy_string_are_equal(method_string, DY_STR_LIT("textDocument/didOpen"))) {
-        if (!have_params) {
+        if (params == NULL) {
             return true;
         }
+        if (*params != DY_JSON_OBJECT) {
+            return true;
+        }
+        ++params;
 
-        struct dy_json_object param_obj;
-        if (!json_force_object(params, &param_obj)) {
+        const uint8_t *text_document = json_get_member(params, DY_STR_LIT("textDocument"));
+        if (text_document == NULL) {
             return true;
         }
+        if (*text_document != DY_JSON_OBJECT) {
+            return true;
+        }
+        ++text_document;
 
-        dy_json_t text_document;
-        if (!json_get_member(param_obj, DY_STR_LIT("textDocument"), &text_document)) {
+        const uint8_t *uri = json_get_member(text_document, DY_STR_LIT("uri"));
+        if (uri == NULL) {
             return true;
         }
+        if (*uri != DY_JSON_STRING) {
+            return true;
+        }
+        ++uri;
+        dy_string_t uri_string = convert_json_string(uri);
 
-        struct dy_json_object text_document_obj;
-        if (!json_force_object(text_document, &text_document_obj)) {
+        const uint8_t *text = json_get_member(text_document, DY_STR_LIT("text"));
+        if (text == NULL) {
             return true;
         }
-
-        dy_json_t uri;
-        if (!json_get_member(text_document_obj, DY_STR_LIT("uri"), &uri)) {
+        if (*text != DY_JSON_STRING) {
             return true;
         }
-
-        dy_string_t uri_string;
-        if (!json_force_string(uri, &uri_string)) {
-            return true;
-        }
-
-        dy_json_t text;
-        if (!json_get_member(text_document_obj, DY_STR_LIT("text"), &text)) {
-            return true;
-        }
-
-        dy_string_t text_string;
-        if (!json_force_string(text, &text_string)) {
-            return true;
-        }
+        ++text;
+        dy_string_t text_string = convert_json_string(text);
 
         dy_lsp_did_open(ctx, uri_string, text_string);
 
@@ -256,79 +283,75 @@ bool dy_lsp_handle_message(dy_lsp_ctx_t *ctx, dy_json_t message)
     }
 
     if (dy_string_are_equal(method_string, DY_STR_LIT("textDocument/didChange"))) {
-        if (!have_params) {
+        if (params == NULL) {
             return true;
         }
-
-        struct dy_json_object params_obj;
-        if (!json_force_object(params, &params_obj)) {
+        if (*params != DY_JSON_OBJECT) {
             return true;
         }
+        ++params;
 
-        dy_json_t text_document;
-        if (!json_get_member(params_obj, DY_STR_LIT("textDocument"), &text_document)) {
+        const uint8_t *text_document = json_get_member(params, DY_STR_LIT("textDocument"));
+        if (text_document == NULL) {
             return true;
         }
-
-        struct dy_json_object text_document_obj;
-        if (!json_force_object(text_document, &text_document_obj)) {
+        if (*text_document != DY_JSON_OBJECT) {
             return true;
         }
+        ++text_document;
 
-        dy_json_t uri;
-        if (!json_get_member(text_document_obj, DY_STR_LIT("uri"), &uri)) {
+        const uint8_t *uri = json_get_member(text_document, DY_STR_LIT("uri"));
+        if (uri == NULL) {
             return true;
         }
-
-        dy_string_t uri_string;
-        if (!json_force_string(uri, &uri_string)) {
+        if (*uri != DY_JSON_STRING) {
             return true;
         }
+        ++uri;
+        dy_string_t uri_string = convert_json_string(uri);
 
-        dy_json_t content_changes;
-        if (!json_get_member(params_obj, DY_STR_LIT("contentChanges"), &content_changes)) {
+        const uint8_t *content_changes = json_get_member(params, DY_STR_LIT("contentChanges"));
+        if (content_changes == NULL) {
             return true;
         }
-
-        struct dy_json_array content_changes_array;
-        if (!json_force_array(content_changes, &content_changes_array)) {
+        if (*content_changes != DY_JSON_ARRAY) {
             return true;
         }
+        ++content_changes;
 
-        dy_lsp_did_change(ctx, uri_string, content_changes_array);
+        dy_lsp_did_change(ctx, uri_string, content_changes);
 
         return true;
     }
 
     if (dy_string_are_equal(method_string, DY_STR_LIT("textDocument/didClose"))) {
-        if (!have_params) {
+        if (params == NULL) {
             return true;
         }
+        if (*params != DY_JSON_OBJECT) {
+            return true;
+        }
+        ++params;
 
-        struct dy_json_object params_obj;
-        if (!json_force_object(params, &params_obj)) {
+        const uint8_t *text_document = json_get_member(params, DY_STR_LIT("textDocument"));
+        if (text_document == NULL) {
             return true;
         }
+        if (*text_document != DY_JSON_OBJECT) {
+            return true;
+        }
+        ++text_document;
 
-        dy_json_t text_document;
-        if (!json_get_member(params_obj, DY_STR_LIT("textDocument"), &text_document)) {
+        const uint8_t *uri = json_get_member(text_document, DY_STR_LIT("uri"));
+        if (uri == NULL)  {
             return true;
         }
+        if (*uri != DY_JSON_STRING) {
+            return true;
+        }
+        ++uri;
 
-        struct dy_json_object text_document_obj;
-        if (!json_force_object(text_document, &text_document_obj)) {
-            return true;
-        }
-
-        dy_json_t uri;
-        if (!json_get_member(text_document_obj, DY_STR_LIT("uri"), &uri)) {
-            return true;
-        }
-
-        dy_string_t uri_string;
-        if (!json_force_string(uri, &uri_string)) {
-            return true;
-        }
+        dy_string_t uri_string = convert_json_string(uri);
 
         dy_lsp_did_close(ctx, uri_string);
 
@@ -336,110 +359,117 @@ bool dy_lsp_handle_message(dy_lsp_ctx_t *ctx, dy_json_t message)
     }
 
     if (dy_string_are_equal(method_string, DY_STR_LIT("textDocument/hover"))) {
-        if (!have_id) {
+        if (id == NULL) {
             return true;
         }
 
-        if (!have_params) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("Missing 'params' field."))), ctx->env);
+        if (params == NULL) {
+            invalid_request(id, DY_STR_LIT("Missing 'params' field."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
+            return true;
+        }
+        if (*params != DY_JSON_OBJECT) {
+            invalid_request(id, DY_STR_LIT("'params' is not an object."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
+            return true;
+        }
+        ++params;
+
+        const uint8_t *text_document = json_get_member(params, DY_STR_LIT("textDocument"));
+        if (text_document == NULL) {
+            invalid_request(id, DY_STR_LIT("Missing 'textDocument' field."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
             return true;
         }
 
-        struct dy_json_object params_obj;
-        if (!json_force_object(params, &params_obj)) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("'params' is not an object."))), ctx->env);
+        if (*text_document != DY_JSON_OBJECT) {
+            invalid_request(id, DY_STR_LIT("'textDocument' is not an object."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
             return true;
         }
+        ++text_document;
 
-        dy_json_t text_document;
-        if (!json_get_member(params_obj, DY_STR_LIT("textDocument"), &text_document)) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("Missing 'textDocument' field."))), ctx->env);
+        const uint8_t *uri = json_get_member(text_document, DY_STR_LIT("uri"));
+        if (uri == NULL) {
+            invalid_request(id, DY_STR_LIT("Missing 'uri' field."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
             return true;
         }
+        if (*uri != DY_JSON_STRING) {
+            invalid_request(id, DY_STR_LIT("'uri' is not a string."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
+            return true;
+        }
+        ++uri;
+        dy_string_t uri_string = convert_json_string(uri);
 
-        struct dy_json_object text_document_obj;
-        if (!json_force_object(text_document, &text_document_obj)) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("'textDocument' is not an object."))), ctx->env);
+        const uint8_t *position = json_get_member(params, DY_STR_LIT("position"));
+        if (position == NULL) {
+            invalid_request(id, DY_STR_LIT("Missing 'position' field."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
             return true;
         }
+        if (*position != DY_JSON_OBJECT) {
+            invalid_request(id, DY_STR_LIT("'position' is not an object."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
+            return true;
+        }
+        ++position;
 
-        dy_json_t uri;
-        if (!json_get_member(text_document_obj, DY_STR_LIT("uri"), &uri)) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("Missing 'uri' field."))), ctx->env);
+        const uint8_t *line = json_get_member(position, DY_STR_LIT("line"));
+        if (line == NULL) {
+            invalid_request(id, DY_STR_LIT("Missing 'line' field."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
             return true;
         }
-
-        dy_string_t uri_string;
-        if (!json_force_string(uri, &uri_string)) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("'uri' is not a string."))), ctx->env);
+        if (*line != DY_JSON_NUMBER) {
+            invalid_request(id, DY_STR_LIT("'line' is not a number."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
             return true;
         }
-
-        dy_json_t position;
-        if (!json_get_member(params_obj, DY_STR_LIT("position"), &position)) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("Missing 'position' field."))), ctx->env);
-            return true;
-        }
-
-        struct dy_json_object position_obj;
-        if (!json_force_object(position, &position_obj)) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("'position' is not a string."))), ctx->env);
-            return true;
-        }
-
-        dy_json_t line;
-        if (!json_get_member(position_obj, DY_STR_LIT("line"), &line)) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("Missing 'line' field."))), ctx->env);
-            return true;
-        }
+        ++line;
 
         long line_number;
-        if (!json_force_integer(line, &line_number)) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("'line' is not a number."))), ctx->env);
+        memcpy(&line_number, line, sizeof(line_number));
+
+        const uint8_t *character = json_get_member(position, DY_STR_LIT("character"));
+        if (character == NULL) {
+            invalid_request(id, DY_STR_LIT("Missing 'character' field."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
             return true;
         }
-
-        dy_json_t character;
-        if (!json_get_member(position_obj, DY_STR_LIT("character"), &character)) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("Missing 'character' field."))), ctx->env);
+        if (*character != DY_JSON_NUMBER) {
+            invalid_request(id, DY_STR_LIT("'character' is not a number."), &ctx->output_buffer);
+            dy_lsp_send(ctx);
             return true;
         }
-
+        ++character;
         long character_number;
-        if (!json_force_integer(character, &character_number)) {
-            ctx->send(error_response(id, invalid_request(DY_STR_LIT("'character' is not a number."))), ctx->env);
-            return true;
-        }
+        memcpy(&character_number, character, sizeof(character_number));
 
-        dy_json_t result, error;
-        if (dy_lsp_hover(ctx, uri_string, line_number, character_number, &result, &error)) {
-            ctx->send(success_response(id, result), ctx->env);
-        } else {
-            ctx->send(error_response(id, error), ctx->env);
-        }
+        dy_lsp_hover(ctx, id, uri_string, line_number, character_number, &ctx->output_buffer);
+
+        dy_lsp_send(ctx);
 
         return true;
     }
 
-    if (have_id) {
-        ctx->send(error_response(id, method_not_found(DY_STR_LIT("Unknown method name."))), ctx->env);
+    if (id != NULL) {
+        method_not_found(id, DY_STR_LIT("Unknown method name."), &ctx->output_buffer);
+        dy_lsp_send(ctx);
     }
 
     return true;
 }
 
-bool dy_lsp_initialize(dy_lsp_ctx_t *ctx, dy_json_t *result, dy_json_t *error)
+void dy_lsp_initialize(const uint8_t *id, dy_lsp_ctx_t *ctx, dy_array_t *json)
 {
     if (ctx->is_initialized) {
-        *error = invalid_request(DY_STR_LIT("Already initialized."));
-        return false;
+        invalid_request(id, DY_STR_LIT("Already initialized."), json);
+    } else {
+        ctx->is_initialized = true;
+        initialize_response(id, json);
     }
-
-    ctx->is_initialized = true;
-
-    *result = initialize_response();
-
-    return true;
 }
 
 void dy_lsp_initialized(dy_lsp_ctx_t *ctx)
@@ -448,17 +478,16 @@ void dy_lsp_initialized(dy_lsp_ctx_t *ctx)
     return;
 }
 
-dy_json_t dy_lsp_shutdown(dy_lsp_ctx_t *ctx)
+void dy_lsp_shutdown(dy_lsp_ctx_t *ctx)
 {
     ctx->received_shutdown_request = true;
-    return dy_json_null();
 }
 
 void dy_lsp_did_open(dy_lsp_ctx_t *ctx, dy_string_t uri, dy_string_t text)
 {
     struct document doc = {
-        .uri = uri,
-        .text = text,
+        .uri = view_to_array(uri),
+        .text = view_to_array(text),
         .core_ctx = {
             .running_id = 0,
             .bound_inference_vars = dy_array_create(sizeof(struct dy_bound_inference_var), DY_ALIGNOF(struct dy_bound_inference_var), 1),
@@ -490,64 +519,67 @@ void dy_lsp_did_close(dy_lsp_ctx_t *ctx, dy_string_t uri)
         struct document doc;
         dy_array_get(ctx->documents, i, &doc);
 
-        if (dy_string_are_equal(doc.uri, uri)) {
+        if (dy_string_are_equal(array_view(doc.uri), uri)) {
             dy_array_remove(&ctx->documents, i);
             break;
         }
     }
 }
 
-void dy_lsp_did_change(dy_lsp_ctx_t *ctx, dy_string_t uri, struct dy_json_array content_changes)
+void dy_lsp_did_change(dy_lsp_ctx_t *ctx, dy_string_t uri, const uint8_t *content_changes)
 {
     for (size_t i = 0, size = ctx->documents.num_elems; i < size; ++i) {
         struct document *doc = dy_array_pos(ctx->documents, i);
 
-        if (!dy_string_are_equal(doc->uri, uri)) {
+        if (!dy_string_are_equal(array_view(doc->uri), uri)) {
             continue;
         }
 
-        for (size_t k = 0; k < content_changes.num_values; ++k) {
-            dy_json_t change = content_changes.values[k];
+        while (*content_changes != DY_JSON_END) {
+            const uint8_t *change = content_changes;
 
-            struct dy_json_object change_obj;
-            if (!json_force_object(change, &change_obj)) {
+            if (*change != DY_JSON_OBJECT) {
                 return;
             }
+            change++;
 
-            dy_json_t text;
-            if (!json_get_member(change_obj, DY_STR_LIT("text"), &text)) {
+            const uint8_t *text = json_get_member(change, DY_STR_LIT("text"));
+            if (text == NULL) {
                 return;
             }
-
-            dy_string_t text_string;
-            if (!json_force_string(text, &text_string)) {
+            if (*text != DY_JSON_STRING) {
                 return;
             }
+            ++text;
 
-            doc->text = text_string;
+            dy_string_t text_string = convert_json_string(text);
+
+            replace_storage_with_view(&doc->text, text_string);
 
             process_document(ctx, doc);
+
+            content_changes = skip_json_value(content_changes);
         }
 
         break;
     }
 }
 
-bool dy_lsp_hover(dy_lsp_ctx_t *ctx, dy_string_t uri, long line_number, long utf16_char_offset, dy_json_t *result, dy_json_t *error)
+void dy_lsp_hover(dy_lsp_ctx_t *ctx, const uint8_t *id, dy_string_t uri, long line_number, long utf16_char_offset, dy_array_t *json)
 {
     for (size_t i = 0, size = ctx->documents.num_elems; i < size; ++i) {
         struct document *doc = dy_array_pos(ctx->documents, i);
 
-        if (!dy_string_are_equal(doc->uri, uri)) {
+        if (!dy_string_are_equal(array_view(doc->uri), uri)) {
             continue;
         }
 
-        *result = dy_json_null();
-        return true;
+        null_success_response(id, json);
+
+        return;
     }
 
-    *error = invalid_request(DY_STR_LIT("Could not find the document."));
-    return false;
+    invalid_request(id, DY_STR_LIT("Could not find the document."), json);
 }
 
 void dy_lsp_exit(dy_lsp_ctx_t *ctx)
@@ -562,251 +594,155 @@ int dy_lsp_exit_code(dy_lsp_ctx_t *ctx)
     return ctx->exit_code;
 }
 
-dy_json_t initialize_response()
+void initialize_response(const uint8_t *id, dy_array_t *json)
 {
-    struct dy_json_member capabilities = {
-        .string = DY_STR_LIT("capabilities"),
-        .value = server_capabilities()
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
 
-    struct dy_json_member m_server_info = {
-        .string = DY_STR_LIT("serverInfo"),
-        .value = server_info()
-    };
+    put_string_literal(DY_STR_LIT("jsonrpc"), json);
+    put_string_literal(DY_STR_LIT("2.0"), json);
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
-    dy_array_add(&members, &capabilities);
-    dy_array_add(&members, &m_server_info);
+    put_string_literal(DY_STR_LIT("id"), json);
+    copy_json_value(id, json);
 
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
-        }
-    };
+    put_string_literal(DY_STR_LIT("result"), json);
+
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
+
+    put_string_literal(DY_STR_LIT("capabilities"), json);
+    server_capabilities(json);
+
+    put_string_literal(DY_STR_LIT("serverInfo"), json);
+    server_info(json);
+
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
+
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
-dy_json_t invalid_request(dy_string_t message)
+void invalid_request(const uint8_t *id, dy_string_t message, dy_array_t *json)
 {
-    return response_error(-32600, message);
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
+
+    put_string_literal(DY_STR_LIT("jsonrpc"), json);
+    put_string_literal(DY_STR_LIT("2.0"), json);
+
+    put_string_literal(DY_STR_LIT("id"), json);
+    copy_json_value(id, json);
+
+    put_string_literal(DY_STR_LIT("error"), json);
+    response_error(-32600, message, json);
+
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
-dy_json_t method_not_found(dy_string_t message)
+void method_not_found(const uint8_t *id, dy_string_t message, dy_array_t *json)
 {
-    return response_error(-32601, message);
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
+
+    put_string_literal(DY_STR_LIT("jsonrpc"), json);
+    put_string_literal(DY_STR_LIT("2.0"), json);
+
+    put_string_literal(DY_STR_LIT("id"), json);
+    copy_json_value(id, json);
+
+    put_string_literal(DY_STR_LIT("error"), json);
+    response_error(-32601, message, json);
+
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
-dy_json_t response_error(long code, dy_string_t message)
+void response_error(long code, dy_string_t message, dy_array_t *json)
 {
-    struct dy_json_member m_code = {
-        .string = DY_STR_LIT("code"),
-        .value = dy_json_integer(code)
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
 
-    struct dy_json_member m_message = {
-        .string = DY_STR_LIT("message"),
-        .value = dy_json_string(message)
-    };
+    put_string_literal(DY_STR_LIT("code"), json);
+    put_number(code, json);
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
-    dy_array_add(&members, &m_code);
-    dy_array_add(&members, &m_message);
+    put_string_literal(DY_STR_LIT("message"), json);
+    put_string_literal(message, json);
 
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
-        }
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
-dy_json_t server_capabilities()
+void server_capabilities(dy_array_t *json)
 {
-    struct dy_json_member text_document_sync = {
-        .string = DY_STR_LIT("textDocumentSync"),
-        .value = text_document_sync_options()
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
 
-    struct dy_json_member hover_provider = {
-        .string = DY_STR_LIT("hoverProvider"),
-        .value = dy_json_true()
-    };
+    put_string_literal(DY_STR_LIT("textDocumentSync"), json);
+    text_document_sync_options(json);
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
-    dy_array_add(&members, &text_document_sync);
-    dy_array_add(&members, &hover_provider);
+    put_string_literal(DY_STR_LIT("hoverProvider"), json);
+    dy_array_add(json, &(uint8_t){ DY_JSON_TRUE });
 
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
-        }
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
-dy_json_t server_info(void)
+void server_info(dy_array_t *json)
 {
-    struct dy_json_member name = {
-        .string = DY_STR_LIT("name"),
-        .value = dy_json_string(DY_STR_LIT("Duality"))
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
 
-    struct dy_json_member version = {
-        .string = DY_STR_LIT("version"),
-        .value = dy_json_string(DY_STR_LIT("0.0.1"))
-    };
+    put_string_literal(DY_STR_LIT("name"), json);
+    put_string_literal(DY_STR_LIT("Duality"), json);
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
-    dy_array_add(&members, &name);
-    dy_array_add(&members, &version);
+    put_string_literal(DY_STR_LIT("version"), json);
+    put_string_literal(DY_STR_LIT("0.0.1"), json);
 
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
-        }
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
-dy_json_t text_document_sync_options(void)
+void text_document_sync_options(dy_array_t *json)
 {
-    struct dy_json_member open_close = {
-        .string = DY_STR_LIT("openClose"),
-        .value = dy_json_true()
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
 
-    struct dy_json_member change = {
-        .string = DY_STR_LIT("change"),
-        .value = dy_json_integer(1)
-    };
+    put_string_literal(DY_STR_LIT("openClose"), json);
+    dy_array_add(json, &(uint8_t){ DY_JSON_TRUE });
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
-    dy_array_add(&members, &open_close);
-    dy_array_add(&members, &change);
+    put_string_literal(DY_STR_LIT("change"), json);
+    put_number(1, json);
 
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
-        }
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
-dy_json_t error_response(dy_json_t id, dy_json_t error)
+void null_success_response(const uint8_t *id, dy_array_t *json)
 {
-    struct dy_json_member jsonrpc = {
-        .string = DY_STR_LIT("jsonrpc"),
-        .value = dy_json_string(DY_STR_LIT("2.0"))
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
 
-    struct dy_json_member m_id = {
-        .string = DY_STR_LIT("id"),
-        .value = id
-    };
+    put_string_literal(DY_STR_LIT("jsonrpc"), json);
+    put_string_literal(DY_STR_LIT("2.0"), json);
 
-    struct dy_json_member m_error = {
-        .string = DY_STR_LIT("error"),
-        .value = error
-    };
+    put_string_literal(DY_STR_LIT("id"), json);
+    copy_json_value(id, json);
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 3);
-    dy_array_add(&members, &jsonrpc);
-    dy_array_add(&members, &m_id);
-    dy_array_add(&members, &m_error);
+    put_string_literal(DY_STR_LIT("result"), json);
+    dy_array_add(json, &(uint8_t){ DY_JSON_NULL });
 
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
-        }
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
-dy_json_t success_response(dy_json_t id, dy_json_t result)
+void hover_result(dy_string_t contents, dy_array_t *json)
 {
-    struct dy_json_member jsonrpc = {
-        .string = DY_STR_LIT("jsonrpc"),
-        .value = dy_json_string(DY_STR_LIT("2.0"))
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
 
-    struct dy_json_member m_id = {
-        .string = DY_STR_LIT("id"),
-        .value = id
-    };
+    put_string_literal(DY_STR_LIT("contents"), json);
+    put_string_literal(contents, json);
 
-    struct dy_json_member m_result = {
-        .string = DY_STR_LIT("result"),
-        .value = result
-    };
-
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 3);
-    dy_array_add(&members, &jsonrpc);
-    dy_array_add(&members, &m_id);
-    dy_array_add(&members, &m_result);
-
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
-        }
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
-dy_json_t hover_result(dy_string_t contents)
+void publish_diagnostics(struct dy_core_ctx *ctx, dy_string_t uri, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json)
 {
-    struct dy_json_member m_contents = {
-        .string = DY_STR_LIT("contents"),
-        .value = dy_json_string(contents)
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 1);
-    dy_array_add(&members, &m_contents);
+    put_string_literal(DY_STR_LIT("jsonrpc"), json);
+    put_string_literal(DY_STR_LIT("2.0"), json);
 
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
-        }
-    };
-}
+    put_string_literal(DY_STR_LIT("method"), json);
+    put_string_literal(DY_STR_LIT("textDocument/publishDiagnostics"), json);
 
-dy_json_t make_notification(dy_string_t method, dy_json_t params)
-{
-    struct dy_json_member jsonrpc_member = {
-        .string = DY_STR_LIT("jsonrpc"),
-        .value = dy_json_string(DY_STR_LIT("2.0"))
-    };
+    put_string_literal(DY_STR_LIT("params"), json);
+    diagnostics_params(ctx, uri, text_sources, expr, text, json);
 
-    struct dy_json_member method_member = {
-        .string = DY_STR_LIT("method"),
-        .value = dy_json_string(method)
-    };
-
-    struct dy_json_member params_member = {
-        .string = DY_STR_LIT("params"),
-        .value = params
-    };
-
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 3);
-    dy_array_add(&members, &jsonrpc_member);
-    dy_array_add(&members, &method_member);
-    dy_array_add(&members, &params_member);
-
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
-        }
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
 void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
@@ -817,14 +753,17 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
     }
 
     struct dy_parser_ctx parser_ctx = {
-        .stream = stream_from_string(doc->text),
+        .stream = {
+            .get_chars = null_stream,
+            .buffer = doc->text,
+            .env = NULL,
+            .current_index = 0
+        },
         .string_arrays = dy_array_create(sizeof(dy_array_t *), DY_ALIGNOF(dy_array_t *), 32)
     };
 
     struct dy_ast_do_block ast;
     bool parsing_succeeded = dy_parse_file(&parser_ctx, &ast);
-
-    dy_array_destroy(parser_ctx.stream.buffer);
 
     if (!parsing_succeeded) {
         return;
@@ -851,35 +790,9 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
     doc->core_is_present = true;
     doc->core = core;
 
-    dy_array_t diagnostics = dy_array_create(sizeof(dy_json_t), DY_ALIGNOF(dy_json_t), 8);
-    produce_diagnostics(&doc->core_ctx, ast_to_core_ctx.text_sources, core, doc->text, &diagnostics);
+    publish_diagnostics(&doc->core_ctx, array_view(doc->uri), ast_to_core_ctx.text_sources, core, array_view(doc->text), &ctx->output_buffer);
 
-    dy_json_t diag_json = {
-        .tag = DY_JSON_VALUE_ARRAY,
-        .array = {
-            .values = diagnostics.buffer,
-            .num_values = diagnostics.num_elems,
-        }
-    };
-
-    dy_json_t params = make_diagnostics_params(doc->uri, diag_json);
-
-    ctx->send(make_notification(DY_STR_LIT("textDocument/publishDiagnostics"), params), ctx->env);
-}
-
-struct dy_stream stream_from_string(dy_string_t s)
-{
-    dy_array_t buffer = dy_array_create(sizeof(char), DY_ALIGNOF(char), s.size);
-    for (size_t i = 0; i < s.size; ++i) {
-        dy_array_add(&buffer, s.ptr + i);
-    }
-
-    return (struct dy_stream){
-        .get_chars = null_stream,
-        .buffer = buffer,
-        .env = NULL,
-        .current_index = 0
-    };
+    dy_lsp_send(ctx);
 }
 
 void null_stream(dy_array_t *buffer, void *env)
@@ -930,17 +843,23 @@ bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, 
     return true;
 }
 
-bool produce_diagnostics(struct dy_core_ctx *ctx, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *diagnostics)
+bool produce_diagnostics(struct dy_core_ctx *ctx, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EQUALITY_MAP:
-        return produce_diagnostics(ctx, text_sources, *expr.equality_map.e1, text, diagnostics) && produce_diagnostics(ctx, text_sources, *expr.equality_map.e2, text, diagnostics);
-    case DY_CORE_EXPR_TYPE_MAP:
-        return produce_diagnostics(ctx, text_sources, *expr.type_map.type, text, diagnostics) && produce_diagnostics(ctx, text_sources, *expr.type_map.expr, text, diagnostics);
+    case DY_CORE_EXPR_EQUALITY_MAP: {
+        bool b1 = produce_diagnostics(ctx, text_sources, *expr.equality_map.e1, text, json);
+        bool b2 = produce_diagnostics(ctx, text_sources, *expr.equality_map.e2, text, json);
+        return b1 && b2;
+    }
+    case DY_CORE_EXPR_TYPE_MAP: {
+        bool b1 = produce_diagnostics(ctx, text_sources, *expr.type_map.type, text, json);
+        bool b2 = produce_diagnostics(ctx, text_sources, *expr.type_map.expr, text, json);
+        return b1 && b2;
+    }
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM: {
-        bool err1 = produce_diagnostics(ctx, text_sources, *expr.equality_map_elim.expr, text, diagnostics);
-        bool err2 = produce_diagnostics(ctx, text_sources, *expr.equality_map_elim.map.e1, text, diagnostics);
-        bool err3 = produce_diagnostics(ctx, text_sources, *expr.equality_map_elim.map.e2, text, diagnostics);
+        bool err1 = produce_diagnostics(ctx, text_sources, *expr.equality_map_elim.expr, text, json);
+        bool err2 = produce_diagnostics(ctx, text_sources, *expr.equality_map_elim.map.e1, text, json);
+        bool err3 = produce_diagnostics(ctx, text_sources, *expr.equality_map_elim.map.e2, text, json);
 
         if (expr.equality_map_elim.check_result == DY_NO || !err1) {
             const struct dy_range *r = get_text_range(text_sources, expr.equality_map_elim.id);
@@ -948,34 +867,36 @@ bool produce_diagnostics(struct dy_core_ctx *ctx, dy_array_t text_sources, struc
                 return false;
             }
 
-            dy_json_t range = compute_lsp_range(text, *r);
-
-            dy_json_t msg = error_message(ctx, expr.equality_map_elim);
-
-            dy_json_t diagnostic = make_diagnostic(range, dy_json_integer(1), msg);
-
-            dy_array_add(diagnostics, &diagnostic);
+            make_diagnostic(text, *r, 1, DY_STR_LIT("Message placeholder"), json);
         }
 
         return err2 && err3;
     }
-    case DY_CORE_EXPR_TYPE_MAP_ELIM:
-        return produce_diagnostics(ctx, text_sources, *expr.type_map_elim.expr, text, diagnostics) &&
-        produce_diagnostics(ctx, text_sources, *expr.type_map_elim.map.type, text, diagnostics) &&
-        produce_diagnostics(ctx, text_sources, *expr.type_map_elim.map.expr, text, diagnostics);
-    case DY_CORE_EXPR_JUNCTION:
-        return produce_diagnostics(ctx, text_sources, *expr.junction.e1, text, diagnostics) &&
-        produce_diagnostics(ctx, text_sources, *expr.junction.e2, text, diagnostics);
-    case DY_CORE_EXPR_ALTERNATIVE:
-        return produce_diagnostics(ctx, text_sources, *expr.alternative.first, text, diagnostics) &&
-        produce_diagnostics(ctx, text_sources, *expr.alternative.second, text, diagnostics);
+    case DY_CORE_EXPR_TYPE_MAP_ELIM: {
+        bool b1 = produce_diagnostics(ctx, text_sources, *expr.type_map_elim.expr, text, json);
+        bool b2 = produce_diagnostics(ctx, text_sources, *expr.type_map_elim.map.type, text, json);
+        bool b3 = produce_diagnostics(ctx, text_sources, *expr.type_map_elim.map.expr, text, json);
+        return b1 && b2 && b3;
+    }
+    case DY_CORE_EXPR_JUNCTION: {
+        bool b1 = produce_diagnostics(ctx, text_sources, *expr.junction.e1, text, json);
+        bool b2 = produce_diagnostics(ctx, text_sources, *expr.junction.e2, text, json);
+        return b1 && b2;
+    }
+    case DY_CORE_EXPR_ALTERNATIVE: {
+        bool b1 = produce_diagnostics(ctx, text_sources, *expr.alternative.first, text, json);
+        bool b2 = produce_diagnostics(ctx, text_sources, *expr.alternative.second, text, json);
+        return b1 && b2;
+    }
     case DY_CORE_EXPR_VARIABLE:
         return true;
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
         dy_bail("should never be reached");
-    case DY_CORE_EXPR_RECURSION:
-        return produce_diagnostics(ctx, text_sources, *expr.recursion.type, text, diagnostics) &&
-        produce_diagnostics(ctx, text_sources, *expr.recursion.expr, text, diagnostics);
+    case DY_CORE_EXPR_RECURSION: {
+        bool b1 = produce_diagnostics(ctx, text_sources, *expr.recursion.type, text, json);
+        bool b2 = produce_diagnostics(ctx, text_sources, *expr.recursion.expr, text, json);
+        return b1 && b2;
+    }
     case DY_CORE_EXPR_END:
         return true;
     case DY_CORE_EXPR_CUSTOM:
@@ -1000,7 +921,7 @@ const struct dy_range *get_text_range(dy_array_t text_sources, size_t id)
     return NULL;
 }
 
-dy_json_t compute_lsp_range(dy_string_t text, struct dy_range range)
+void compute_lsp_range(dy_string_t text, struct dy_range range, dy_array_t *json)
 {
     long line_start = 0;
     long character_start = 0;
@@ -1026,172 +947,246 @@ dy_json_t compute_lsp_range(dy_string_t text, struct dy_range range)
         }
     }
 
-    return make_range(make_position(line_start, character_start), make_position(line_end, character_end));
+    make_range(line_start, character_start, line_end, character_end, json);
 }
 
-dy_json_t error_message(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim)
+void make_diagnostic(dy_string_t text, struct dy_range range, long severity, dy_string_t message, dy_array_t *json)
 {
-    if (elim.check_result == DY_NO) {
-        return dy_json_string(DY_STR_LIT("Error message placeholder."));
-    } else {
-        return dy_json_string(DY_STR_LIT("Warning message placeholder."));
-    }
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
+
+    put_string_literal(DY_STR_LIT("range"), json);
+    compute_lsp_range(text, range, json);
+
+    put_string_literal(DY_STR_LIT("severity"), json);
+    put_number(severity, json);
+
+    put_string_literal(DY_STR_LIT("message"), json);
+    put_string_literal(message, json);
+
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
-dy_json_t make_diagnostic(dy_json_t range, dy_json_t severity, dy_json_t message)
+void diagnostics_params(struct dy_core_ctx *ctx, dy_string_t uri, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json)
 {
-    struct dy_json_member range_member = {
-        .string = DY_STR_LIT("range"),
-        .value = range
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
 
-    struct dy_json_member severity_member = {
-        .string = DY_STR_LIT("severity"),
-        .value = severity
-    };
+    put_string_literal(DY_STR_LIT("uri"), json);
+    put_string_literal(uri, json);
 
-    struct dy_json_member message_member = {
-        .string = DY_STR_LIT("message"),
-        .value = message
-    };
+    put_string_literal(DY_STR_LIT("diagnostics"), json);
+    dy_array_add(json, &(uint8_t){ DY_JSON_ARRAY });
+    produce_diagnostics(ctx, text_sources, expr, text, json);
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 3);
-    dy_array_add(&members, &range_member);
-    dy_array_add(&members, &severity_member);
-    dy_array_add(&members, &message_member);
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
+}
 
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
+void make_position(long line, long character, dy_array_t *json)
+{
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
+
+    put_string_literal(DY_STR_LIT("line"), json);
+    put_number(line, json);
+
+    put_string_literal(DY_STR_LIT("character"), json);
+    put_number(character, json);
+
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
+}
+
+void make_range(long start_line, long start_character, long end_line, long end_character, dy_array_t *json)
+{
+    dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
+
+    put_string_literal(DY_STR_LIT("start"), json);
+    make_position(start_line, start_character, json);
+
+    put_string_literal(DY_STR_LIT("end"), json);
+    make_position(end_line, end_character, json);
+
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
+}
+
+const uint8_t *json_get_member(const uint8_t *p, dy_string_t member)
+{
+    while (*p != DY_JSON_END) {
+        dy_string_t s = convert_json_string(p + 1);
+
+        const uint8_t *value = skip_json_string(p);
+
+        if (dy_string_are_equal(s, member)) {
+            return value;
         }
+
+        p = skip_json_value(value);
+    }
+
+    return NULL;
+}
+
+dy_string_t convert_json_string(const uint8_t *p)
+{
+    size_t i = 0;
+
+    while (p[i] != DY_JSON_END) {
+        ++i;
+    }
+
+    return (dy_string_t){
+        .ptr = (const char *)p,
+        .size = i
     };
 }
 
-dy_json_t make_diagnostics_params(dy_string_t uri, dy_json_t diagnostics)
+void put_string_literal(dy_string_t s, dy_array_t *json)
 {
-    struct dy_json_member uri_member = {
-        .string = DY_STR_LIT("uri"),
-        .value = dy_json_string(uri)
-    };
+    dy_array_add(json, &(uint8_t){ DY_JSON_STRING });
 
-    struct dy_json_member diagnostics_member = {
-        .string = DY_STR_LIT("diagnostics"),
-        .value = diagnostics
-    };
+    for (size_t i = 0; i < s.size; ++i) {
+        dy_array_add(json, s.ptr + i);
+    }
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 3);
-    dy_array_add(&members, &uri_member);
-    dy_array_add(&members, &diagnostics_member);
+    dy_array_add(json, &(uint8_t){ DY_JSON_END });
+}
 
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
+const uint8_t *copy_json_value(const uint8_t *src, dy_array_t *dst)
+{
+    dy_array_add(dst, src);
+
+    switch (*src) {
+    case DY_JSON_OBJECT:
+        ++src;
+
+        while (*src != DY_JSON_END) {
+            src = copy_json_string(src, dst);
+            src = copy_json_value(src, dst);
         }
-    };
-}
 
-dy_json_t make_position(long line, long character)
-{
-    struct dy_json_member line_member = {
-        .string = DY_STR_LIT("line"),
-        .value = dy_json_integer(line)
-    };
+        dy_array_add(dst, src);
 
-    struct dy_json_member character_member = {
-        .string = DY_STR_LIT("character"),
-        .value = dy_json_integer(character)
-    };
+        return src + 1;
+    case DY_JSON_ARRAY:
+        ++src;
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
-    dy_array_add(&members, &line_member);
-    dy_array_add(&members, &character_member);
-
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
+        while (*src != DY_JSON_END) {
+            src = copy_json_value(src, dst);
         }
-    };
-}
 
-dy_json_t make_range(dy_json_t start, dy_json_t end)
-{
-    struct dy_json_member start_member = {
-        .string = DY_STR_LIT("start"),
-        .value = start
-    };
+        dy_array_add(dst, src);
 
-    struct dy_json_member end_member = {
-        .string = DY_STR_LIT("end"),
-        .value = end
-    };
+        return src + 1;
+    case DY_JSON_STRING:
+        return copy_json_string(src, dst);
+    case DY_JSON_NUMBER:
+        ++src;
 
-    dy_array_t members = dy_array_create(sizeof(struct dy_json_member), DY_ALIGNOF(struct dy_json_member), 2);
-    dy_array_add(&members, &start_member);
-    dy_array_add(&members, &end_member);
-
-    return (dy_json_t){
-        .tag = DY_JSON_VALUE_OBJECT,
-        .object = {
-            .members = members.buffer,
-            .num_members = members.num_elems,
+        for (size_t i = 0; i < sizeof(long); ++i) {
+            dy_array_add(dst, src + i);
         }
+
+        return src + sizeof(long);
+    case DY_JSON_END:
+    case DY_JSON_NULL:
+    case DY_JSON_TRUE:
+    case DY_JSON_FALSE:
+        return src + 1;
+    }
+
+    dy_bail("Invalid JSON type");
+}
+
+const uint8_t *copy_json_string(const uint8_t *src, dy_array_t *dst)
+{
+    ++src;
+
+    while (*src != DY_JSON_END) {
+        dy_array_add(dst, src);
+        ++src;
+    }
+
+    dy_array_add(dst, src);
+
+    return src + 1;
+}
+
+const uint8_t *skip_json_value(const uint8_t *p)
+{
+    switch (*p) {
+    case DY_JSON_OBJECT:
+        ++p;
+
+        while (*p != DY_JSON_END) {
+            p = skip_json_string(p);
+            p = skip_json_value(p);
+        }
+
+        return p + 1;
+    case DY_JSON_ARRAY:
+        ++p;
+
+        while (*p != DY_JSON_END) {
+            p = skip_json_value(p);
+        }
+
+        return p + 1;
+    case DY_JSON_STRING:
+        return skip_json_string(p);
+    case DY_JSON_NUMBER:
+        return p + 1 + sizeof(long);
+    case DY_JSON_END:
+    case DY_JSON_NULL:
+    case DY_JSON_TRUE:
+    case DY_JSON_FALSE:
+        return p + 1;
+    }
+
+    dy_bail("Invalid JSON type");
+}
+
+const uint8_t *skip_json_string(const uint8_t *p)
+{
+    ++p;
+
+    while (*p != DY_JSON_END) {
+        ++p;
+    }
+
+    return p + 1;
+}
+
+void put_number(long x, dy_array_t *json)
+{
+    dy_array_add(json, &(uint8_t){ DY_JSON_NUMBER });
+    for (size_t i = 0; i < sizeof(long); ++i) {
+        dy_array_add(json, (uint8_t *)&x + i);
+    }
+}
+
+dy_string_t array_view(dy_array_t x)
+{
+    return (dy_string_t){
+        .ptr = x.buffer,
+        .size = x.num_elems
     };
 }
 
-bool json_force_object(dy_json_t json, struct dy_json_object *object)
+dy_array_t view_to_array(dy_string_t s)
 {
-    if (json.tag != DY_JSON_VALUE_OBJECT) {
-        return false;
-    }
-
-    *object = json.object;
-    return true;
+    dy_array_t x = dy_array_create(1, 1, s.size);
+    replace_storage_with_view(&x, s);
+    return x;
 }
 
-bool json_get_member(struct dy_json_object object, dy_string_t member, dy_json_t *value)
+void replace_storage_with_view(dy_array_t *x, dy_string_t s)
 {
-    for (size_t i = 0; i < object.num_members; ++i) {
-        if (dy_string_are_equal(object.members[i].string, member)) {
-            *value = object.members[i].value;
-            return true;
-        }
+    x->num_elems = 0;
+    for (size_t i = 0; i < s.size; ++i) {
+        dy_array_add(x, s.ptr + i);
     }
-
-    return false;
 }
 
-bool json_force_string(dy_json_t json, dy_string_t *value)
+void dy_lsp_send(dy_lsp_ctx_t *ctx)
 {
-    if (json.tag != DY_JSON_VALUE_STRING) {
-        return false;
-    }
-
-    *value = json.string;
-    return true;
-}
-
-bool json_force_array(dy_json_t json, struct dy_json_array *array)
-{
-    if (json.tag != DY_JSON_VALUE_ARRAY) {
-        return false;
-    }
-
-    *array = json.array;
-    return true;
-}
-
-bool json_force_integer(dy_json_t json, long *value)
-{
-    if (json.tag != DY_JSON_VALUE_NUMBER || json.number.tag != DY_JSON_NUMBER_INTEGER) {
-        return false;
-    }
-
-    *value = json.number.integer;
-    return true;
+    ctx->send(ctx->output_buffer.buffer, ctx->env);
+    ctx->output_buffer.num_elems = 0;
 }
