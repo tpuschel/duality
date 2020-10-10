@@ -8,6 +8,7 @@
 
 #include "overflow.h"
 #include "rc.h"
+#include "string.h"
 
 /**
  * This file implements dynamically
@@ -51,6 +52,8 @@ static inline void dy_array_destroy(dy_array_t array);
 
 static inline void *dy_array_pos(dy_array_t array, size_t i);
 static inline void *dy_array_last(dy_array_t array);
+
+static inline dy_string_t dy_array_view(const dy_array_t *array);
 
 dy_array_t dy_array_create(size_t elem_size, size_t alignment, size_t capacity)
 {
@@ -177,4 +180,12 @@ void *dy_array_last(dy_array_t array)
 void dy_array_destroy(dy_array_t array)
 {
     dy_rc_release(array.buffer, array.pre_padding, array.post_padding);
+}
+
+dy_string_t dy_array_view(const dy_array_t *array)
+{
+    return (dy_string_t){
+        .ptr = array->buffer,
+        .size = array->num_elems
+    };
 }

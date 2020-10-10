@@ -8,7 +8,6 @@
 
 #include "../core/check.h"
 #include "../core/eval.h"
-#include "ast.h"
 
 /**
  * Support for strings. Just for testing puposes, for now.
@@ -17,7 +16,7 @@
 static size_t dy_string_id;
 
 struct dy_string_data {
-    dy_string_t value;
+    dy_array_t value;
 };
 
 static struct dy_core_expr dy_string_type_of(void *data, struct dy_core_ctx *ctx);
@@ -109,7 +108,18 @@ dy_ternary_t dy_string_is_equal(void *data, struct dy_core_ctx *ctx, struct dy_c
 
     if (expr.tag == DY_CORE_EXPR_CUSTOM && expr.custom.id == dy_string_id) {
         struct dy_string_data *s2 = expr.custom.data;
-        if (dy_string_are_equal(s->value, s2->value)) {
+
+        dy_string_t view1 = {
+            .ptr = s->value.buffer,
+            .size = s->value.num_elems
+        };
+
+        dy_string_t view2 = {
+            .ptr = s2->value.buffer,
+            .size = s2->value.num_elems
+        };
+
+        if (dy_string_are_equal(view1, view2)) {
             return DY_YES;
         } else {
             return DY_NO;
@@ -212,8 +222,8 @@ void dy_string_to_string(void *data, struct dy_core_ctx *ctx, dy_array_t *string
 
     dy_array_add(string, &(char){ '\"' });
 
-    for (size_t i = 0; i < s->value.size; ++i) {
-        dy_array_add(string, s->value.ptr + i);
+    for (size_t i = 0; i < s->value.num_elems; ++i) {
+        dy_array_add(string, (char *)s->value.buffer + i);
     }
 
     dy_array_add(string, &(char){ '\"' });

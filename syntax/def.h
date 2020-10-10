@@ -8,7 +8,6 @@
 
 #include "../core/check.h"
 #include "../core/eval.h"
-#include "ast.h"
 
 static size_t dy_def_id;
 
@@ -148,11 +147,11 @@ bool dy_def_check(void *data, struct dy_core_ctx *ctx, struct dy_core_expr *resu
         dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
 
         *result = new_body;
-        
+
         return true;
     } else {
         struct dy_core_expr type_of_arg = dy_type_of(ctx, evaled_arg);
-        
+
         dy_array_add(&ctx->bindings, &(struct dy_core_binding){
             .id = def->id,
             .type = type_of_arg,
@@ -164,7 +163,7 @@ bool dy_def_check(void *data, struct dy_core_ctx *ctx, struct dy_core_expr *resu
         if (!dy_check_expr(ctx, def->body, &checked_body)) {
             checked_body = dy_core_expr_retain(ctx, def->body);
         }
-        
+
         --ctx->bindings.num_elems;
 
         dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
@@ -181,7 +180,7 @@ bool dy_def_check(void *data, struct dy_core_ctx *ctx, struct dy_core_expr *resu
             .tag = DY_CORE_EXPR_CUSTOM,
             .custom = dy_def_create(new_data)
         };
-        
+
         return true;
     }
 }
@@ -257,7 +256,7 @@ bool dy_def_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy
         if (!arg_is_new) {
             return false;
         }
-        
+
         struct dy_def_data new_data = {
             .id = def->id,
             .arg = arg,
@@ -268,7 +267,7 @@ bool dy_def_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy
             .tag = DY_CORE_EXPR_CUSTOM,
             .custom = dy_def_create(new_data)
         };
-        
+
         return true;
     }
 
@@ -278,19 +277,19 @@ bool dy_def_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy
 
     struct dy_core_expr body;
     bool body_is_new = substitute(ctx, def->body, id, sub, &body);
-    
+
     if (!arg_is_new && !body_is_new) {
         return false;
     }
-    
+
     if (!arg_is_new) {
         arg = dy_core_expr_retain(ctx, def->arg);
     }
-    
+
     if (!body_is_new) {
         body = dy_core_expr_retain(ctx, def->body);
     }
-    
+
     struct dy_def_data new_data = {
         .id = def->id,
         .arg = arg,
@@ -301,7 +300,7 @@ bool dy_def_substitute(void *data, struct dy_core_ctx *ctx, size_t id, struct dy
         .tag = DY_CORE_EXPR_CUSTOM,
         .custom = dy_def_create(new_data)
     };
-    
+
     return true;
 }
 

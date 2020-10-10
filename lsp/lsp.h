@@ -12,7 +12,6 @@
 #include "../core/check.h"
 
 #include "../syntax/parser.h"
-#include "../syntax/ast_to_core.h"
 
 /**
  * This file implements LSP support.
@@ -759,38 +758,28 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
             .env = NULL,
             .current_index = 0
         },
-        .string_arrays = dy_array_create(sizeof(dy_array_t *), DY_ALIGNOF(dy_array_t *), 32)
+        .core_ctx = doc->core_ctx,
+        .bound_vars = dy_array_create(sizeof(struct dy_bound_var), DY_ALIGNOF(struct dy_bound_var), 64),
+        .text_sources = dy_array_create(sizeof(struct dy_text_source), DY_ALIGNOF(struct dy_text_source), 64)
     };
 
-    struct dy_ast_do_block ast;
-    bool parsing_succeeded = dy_parse_file(&parser_ctx, &ast);
-
-    if (!parsing_succeeded) {
+    struct dy_core_expr new_core;
+    if (dy_parse_file(&parser_ctx, &new_core)) {
         return;
     }
 
-    struct dy_ast_to_core_ctx ast_to_core_ctx = {
-        .core_ctx = doc->core_ctx,
-        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), DY_ALIGNOF(struct dy_ast_to_core_bound_var), 64),
-        .text_sources = dy_array_create(sizeof(struct dy_ast_to_core_text_source), DY_ALIGNOF(struct dy_ast_to_core_text_source), 64)
-    };
+    doc->core_ctx = parser_ctx.core_ctx;
 
-    struct dy_core_expr core = dy_ast_do_block_to_core(&ast_to_core_ctx, ast);
-
-    doc->core_ctx = ast_to_core_ctx.core_ctx;
-
-    dy_ast_do_block_release(ast.body);
-
-    struct dy_core_expr new_core;
-    if (dy_check_expr(&doc->core_ctx, core, &new_core)) {
-        dy_core_expr_release(&doc->core_ctx, core);
-        core = new_core;
+    struct dy_core_expr checked_new_core;
+    if (dy_check_expr(&doc->core_ctx, new_core, &checked_new_core)) {
+        dy_core_expr_release(&doc->core_ctx, new_core);
+        new_core = checked_new_core;
     }
 
     doc->core_is_present = true;
-    doc->core = core;
+    doc->core = new_core;
 
-    publish_diagnostics(&doc->core_ctx, array_view(doc->uri), ast_to_core_ctx.text_sources, core, array_view(doc->text), &ctx->output_buffer);
+    publish_diagnostics(&doc->core_ctx, array_view(doc->uri), parser_ctx.text_sources, doc->core, array_view(doc->text), &ctx->output_buffer);
 
     dy_lsp_send(ctx);
 }
@@ -912,7 +901,7 @@ bool produce_diagnostics(struct dy_core_ctx *ctx, dy_array_t text_sources, struc
 const struct dy_range *get_text_range(dy_array_t text_sources, size_t id)
 {
     for (size_t i = 0, size = text_sources.num_elems; i < size; ++i) {
-        const struct dy_ast_to_core_text_source *p = dy_array_pos(text_sources, i);
+        const struct dy_text_source *p = dy_array_pos(text_sources, i);
         if (p->id == id) {
             return &p->text_range;
         }

@@ -7,7 +7,6 @@
 #define _GNU_SOURCE // For glibc's asprintf.
 
 #include "syntax/parser.h"
-#include "syntax/ast_to_core.h"
 
 #include "core/check.h"
 #include "core/eval.h"
@@ -53,22 +52,6 @@ int main(int argc, const char *argv[])
         stream = stdin;
     }
 
-    struct dy_parser_ctx parser_ctx = {
-        .stream = {
-            .get_chars = read_chunk,
-            .buffer = dy_array_create(sizeof(char), DY_ALIGNOF(char), CHUNK_SIZE),
-            .env = stream,
-            .current_index = 0,
-        },
-        .string_arrays = dy_array_create(sizeof(dy_array_t *), DY_ALIGNOF(dy_array_t *), 32)
-    };
-
-    struct dy_ast_do_block program_ast;
-    if (!dy_parse_file(&parser_ctx, &program_ast)) {
-        fprintf(stderr, "Failed to parse program.\n");
-        return -1;
-    }
-
     struct dy_core_ctx core_ctx = {
         .running_id = 0,
         .bound_inference_vars = dy_array_create(sizeof(struct dy_bound_inference_var), DY_ALIGNOF(struct dy_bound_inference_var), 64),
@@ -87,17 +70,25 @@ int main(int argc, const char *argv[])
     dy_def_register(&core_ctx);
     dy_string_register(&core_ctx);
 
-    struct dy_ast_to_core_ctx ast_to_core_ctx = {
+    struct dy_parser_ctx parser_ctx = {
+        .stream = {
+            .get_chars = read_chunk,
+            .buffer = dy_array_create(sizeof(char), DY_ALIGNOF(char), CHUNK_SIZE),
+            .env = stream,
+            .current_index = 0,
+        },
         .core_ctx = core_ctx,
-        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), DY_ALIGNOF(struct dy_ast_to_core_bound_var), 64),
-        .text_sources = dy_array_create(sizeof(struct dy_ast_to_core_text_source), DY_ALIGNOF(struct dy_ast_to_core_text_source), 64),
+        .bound_vars = dy_array_create(sizeof(struct dy_bound_var), DY_ALIGNOF(struct dy_bound_var), 64),
+        .text_sources = dy_array_create(sizeof(struct dy_text_source), DY_ALIGNOF(struct dy_text_source), 64),
     };
 
-    struct dy_core_expr program = dy_ast_do_block_to_core(&ast_to_core_ctx, program_ast);
+    struct dy_core_expr program;
+    if (!dy_parse_file(&parser_ctx, &program)) {
+        fprintf(stderr, "Failed to parse program.\n");
+        return -1;
+    }
 
-    core_ctx = ast_to_core_ctx.core_ctx;
-
-    dy_ast_do_block_release(program_ast.body);
+    core_ctx = parser_ctx.core_ctx;
 
     size_t constraint_start = core_ctx.constraints.num_elems;
     struct dy_core_expr checked_program;
@@ -109,7 +100,7 @@ int main(int argc, const char *argv[])
 
     if (core_has_error(program)) {
         fprintf(stderr, "Errors:\n");
-        print_core_errors(ast_to_core_ctx.text_sources, stderr, program, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
+        print_core_errors(parser_ctx.text_sources, stderr, program, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
         return -1;
     }
 
@@ -124,7 +115,7 @@ int main(int argc, const char *argv[])
 
         if (core_has_error(result)) {
             fprintf(stderr, "Errors:\n");
-            print_core_errors(ast_to_core_ctx.text_sources, stderr, result, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
+            print_core_errors(parser_ctx.text_sources, stderr, result, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
         }
         return -1;
     } else {
@@ -261,8 +252,8 @@ bool print_core_errors(dy_array_t text_sources, FILE *file, struct dy_core_expr 
         if (expr.custom.id == dy_uv_id) {
             struct dy_uv_data *data = expr.custom.data;
 
-            fprintf(file, "Unbound variable: ");
-            print_error_fragment(file, data->var.text_range, text, text_size);
+            fprintf(file, "Unbound variable\n");
+            //print_error_fragment(file, data->var.text_range, text, text_size);
         }
 
         if (expr.custom.id == dy_def_id) {

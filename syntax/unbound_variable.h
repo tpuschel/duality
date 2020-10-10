@@ -7,12 +7,11 @@
 #pragma once
 
 #include "../core/core.h"
-#include "ast.h"
 
 static size_t dy_uv_id;
 
 struct dy_uv_data {
-    struct dy_ast_literal var;
+    dy_array_t var;
 };
 
 static struct dy_core_expr dy_uv_type_of(void *data, struct dy_core_ctx *ctx);
@@ -183,7 +182,7 @@ void dy_uv_to_string(void *data, struct dy_core_ctx *ctx, dy_array_t *string)
 {
     struct dy_uv_data *d = data;
 
-    for (size_t i = 0; i < d->var.value.size; ++i) {
-        dy_array_add(string, d->var.value.ptr + i);
+    for (size_t i = 0; i < d->var.num_elems; ++i) {
+        dy_array_add(string, (char *)d->var.buffer + i);
     }
 }
