@@ -158,25 +158,25 @@ bool dy_check_equality_map(struct dy_core_ctx *ctx, struct dy_core_equality_map 
     size_t constraint_start2 = ctx->constraints.num_elems;
     struct dy_core_expr e2;
     bool e2_is_new = dy_check_expr(ctx, *equality_map.e2, &e2);
-    
+
     dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
 
     if (!e1_is_new && !e2_is_new) {
         return false;
     }
-    
+
     if (e1_is_new) {
         equality_map.e1 = dy_core_expr_new(e1);
     } else {
         dy_core_expr_retain_ptr(equality_map.e1);
     }
-    
+
     if (e2_is_new) {
         equality_map.e2 = dy_core_expr_new(e2);
     } else {
         dy_core_expr_retain_ptr(equality_map.e2);
     }
-    
+
     *result = equality_map;
     return true;
 }
@@ -205,19 +205,19 @@ bool dy_check_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map
     --ctx->bindings.num_elems;
 
     dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
-    
+
     if (!type_is_new && !expr_is_new) {
         dy_core_expr_release(ctx, type);
         return false;
     }
-    
+
     if (type_is_new) {
         type_map.type = dy_core_expr_new(type);
     } else {
         dy_core_expr_release(ctx, type);
         dy_core_expr_retain_ptr(type_map.type);
     }
-    
+
     if (expr_is_new) {
         type_map.expr = dy_core_expr_new(expr);
     } else {
@@ -247,7 +247,7 @@ bool dy_check_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality
     }
 
     dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
-    
+
     size_t subtype_implicits_old_size = ctx->subtype_implicits.num_elems;
 
     dy_ternary_t check_result = elim.check_result;
@@ -269,7 +269,7 @@ bool dy_check_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality
                     .is_implicit = eq_map.is_implicit,
                 }
             };
-            
+
             bool did_transform_expr = false;
             struct dy_core_expr new_expr;
             check_result = dy_is_subtype(ctx, type_of_expr, type_map_expr, expr, &new_expr, &did_transform_expr);
@@ -285,7 +285,7 @@ bool dy_check_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality
                 .tag = DY_CORE_EXPR_EQUALITY_MAP,
                 .equality_map = eq_map
             };
-            
+
             bool did_transform_expr = false;
             struct dy_core_expr new_expr;
             check_result = dy_is_subtype(ctx, type_of_expr, equality_map_expr, expr, &new_expr, &did_transform_expr);
@@ -300,14 +300,14 @@ bool dy_check_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality
 
         dy_core_expr_release(ctx, type_of_expr);
     }
-    
+
     if (expr_is_new) {
         elim.expr = dy_core_expr_new(expr);
     } else {
         dy_core_expr_release(ctx, expr);
         dy_core_expr_retain_ptr(elim.expr);
     }
-    
+
     if (eq_map_is_new) {
         elim.map = eq_map;
     } else {
@@ -316,7 +316,7 @@ bool dy_check_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality
         dy_core_expr_retain_ptr(elim.map.e1);
         dy_core_expr_retain_ptr(elim.map.e2);
     }
-    
+
     dy_ternary_t old_status = elim.check_result;
     elim.check_result = check_result;
 
@@ -337,7 +337,7 @@ bool dy_check_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality
             ret = ret2;
         }
     }
-    
+
     if (!expr_is_new && !eq_map_is_new && elim.check_result == old_status && !transformed) {
         dy_core_expr_release(ctx, ret);
         return false;
@@ -363,17 +363,17 @@ bool dy_check_junction(struct dy_core_ctx *ctx, struct dy_core_junction junction
     bool e2_is_new = dy_check_expr(ctx, *junction.e2, &e2);
 
     dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
-    
+
     if (!e1_is_new && !e2_is_new) {
         return false;
     }
-    
+
     if (e1_is_new) {
         junction.e1 = dy_core_expr_new(e1);
     } else {
         dy_core_expr_retain_ptr(junction.e1);
     }
-    
+
     if (e2_is_new) {
         junction.e2 = dy_core_expr_new(e2);
     } else {
@@ -395,17 +395,17 @@ bool dy_check_alternative(struct dy_core_ctx *ctx, struct dy_core_alternative al
     bool second_is_new = dy_check_expr(ctx, *alternative.second, &second);
 
     dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_NEGATIVE);
-    
+
     if (!first_is_new && !second_is_new) {
         return false;
     }
-    
+
     if (first_is_new) {
         alternative.first = dy_core_expr_new(first);
     } else {
         dy_core_expr_retain_ptr(alternative.first);
     }
-    
+
     if (second_is_new) {
         alternative.second = dy_core_expr_new(second);
     } else {
@@ -441,9 +441,9 @@ bool dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recurs
     remove_mentions_in_constraints(ctx, recursion.id, constraint_start2);
 
     --ctx->bindings.num_elems;
-    
+
     dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_CORE_POLARITY_POSITIVE);
-    
+
     size_t subtype_implicits_old_size = ctx->subtype_implicits.num_elems;
 
     dy_ternary_t check_result = recursion.check_result;
@@ -451,7 +451,7 @@ bool dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recurs
         struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
         constraint_start2 = ctx->constraints.num_elems;
-        
+
         struct dy_core_expr expr2;
         bool did_transform_expr = false;
         check_result = dy_is_subtype(ctx, type_of_expr, type, expr, &expr2, &did_transform_expr);
@@ -465,29 +465,29 @@ bool dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recurs
 
         dy_core_expr_release(ctx, type_of_expr);
     }
-    
+
     if (type_is_new) {
         recursion.type = dy_core_expr_new(type);
     } else {
         dy_core_expr_release(ctx, type);
         dy_core_expr_retain_ptr(recursion.type);
     }
-    
+
     if (expr_is_new) {
         recursion.expr = dy_core_expr_new(expr);
     } else {
         dy_core_expr_release(ctx, expr);
         dy_core_expr_retain_ptr(recursion.expr);
     }
-    
+
     dy_ternary_t old_status = recursion.check_result;
     recursion.check_result = check_result;
-    
+
     struct dy_core_expr ret = {
         .tag = DY_CORE_EXPR_RECURSION,
         .recursion = recursion
     };
-    
+
     bool did_transform = false;
     for (size_t i = subtype_implicits_old_size, size = ctx->subtype_implicits.num_elems; i < size; ++i) {
         struct dy_core_binding b;
@@ -500,7 +500,7 @@ bool dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recurs
             ret = ret2;
         }
     }
-    
+
     if (!type_is_new && !expr_is_new && recursion.check_result == old_status && !did_transform) {
         dy_core_expr_release(ctx, ret);
         return false;
@@ -517,7 +517,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct 
     if (!dy_check_expr(ctx, *inference_type_map.type, &type)) {
         type = dy_core_expr_retain(ctx, *inference_type_map.type);
     }
-    
+
     dy_array_add(&ctx->bindings, &(struct dy_core_binding){
         .id = inference_type_map.id,
         .type = type,
@@ -542,7 +542,7 @@ struct dy_core_expr dy_check_inference_type_map(struct dy_core_ctx *ctx, struct 
     }
 
     dy_core_expr_release(ctx, type);
-    
+
     return expr;
 }
 
@@ -640,7 +640,7 @@ bool dy_resolve_now_free_inference_vars(struct dy_core_ctx *ctx, size_t id, stru
         }
 
         dy_retire_ids_array(ctx, bound_inference_var->binding_ids);
-        
+
         struct dy_bound_inference_var copy = *bound_inference_var;
 
         dy_array_remove(&ctx->bound_inference_vars, i);
@@ -654,7 +654,7 @@ bool dy_resolve_now_free_inference_vars(struct dy_core_ctx *ctx, size_t id, stru
 
         i = ctx->bound_inference_vars.num_elems;
     }
-    
+
     if (!did_transform) {
         dy_core_expr_release(ctx, ret);
         return false;
@@ -686,7 +686,7 @@ bool dy_resolve_inference_var(struct dy_core_ctx *ctx, size_t id, struct dy_core
         if (!substitute(ctx, expr, id, sub, &expr)) {
             expr = dy_core_expr_retain(ctx, expr);
         }
-        
+
         dy_core_expr_release(ctx, sub);
 
         dy_free_first_constraints(ctx, constraint_start, ctx->constraints.num_elems);
@@ -701,7 +701,7 @@ bool dy_resolve_inference_var(struct dy_core_ctx *ctx, size_t id, struct dy_core
             dy_core_expr_release(ctx, expr);
             expr = new_expr;
         }
-        
+
         *result = expr;
         return true;
     } else {
@@ -746,7 +746,7 @@ bool dy_resolve_inference_var(struct dy_core_ctx *ctx, size_t id, struct dy_core
                 dy_core_expr_release(ctx, expr);
                 expr = new_expr;
             }
-            
+
             *result = expr;
             return true;
         } else {
@@ -834,12 +834,12 @@ bool remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t id, struct dy_co
                 return true;
             }
         }
-        
+
         struct dy_core_expr e2;
         if (!remove_mentions_in_subtype(ctx, id, *subtype.equality_map.e2, &e2)) {
             return false;
         }
-        
+
         dy_core_expr_retain_ptr(subtype.equality_map.e1);
         subtype.equality_map.e2 = dy_core_expr_new(e2);
         *result = subtype;
@@ -848,52 +848,52 @@ bool remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t id, struct dy_co
     case DY_CORE_EXPR_TYPE_MAP: {
         struct dy_core_expr type;
         bool type_is_new = remove_mentions_in_supertype(ctx, id, *subtype.type_map.type, &type);
-        
+
         struct dy_core_expr expr;
         bool expr_is_new = remove_mentions_in_subtype(ctx, id, *subtype.type_map.expr, &expr);
-        
+
         if (!type_is_new && !expr_is_new) {
             return false;
         }
-        
+
         if (type_is_new) {
             subtype.type_map.type = dy_core_expr_new(type);
         } else {
             dy_core_expr_retain_ptr(subtype.type_map.type);
         }
-        
+
         if (expr_is_new) {
             subtype.type_map.expr = dy_core_expr_new(expr);
         } else {
             dy_core_expr_retain_ptr(subtype.type_map.expr);
         }
-        
+
         *result = subtype;
         return true;
     }
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP: {
         struct dy_core_expr type;
         bool type_is_new = remove_mentions_in_supertype(ctx, id, *subtype.inference_type_map.type, &type);
-        
+
         struct dy_core_expr expr;
         bool expr_is_new = remove_mentions_in_subtype(ctx, id, *subtype.inference_type_map.expr, &expr);
-        
+
         if (!type_is_new && !expr_is_new) {
             return false;
         }
-        
+
         if (type_is_new) {
             subtype.inference_type_map.type = dy_core_expr_new(type);
         } else {
             dy_core_expr_retain_ptr(subtype.inference_type_map.type);
         }
-        
+
         if (expr_is_new) {
             subtype.inference_type_map.expr = dy_core_expr_new(expr);
         } else {
             dy_core_expr_retain_ptr(subtype.inference_type_map.expr);
         }
-        
+
         *result = subtype;
         return true;
     }
@@ -914,52 +914,52 @@ bool remove_mentions_in_subtype(struct dy_core_ctx *ctx, size_t id, struct dy_co
     case DY_CORE_EXPR_JUNCTION: {
         struct dy_core_expr e1;
         bool e1_is_new = remove_mentions_in_subtype(ctx, id, *subtype.junction.e1, &e1);
-           
+
         struct dy_core_expr e2;
         bool e2_is_new = remove_mentions_in_subtype(ctx, id, *subtype.junction.e2, &e2);
-           
+
        if (!e1_is_new && !e2_is_new) {
            return false;
        }
-       
+
        if (e1_is_new) {
            subtype.junction.e1 = dy_core_expr_new(e1);
        } else {
            dy_core_expr_retain_ptr(subtype.junction.e1);
        }
-       
+
        if (e2_is_new) {
            subtype.junction.e2 = dy_core_expr_new(e2);
        } else {
            dy_core_expr_retain_ptr(subtype.junction.e2);
        }
-       
+
        *result = subtype;
        return true;
     }
     case DY_CORE_EXPR_RECURSION: {
         struct dy_core_expr type;
         bool type_is_new = remove_mentions_in_supertype(ctx, id, *subtype.recursion.type, &type);
-        
+
         struct dy_core_expr expr;
         bool expr_is_new = remove_mentions_in_subtype(ctx, id, *subtype.recursion.expr, &expr);
-        
+
         if (!type_is_new && !expr_is_new) {
             return false;
         }
-        
+
         if (type_is_new) {
             subtype.recursion.type = dy_core_expr_new(type);
         } else {
             dy_core_expr_retain_ptr(subtype.recursion.type);
         }
-        
+
         if (expr_is_new) {
             subtype.recursion.expr = dy_core_expr_new(expr);
         } else {
             dy_core_expr_retain_ptr(subtype.recursion.expr);
         }
-        
+
         *result = subtype;
         return true;
     }
@@ -1017,12 +1017,12 @@ bool remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t id, struct dy_
                 return true;
             }
         }
-        
+
         struct dy_core_expr e2;
         if (!remove_mentions_in_supertype(ctx, id, *supertype.equality_map.e2, &e2)) {
             return false;
         }
-        
+
         dy_core_expr_retain_ptr(supertype.equality_map.e1);
         supertype.equality_map.e2 = dy_core_expr_new(e2);
         *result = supertype;
@@ -1031,52 +1031,52 @@ bool remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t id, struct dy_
     case DY_CORE_EXPR_TYPE_MAP: {
         struct dy_core_expr type;
         bool type_is_new = remove_mentions_in_subtype(ctx, id, *supertype.type_map.type, &type);
-        
+
         struct dy_core_expr expr;
         bool expr_is_new = remove_mentions_in_supertype(ctx, id, *supertype.type_map.expr, &expr);
-        
+
         if (!type_is_new && !expr_is_new) {
             return false;
         }
-        
+
         if (type_is_new) {
             supertype.type_map.type = dy_core_expr_new(type);
         } else {
             dy_core_expr_retain_ptr(supertype.type_map.type);
         }
-        
+
         if (expr_is_new) {
             supertype.type_map.expr = dy_core_expr_new(expr);
         } else {
             dy_core_expr_retain_ptr(supertype.type_map.expr);
         }
-        
+
         *result = supertype;
         return true;
     }
     case DY_CORE_EXPR_INFERENCE_TYPE_MAP: {
         struct dy_core_expr type;
         bool type_is_new = remove_mentions_in_subtype(ctx, id, *supertype.inference_type_map.type, &type);
-        
+
         struct dy_core_expr expr;
         bool expr_is_new = remove_mentions_in_supertype(ctx, id, *supertype.inference_type_map.expr, &expr);
-        
+
         if (!type_is_new && !expr_is_new) {
             return false;
         }
-        
+
         if (type_is_new) {
             supertype.inference_type_map.type = dy_core_expr_new(type);
         } else {
             dy_core_expr_retain_ptr(supertype.inference_type_map.type);
         }
-        
+
         if (expr_is_new) {
             supertype.inference_type_map.expr = dy_core_expr_new(expr);
         } else {
             dy_core_expr_retain_ptr(supertype.inference_type_map.expr);
         }
-        
+
         *result = supertype;
         return true;
     }
@@ -1097,52 +1097,52 @@ bool remove_mentions_in_supertype(struct dy_core_ctx *ctx, size_t id, struct dy_
     case DY_CORE_EXPR_JUNCTION: {
         struct dy_core_expr e1;
         bool e1_is_new = remove_mentions_in_supertype(ctx, id, *supertype.junction.e1, &e1);
-           
+
         struct dy_core_expr e2;
         bool e2_is_new = remove_mentions_in_supertype(ctx, id, *supertype.junction.e2, &e2);
-           
+
        if (!e1_is_new && !e2_is_new) {
            return false;
        }
-       
+
        if (e1_is_new) {
            supertype.junction.e1 = dy_core_expr_new(e1);
        } else {
            dy_core_expr_retain_ptr(supertype.junction.e1);
        }
-       
+
        if (e2_is_new) {
            supertype.junction.e2 = dy_core_expr_new(e2);
        } else {
            dy_core_expr_retain_ptr(supertype.junction.e2);
        }
-       
+
        *result = supertype;
        return true;
     }
     case DY_CORE_EXPR_RECURSION: {
         struct dy_core_expr type;
         bool type_is_new = remove_mentions_in_subtype(ctx, id, *supertype.recursion.type, &type);
-        
+
         struct dy_core_expr expr;
         bool expr_is_new = remove_mentions_in_supertype(ctx, id, *supertype.recursion.expr, &expr);
-        
+
         if (!type_is_new && !expr_is_new) {
             return false;
         }
-        
+
         if (type_is_new) {
             supertype.recursion.type = dy_core_expr_new(type);
         } else {
             dy_core_expr_retain_ptr(supertype.recursion.type);
         }
-        
+
         if (expr_is_new) {
             supertype.recursion.expr = dy_core_expr_new(expr);
         } else {
             dy_core_expr_retain_ptr(supertype.recursion.expr);
         }
-        
+
         *result = supertype;
         return true;
     }

@@ -7,6 +7,7 @@
 #pragma once
 
 #include "../support/bail.h"
+#include "core.h"
 
 /**
  * The functions here define equality for all objects of Core.
@@ -237,7 +238,7 @@ dy_ternary_t type_map_is_equal_to_type_map(struct dy_core_ctx *ctx, struct dy_co
     if (type_map1.polarity != type_map2.polarity || type_map1.is_implicit != type_map2.is_implicit) {
         return DY_NO;
     }
-    
+
     dy_array_add(&ctx->equal_variables, &(struct dy_equal_variables){
         .id1 = type_map1.id,
         .id2 = type_map2.id
@@ -282,20 +283,20 @@ dy_ternary_t variable_is_equal(struct dy_core_ctx *ctx, size_t variable_id, stru
     if (variable_id == expr.variable_id) {
         return DY_YES;
     }
-    
+
     for (size_t i = 0, size = ctx->equal_variables.num_elems; i < size; ++i) {
         struct dy_equal_variables v;
         dy_array_get(ctx->equal_variables, i, &v);
-        
+
         if (v.id1 == variable_id && v.id2 == expr.variable_id) {
             return true;
         }
-        
+
         if (v.id1 == expr.variable_id && v.id2 == variable_id) {
             return true;
         }
     }
-    
+
     return DY_MAYBE;
 }
 

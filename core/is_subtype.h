@@ -57,7 +57,7 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
     if (subtype.tag == DY_CORE_EXPR_RECURSION && supertype.tag == DY_CORE_EXPR_RECURSION && subtype.recursion.polarity == supertype.recursion.polarity && subtype.recursion.id == supertype.recursion.id) {
         return dy_is_subtype(ctx, *subtype.recursion.expr, *supertype.recursion.expr, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
-    
+
     if (subtype.tag == DY_CORE_EXPR_RECURSION && subtype.recursion.polarity == DY_CORE_POLARITY_POSITIVE) {
         return positive_recursion_is_subtype(ctx, subtype.recursion, supertype, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
@@ -65,7 +65,7 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
     if (subtype.tag == DY_CORE_EXPR_RECURSION && subtype.recursion.polarity == DY_CORE_POLARITY_NEGATIVE) {
         return negative_recursion_is_subtype(ctx, subtype.recursion, supertype, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
-    
+
     if (supertype.tag == DY_CORE_EXPR_RECURSION && supertype.recursion.polarity == DY_CORE_POLARITY_POSITIVE) {
         return is_subtype_of_positive_recursion(ctx, subtype, supertype.recursion, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
@@ -73,11 +73,11 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
     if (supertype.tag == DY_CORE_EXPR_RECURSION && supertype.recursion.polarity == DY_CORE_POLARITY_NEGATIVE) {
         return is_subtype_of_negative_recursion(ctx, subtype, supertype.recursion, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
-    
+
     if (supertype.tag == DY_CORE_EXPR_JUNCTION && supertype.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
         return is_subtype_of_positive_junction(ctx, subtype, supertype.junction, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
-    
+
     if (subtype.tag == DY_CORE_EXPR_JUNCTION && subtype.junction.polarity == DY_CORE_POLARITY_NEGATIVE) {
         return negative_junction_is_subtype(ctx, subtype.junction, supertype, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
@@ -89,12 +89,12 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
     if (subtype.tag == DY_CORE_EXPR_JUNCTION && subtype.junction.polarity == DY_CORE_POLARITY_POSITIVE) {
         return positive_junction_is_subtype(ctx, subtype.junction, supertype, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
-    
+
     if (subtype.tag == DY_CORE_EXPR_VARIABLE) {
         if (supertype.tag == DY_CORE_EXPR_VARIABLE && subtype.variable_id == supertype.variable_id) {
             return DY_YES;
         }
-        
+
         enum dy_core_polarity polarity;
         if (dy_is_inference_var(ctx, subtype.variable_id, &polarity) && polarity == DY_CORE_POLARITY_NEGATIVE) {
             dy_array_add(&ctx->constraints, &(struct dy_constraint){
@@ -103,15 +103,15 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
                 .polarity = DY_CORE_POLARITY_NEGATIVE
             });
         }
-        
+
         return DY_MAYBE;
     }
-    
+
     if (supertype.tag == DY_CORE_EXPR_VARIABLE) {
         if (subtype.tag == DY_CORE_EXPR_VARIABLE && subtype.variable_id == supertype.variable_id) {
             return DY_YES;
         }
-        
+
         enum dy_core_polarity polarity;
         if (dy_is_inference_var(ctx, supertype.variable_id, &polarity) && polarity == DY_CORE_POLARITY_POSITIVE) {
             dy_array_add(&ctx->constraints, &(struct dy_constraint){
@@ -120,7 +120,7 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
                 .polarity = DY_CORE_POLARITY_POSITIVE
             });
         }
-        
+
         return DY_MAYBE;
     }
 
@@ -1092,7 +1092,7 @@ bool dy_is_inference_var(struct dy_core_ctx *ctx, size_t id, enum dy_core_polari
             }
         }
     }
-    
+
     for (size_t i = 0, size = ctx->subtype_implicits.num_elems; i < size; ++i) {
         const struct dy_core_binding *b = dy_array_pos(ctx->subtype_implicits, i);
         if (b->id == id) {
@@ -1100,7 +1100,7 @@ bool dy_is_inference_var(struct dy_core_ctx *ctx, size_t id, enum dy_core_polari
             return true;
         }
     }
-    
+
     for (size_t i = 0, size = ctx->bound_inference_vars.num_elems; i < size; ++i) {
         const struct dy_bound_inference_var *bc = dy_array_pos(ctx->bound_inference_vars, i);
         if (bc->id == id) {
@@ -1108,6 +1108,6 @@ bool dy_is_inference_var(struct dy_core_ctx *ctx, size_t id, enum dy_core_polari
             return true;
         }
     }
-    
+
     dy_bail("Unbound variable!");
 }

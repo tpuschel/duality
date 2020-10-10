@@ -32,11 +32,11 @@ struct dy_core_ctx {
     dy_array_t supertype_assumption_cache;
 
     dy_array_t bindings;
-    
+
     dy_array_t equal_variables;
-    
+
     dy_array_t subtype_implicits;
-    
+
     dy_array_t free_ids_arrays;
 
     dy_array_t constraints;

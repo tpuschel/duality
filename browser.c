@@ -81,7 +81,7 @@ const char *process_code(const char *text, size_t text_length_in_bytes)
 
     dy_array_t stringified_expr = dy_array_create(sizeof(char), DY_ALIGNOF(char), 64);
     dy_core_expr_to_string(&core_ctx, result, &stringified_expr);
-    
+
     dy_core_expr_release(&core_ctx, result);
 
     dy_array_add(&stringified_expr, &(char){ '\0' });

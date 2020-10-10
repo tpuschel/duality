@@ -40,13 +40,13 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
             .type = *expr.type_map.type,
             .is_inference_var = false
         });
-        
+
         dy_core_expr_retain_ptr(expr.type_map.type);
         expr.type_map.expr = dy_core_expr_new(dy_type_of(ctx, *expr.type_map.expr));
         expr.type_map.polarity = DY_CORE_POLARITY_POSITIVE;
-        
+
         --ctx->bindings.num_elems;
-        
+
         return expr;
     case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
         return dy_core_expr_retain(ctx, *expr.equality_map_elim.map.e2);
@@ -73,21 +73,21 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
                 return dy_core_expr_retain(ctx, b->type);
             }
         }
-            
+
         for (size_t i = 0, size = ctx->subtype_implicits.num_elems; i < size; ++i) {
             const struct dy_core_binding *b = dy_array_pos(ctx->subtype_implicits, i);
             if (b->id == expr.variable_id) {
                 return dy_core_expr_retain(ctx, b->type);
             }
         }
-            
+
         for (size_t i = 0, size = ctx->bound_inference_vars.num_elems; i < size; ++i) {
             const struct dy_bound_inference_var *bc = dy_array_pos(ctx->bound_inference_vars, i);
             if (bc->id == expr.variable_id) {
                 return dy_core_expr_retain(ctx, bc->type);
             }
         }
-        
+
         dy_bail("Unbound variable!");
     case DY_CORE_EXPR_CUSTOM: {
         const struct dy_core_custom_shared *s = dy_array_pos(ctx->custom_shared, expr.custom.id);
@@ -105,7 +105,7 @@ struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr
             .tag = DY_CORE_EXPR_VARIABLE,
             .variable_id = expr.recursion.id
         };
-        
+
         dy_array_add(&ctx->bindings, &(struct dy_core_binding){
             .id = expr.recursion.id,
             .type = self_type,
