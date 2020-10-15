@@ -764,7 +764,7 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
     };
 
     struct dy_core_expr new_core;
-    if (dy_parse_file(&parser_ctx, &new_core)) {
+    if (!dy_parse_file(&parser_ctx, &new_core)) {
         return;
     }
 
