@@ -208,7 +208,11 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
         dy_ternary_t res1 = dy_is_subtype_no_transformation(ctx, type_of_junction_e1, equality_map);
         assert(x == ctx->constraints.num_elems);
 
+        dy_core_expr_release(ctx, type_of_junction_e1);
+
         if (res1 == DY_YES) {
+            dy_core_expr_release_ptr(ctx, left.junction.e2);
+
             struct dy_core_equality_map_elim new_elim = {
                 .expr = left.junction.e1,
                 .map = equality_map.equality_map,
@@ -217,6 +221,8 @@ struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy
 
             return dy_eval_equality_map_elim(ctx, new_elim, is_value);
         }
+
+        dy_core_expr_release_ptr(ctx, left.junction.e1);
 
         struct dy_core_equality_map_elim new_elim = {
             .expr = left.junction.e2,
