@@ -7,6 +7,7 @@
 #pragma once
 
 #include "core.h"
+#include "are_equal.h"
 
 /**
  * This file deals with collecting/resolving constraints.
@@ -51,7 +52,9 @@ void dy_join_constraints(struct dy_core_ctx *ctx, size_t start1, size_t start2, 
             struct dy_constraint *c2 = dy_array_pos(ctx->constraints, k);
 
             if (c->id == c2->id) {
-                if (polarity == c->polarity) {
+                if (dy_are_equal(ctx, c->expr, c2->expr) == DY_YES) {
+                    dy_core_expr_release(ctx, c->expr);
+                } else if (polarity == c->polarity) {
                     c2->expr = (struct dy_core_expr){
                         .tag = DY_CORE_EXPR_JUNCTION,
                         .junction = {
