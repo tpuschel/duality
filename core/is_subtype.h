@@ -870,11 +870,10 @@ dy_ternary_t is_subtype_of_negative_junction(struct dy_core_ctx *ctx, struct dy_
 
     if (did_transform_e1 || did_transform_e2) {
         *new_subtype_expr = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_JUNCTION,
-            .junction = {
-                .e1 = dy_core_expr_new(e1),
-                .e2 = dy_core_expr_new(e2),
-                .polarity = DY_CORE_POLARITY_POSITIVE,
+            .tag = DY_CORE_EXPR_ALTERNATIVE,
+            .alternative = {
+                .first = dy_core_expr_new(e1),
+                .second = dy_core_expr_new(e2),
             }
         };
 
