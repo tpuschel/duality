@@ -160,11 +160,11 @@ void dy_string_to_string(struct dy_core_ctx *ctx, void *data, dy_array_t *string
 {
     struct dy_string_data *s = data;
 
-    dy_array_add(string, &(char){ '\"' });
+    dy_array_add(string, &(char){ '\'' });
 
     for (size_t i = 0; i < s->value.num_elems; ++i) {
         dy_array_add(string, (char *)s->value.buffer + i);
     }
 
-    dy_array_add(string, &(char){ '\"' });
+    dy_array_add(string, &(char){ '\'' });
 }

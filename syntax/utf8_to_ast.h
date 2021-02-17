@@ -534,7 +534,7 @@ bool dy_utf8_to_ast_string(struct dy_utf8_to_ast_ctx *ctx, dy_array_t *string)
 {
     size_t start_index = ctx->stream.current_index;
 
-    if (!dy_utf8_literal(ctx, DY_STR_LIT("\""))) {
+    if (!dy_utf8_literal(ctx, DY_STR_LIT("'"))) {
         ctx->stream.current_index = start_index;
         return false;
     }
@@ -546,7 +546,7 @@ bool dy_utf8_to_ast_string(struct dy_utf8_to_ast_ctx *ctx, dy_array_t *string)
             return false;
         }
 
-        if (c == '\"') {
+        if (c == '\'') {
             break;
         }
 
