@@ -110,8 +110,8 @@ static inline void replace_storage_with_view(dy_array_t *x, dy_string_t s);
 
 dy_lsp_ctx_t *dy_lsp_create(dy_lsp_send_fn send, void *env)
 {
-    struct dy_lsp_ctx *ctx = dy_rc_alloc(sizeof *ctx, DY_ALIGNOF(*ctx));
-    *ctx = (struct dy_lsp_ctx){
+    dy_lsp_ctx_t *ctx = dy_rc_alloc(sizeof *ctx, DY_ALIGNOF(struct dy_lsp_ctx));
+    *ctx = (dy_lsp_ctx_t){
         .output_buffer = dy_array_create(1, 1, 128),
         .send = send,
         .env = env,
@@ -128,7 +128,7 @@ void dy_lsp_destroy(dy_lsp_ctx_t *ctx)
 {
     dy_array_release(&ctx->documents);
     dy_array_release(&ctx->output_buffer);
-    dy_rc_release(ctx, DY_ALIGNOF(*ctx));
+    dy_rc_release(ctx, DY_ALIGNOF(dy_lsp_ctx_t));
 }
 
 bool dy_lsp_handle_message(dy_lsp_ctx_t *ctx, const uint8_t *message)
