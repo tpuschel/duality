@@ -373,6 +373,8 @@ struct dy_ast_pattern dy_ast_pattern_retain(struct dy_ast_pattern pattern)
         dy_ast_pattern_list_body_retain(pattern.list.body);
         return pattern;
     }
+
+    dy_bail("impossible");
 }
 
 struct dy_ast_pattern *dy_ast_pattern_retain_ptr(struct dy_ast_pattern *pattern)
@@ -391,6 +393,8 @@ void dy_ast_pattern_release(struct dy_ast_pattern pattern)
         dy_ast_pattern_list_body_release(pattern.list.body);
         return;
     }
+
+    dy_bail("impossible");
 }
 
 void dy_ast_pattern_release_ptr(struct dy_ast_pattern *pattern)
@@ -445,22 +449,22 @@ struct dy_ast_do_block_stmnt dy_ast_do_block_stmnt_retain(struct dy_ast_do_block
     switch (stmnt.tag){
     case DY_AST_DO_BLOCK_STMNT_EXPR:
         dy_ast_expr_retain_ptr(stmnt.expr.expr);
-        break;
+        return stmnt;
     case DY_AST_DO_BLOCK_STMNT_LET:
         dy_ast_binding_retain(stmnt.let.binding);
         dy_ast_expr_retain_ptr(stmnt.let.expr);
-        break;
+        return stmnt;
     case DY_AST_DO_BLOCK_STMNT_EQUAL:
         dy_ast_expr_retain_ptr(stmnt.equal.left);
         dy_ast_expr_retain_ptr(stmnt.equal.right);
-        break;
+        return stmnt;
     case DY_AST_DO_BLOCK_STMNT_DEF:
         dy_array_retain(&stmnt.def.name);
         dy_ast_expr_retain_ptr(stmnt.def.expr);
-        break;
+        return stmnt;
     }
 
-    return stmnt;
+    dy_bail("impossible");
 }
 
 
@@ -469,20 +473,22 @@ void dy_ast_do_block_stmnt_release(struct dy_ast_do_block_stmnt stmnt)
     switch (stmnt.tag){
     case DY_AST_DO_BLOCK_STMNT_EXPR:
         dy_ast_expr_release_ptr(stmnt.expr.expr);
-        break;
+        return;
     case DY_AST_DO_BLOCK_STMNT_LET:
         dy_ast_binding_release(stmnt.let.binding);
         dy_ast_expr_release_ptr(stmnt.let.expr);
-        break;
+        return;
     case DY_AST_DO_BLOCK_STMNT_EQUAL:
         dy_ast_expr_release_ptr(stmnt.equal.left);
         dy_ast_expr_release_ptr(stmnt.equal.right);
-        break;
+        return;
     case DY_AST_DO_BLOCK_STMNT_DEF:
         dy_array_release(&stmnt.def.name);
         dy_ast_expr_release_ptr(stmnt.def.expr);
-        break;
+        return;
     }
+
+    dy_bail("impossible");
 }
 
 
@@ -588,15 +594,15 @@ struct dy_ast_binding dy_ast_binding_retain(struct dy_ast_binding binding)
     switch (binding.tag) {
     case DY_AST_BINDING_TYPE:
         dy_ast_expr_retain_ptr(binding.type);
-        break;
+        return binding;
     case DY_AST_BINDING_PATTERN:
         dy_ast_pattern_retain(binding.pattern);
-        break;
+        return binding;
     case DY_AST_BINDING_NOTHING:
-        break;
+        return binding;
     }
 
-    return binding;
+    dy_bail("impossible");
 }
 
 struct dy_ast_binding *dy_ast_binding_retain_ptr(struct dy_ast_binding *binding)
@@ -613,13 +619,15 @@ void dy_ast_binding_release(struct dy_ast_binding binding)
     switch (binding.tag) {
     case DY_AST_BINDING_TYPE:
         dy_ast_expr_release_ptr(binding.type);
-        break;
+        return;
     case DY_AST_BINDING_PATTERN:
         dy_ast_pattern_release(binding.pattern);
-        break;
+        return;
     case DY_AST_BINDING_NOTHING:
-        break;
+        return;
     }
+
+    dy_bail("impossible");
 }
 
 void dy_ast_binding_release_ptr(struct dy_ast_binding *binding)
