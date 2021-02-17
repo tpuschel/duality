@@ -646,7 +646,7 @@ bool dy_remove_mentions_in_type(struct dy_core_ctx *ctx, size_t id, enum dy_pola
         }
         case DY_CORE_RECURSION: {
             struct dy_core_expr expr;
-            if (!dy_remove_mentions_in_type(ctx, id, current_polarity, *expr.problem.recursion.expr, &expr)) {
+            if (!dy_remove_mentions_in_type(ctx, id, current_polarity, *type.problem.recursion.expr, &expr)) {
                 return false;
             }
 

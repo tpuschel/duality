@@ -202,6 +202,8 @@ struct dy_core_expr dy_ast_solution_to_core(struct dy_ast_to_core_ctx *ctx, stru
             }
         };
     }
+
+    dy_bail("impossible");
 }
 
 struct dy_core_expr dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_juxtaposition juxtaposition)
@@ -685,6 +687,8 @@ struct dy_core_expr dy_convert_argument_app_without_type(struct dy_ast_to_core_c
     case DY_AST_ARGUMENT_BANG:
         return dy_convert_bang_app_without_type(ctx, left, is_implicit);
     }
+
+    dy_bail("impossible");
 }
 
 struct dy_core_expr dy_make_direction_app_without_type(struct dy_ast_to_core_ctx *ctx, struct dy_core_expr left, enum dy_direction direction, bool is_implicit)
@@ -780,6 +784,8 @@ struct dy_core_expr dy_convert_argument_app(struct dy_ast_to_core_ctx *ctx, stru
     case DY_AST_ARGUMENT_BANG:
         return dy_convert_bang_app(ctx, left, type, is_implicit);
     }
+
+    dy_bail("impossible");
 }
 
 struct dy_core_expr dy_make_direction_app(struct dy_ast_to_core_ctx *ctx, struct dy_core_expr left, enum dy_direction direction, struct dy_core_expr type, bool is_implicit)

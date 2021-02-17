@@ -8,6 +8,7 @@
 
 #include "../support/array.h"
 #include "../support/rc.h"
+#include "../support/bail.h"
 
 enum dy_ast_argument_tag {
     DY_AST_ARGUMENT_EXPR,
@@ -295,6 +296,8 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
         dy_ast_expr_retain_ptr(expr.solution.expr);
         return expr;
     }
+
+    dy_bail("impossible");
 }
 
 struct dy_ast_expr *dy_ast_expr_retain_ptr(struct dy_ast_expr *expr)
@@ -341,6 +344,8 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
         dy_ast_expr_release_ptr(expr.solution.expr);
         return;
     }
+
+    dy_bail("impossible");
 }
 
 void dy_ast_expr_release_ptr(struct dy_ast_expr *expr)
