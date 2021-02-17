@@ -253,7 +253,7 @@ static inline void dy_ast_binding_release_ptr(struct dy_ast_binding *binding);
 
 struct dy_ast_expr *dy_ast_expr_new(struct dy_ast_expr expr)
 {
-    return dy_rc_new(&expr, sizeof(expr), DY_ALIGNOF(expr));
+    return dy_rc_new(&expr, sizeof(expr), DY_ALIGNOF(struct dy_ast_expr));
 }
 
 struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
@@ -299,7 +299,7 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
 
 struct dy_ast_expr *dy_ast_expr_retain_ptr(struct dy_ast_expr *expr)
 {
-    return dy_rc_retain(expr, DY_ALIGNOF(*expr));
+    return dy_rc_retain(expr, DY_ALIGNOF(struct dy_ast_expr));
 }
 
 void dy_ast_expr_release(struct dy_ast_expr expr)
@@ -346,7 +346,7 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
 void dy_ast_expr_release_ptr(struct dy_ast_expr *expr)
 {
     struct dy_ast_expr e = *expr;
-    if (dy_rc_release(expr, DY_ALIGNOF(*expr)) == 0) {
+    if (dy_rc_release(expr, DY_ALIGNOF(struct dy_ast_expr)) == 0) {
         dy_ast_expr_release(e);
     }
 }
@@ -354,7 +354,7 @@ void dy_ast_expr_release_ptr(struct dy_ast_expr *expr)
 
 struct dy_ast_pattern *dy_ast_pattern_new(struct dy_ast_pattern pattern)
 {
-    return dy_rc_new(&pattern, sizeof(pattern), DY_ALIGNOF(pattern));
+    return dy_rc_new(&pattern, sizeof(pattern), DY_ALIGNOF(struct dy_ast_pattern));
 }
 
 struct dy_ast_pattern dy_ast_pattern_retain(struct dy_ast_pattern pattern)
@@ -372,7 +372,7 @@ struct dy_ast_pattern dy_ast_pattern_retain(struct dy_ast_pattern pattern)
 
 struct dy_ast_pattern *dy_ast_pattern_retain_ptr(struct dy_ast_pattern *pattern)
 {
-    return dy_rc_retain(pattern, DY_ALIGNOF(*pattern));
+    return dy_rc_retain(pattern, DY_ALIGNOF(struct dy_ast_pattern));
 }
 
 void dy_ast_pattern_release(struct dy_ast_pattern pattern)
@@ -391,7 +391,7 @@ void dy_ast_pattern_release(struct dy_ast_pattern pattern)
 void dy_ast_pattern_release_ptr(struct dy_ast_pattern *pattern)
 {
     struct dy_ast_pattern p = *pattern;
-    if (dy_rc_release(pattern, DY_ALIGNOF(*pattern)) == 0) {
+    if (dy_rc_release(pattern, DY_ALIGNOF(struct dy_ast_pattern)) == 0) {
         dy_ast_pattern_release(p);
     }
 }
@@ -399,7 +399,7 @@ void dy_ast_pattern_release_ptr(struct dy_ast_pattern *pattern)
 
 struct dy_ast_do_block *dy_ast_do_block_new(struct dy_ast_do_block do_block)
 {
-    return dy_rc_new(&do_block, sizeof(do_block), DY_ALIGNOF(do_block));
+    return dy_rc_new(&do_block, sizeof(do_block), DY_ALIGNOF(struct dy_ast_do_block));
 }
 
 struct dy_ast_do_block dy_ast_do_block_retain(struct dy_ast_do_block do_block)
@@ -415,7 +415,7 @@ struct dy_ast_do_block dy_ast_do_block_retain(struct dy_ast_do_block do_block)
 
 struct dy_ast_do_block *dy_ast_do_block_retain_ptr(struct dy_ast_do_block *do_block)
 {
-    return dy_rc_retain(do_block, DY_ALIGNOF(*do_block));
+    return dy_rc_retain(do_block, DY_ALIGNOF(struct dy_ast_do_block));
 }
 
 void dy_ast_do_block_release(struct dy_ast_do_block do_block)
@@ -430,7 +430,7 @@ void dy_ast_do_block_release(struct dy_ast_do_block do_block)
 void dy_ast_do_block_release_ptr(struct dy_ast_do_block *do_block)
 {
     struct dy_ast_do_block d = *do_block;
-    if (dy_rc_release(do_block, DY_ALIGNOF(*do_block)) == 0) {
+    if (dy_rc_release(do_block, DY_ALIGNOF(struct dy_ast_do_block)) == 0) {
         dy_ast_do_block_release(d);
     }
 }
@@ -500,7 +500,7 @@ void dy_ast_argument_release(struct dy_ast_argument arg)
 
 struct dy_ast_list_body *dy_ast_list_body_new(struct dy_ast_list_body list_body)
 {
-    return dy_rc_new(&list_body, sizeof(list_body), DY_ALIGNOF(list_body));
+    return dy_rc_new(&list_body, sizeof(list_body), DY_ALIGNOF(struct dy_ast_list_body));
 }
 
 struct dy_ast_list_body dy_ast_list_body_retain(struct dy_ast_list_body list_body)
@@ -514,7 +514,7 @@ struct dy_ast_list_body dy_ast_list_body_retain(struct dy_ast_list_body list_bod
 
 struct dy_ast_list_body *dy_ast_list_body_retain_ptr(struct dy_ast_list_body *list_body)
 {
-    return dy_rc_retain(list_body, DY_ALIGNOF(*list_body));
+    return dy_rc_retain(list_body, DY_ALIGNOF(struct dy_ast_list_body));
 }
 
 void dy_ast_list_body_release(struct dy_ast_list_body list_body)
@@ -528,14 +528,14 @@ void dy_ast_list_body_release(struct dy_ast_list_body list_body)
 void dy_ast_list_body_release_ptr(struct dy_ast_list_body *list_body)
 {
     struct dy_ast_list_body l = *list_body;
-    if (dy_rc_release(list_body, DY_ALIGNOF(*list_body)) == 0) {
+    if (dy_rc_release(list_body, DY_ALIGNOF(struct dy_ast_list_body)) == 0) {
         dy_ast_list_body_release(l);
     }
 }
 
 struct dy_ast_pattern_list_body *dy_ast_pattern_list_body_new(struct dy_ast_pattern_list_body list_body)
 {
-    return dy_rc_new(&list_body, sizeof(list_body), DY_ALIGNOF(list_body));
+    return dy_rc_new(&list_body, sizeof(list_body), DY_ALIGNOF(struct dy_ast_pattern_list_body));
 }
 
 struct dy_ast_pattern_list_body dy_ast_pattern_list_body_retain(struct dy_ast_pattern_list_body list_body)
@@ -550,7 +550,7 @@ struct dy_ast_pattern_list_body dy_ast_pattern_list_body_retain(struct dy_ast_pa
 
 struct dy_ast_pattern_list_body *dy_ast_pattern_list_body_retain_ptr(struct dy_ast_pattern_list_body *list_body)
 {
-    return dy_rc_retain(list_body, DY_ALIGNOF(*list_body));
+    return dy_rc_retain(list_body, DY_ALIGNOF(struct dy_ast_pattern_list_body));
 }
 
 void dy_ast_pattern_list_body_release(struct dy_ast_pattern_list_body list_body)
@@ -564,14 +564,14 @@ void dy_ast_pattern_list_body_release(struct dy_ast_pattern_list_body list_body)
 void dy_ast_pattern_list_body_release_ptr(struct dy_ast_pattern_list_body *list_body)
 {
     struct dy_ast_pattern_list_body l = *list_body;
-    if (dy_rc_release(list_body, DY_ALIGNOF(*list_body)) == 0) {
+    if (dy_rc_release(list_body, DY_ALIGNOF(struct dy_ast_pattern_list_body)) == 0) {
         dy_ast_pattern_list_body_release(l);
     }
 }
 
 struct dy_ast_binding *dy_ast_binding_new(struct dy_ast_binding binding)
 {
-    return dy_rc_new(&binding, sizeof(binding), DY_ALIGNOF(binding));
+    return dy_rc_new(&binding, sizeof(binding), DY_ALIGNOF(struct dy_ast_binding));
 }
 
 struct dy_ast_binding dy_ast_binding_retain(struct dy_ast_binding binding)
@@ -596,7 +596,7 @@ struct dy_ast_binding dy_ast_binding_retain(struct dy_ast_binding binding)
 
 struct dy_ast_binding *dy_ast_binding_retain_ptr(struct dy_ast_binding *binding)
 {
-    return dy_rc_retain(binding, DY_ALIGNOF(*binding));
+    return dy_rc_retain(binding, DY_ALIGNOF(struct dy_ast_binding));
 }
 
 void dy_ast_binding_release(struct dy_ast_binding binding)
@@ -620,7 +620,7 @@ void dy_ast_binding_release(struct dy_ast_binding binding)
 void dy_ast_binding_release_ptr(struct dy_ast_binding *binding)
 {
     struct dy_ast_binding b = *binding;
-    if (dy_rc_release(binding, DY_ALIGNOF(*binding)) == 0) {
+    if (dy_rc_release(binding, DY_ALIGNOF(struct dy_ast_binding)) == 0) {
         dy_ast_binding_release(b);
     }
 }
