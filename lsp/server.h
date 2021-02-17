@@ -72,7 +72,7 @@ int dy_lsp_run_server(FILE *in, FILE *out)
         if (!dy_lsp_process_message(ctx, &stream, &json_buffer)) {
             int ret = dy_lsp_exit_code(ctx);
             dy_lsp_destroy(ctx);
-            dy_array_destroy(json_buffer);
+            dy_array_release(&json_buffer);
             return ret;
         }
 
@@ -166,7 +166,7 @@ void stream_callback(dy_array_t *buffer, void *env)
 
         dy_array_set_excess_capacity(buffer, state->bound_size_in_bytes);
 
-        size_t num_bytes_read = fread(dy_array_excess_buffer(*buffer), sizeof(char), state->bound_size_in_bytes, state->file);
+        size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), state->bound_size_in_bytes, state->file);
 
         dy_array_add_to_size(buffer, num_bytes_read);
 
@@ -174,7 +174,7 @@ void stream_callback(dy_array_t *buffer, void *env)
     } else {
         dy_array_set_excess_capacity(buffer, 1);
 
-        size_t num_bytes_read = fread(dy_array_excess_buffer(*buffer), sizeof(char), 1, state->file);
+        size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), 1, state->file);
 
         dy_array_add_to_size(buffer, num_bytes_read);
     }
@@ -197,10 +197,10 @@ void write_size_t(FILE *file, size_t x)
     }
 
     for (size_t i = buffer.num_elems; i-- > 0;) {
-        fprintf(file, "%c", *(char *)dy_array_pos(buffer, i));
+        fprintf(file, "%c", *(char *)dy_array_pos(&buffer, i));
     }
 
-    dy_array_destroy(buffer);
+    dy_array_release(&buffer);
 }
 
 void set_file_to_binary(FILE *file)

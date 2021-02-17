@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2019-2021 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
@@ -45,7 +45,7 @@ bool dy_stream_get_char(struct dy_stream *stream, char *c)
         }
     }
 
-    dy_array_get(stream->buffer, stream->current_index, c);
+    memcpy(c, dy_array_pos(&stream->buffer, stream->current_index), 1);
     ++stream->current_index;
     return true;
 }

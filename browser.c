@@ -1,12 +1,10 @@
 /*
- * Copyright 2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2020-2021 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
 
-#define _GNU_SOURCE // For glibc's asprintf.
-
-#include "syntax/parser.h"
+#include "syntax/utf8_to_ast.h"
 #include "syntax/ast_to_core.h"
 
 #include "core/check.h"
@@ -31,58 +29,59 @@ const char *process_code(const char *text, size_t text_length_in_bytes)
         .size = text_length_in_bytes
     };
 
-    struct dy_parser_ctx parser_ctx = {
-        .stream = stream_from_string(s),
-        .string_arrays = dy_array_create(sizeof(dy_array_t *), DY_ALIGNOF(dy_array_t *), 32)
+    struct dy_utf8_to_ast_ctx utf8_to_ast_ctx = {
+        .stream = stream_from_string(s)
     };
 
-    struct dy_ast_do_block program_ast;
-    if (!dy_parse_file(&parser_ctx, &program_ast)) {
+    struct dy_ast_do_block ast;
+    if (!dy_utf8_to_ast_file(&utf8_to_ast_ctx, &ast)) {
         return "Failed to parse program.\n";
     }
 
-    struct dy_core_ctx core_ctx = {
-        .running_id = 0,
-        .bound_inference_vars = dy_array_create(sizeof(struct dy_bound_inference_var), DY_ALIGNOF(struct dy_bound_inference_var), 64),
-        .already_visited_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 64),
-        .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
-        .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
-        .bindings = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
-        .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
-        .subtype_implicits = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
-        .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8),
-        .constraints = dy_array_create(sizeof(struct dy_constraint), DY_ALIGNOF(struct dy_constraint), 64),
-        .custom_shared = dy_array_create(sizeof(struct dy_core_custom_shared), DY_ALIGNOF(struct dy_core_custom_shared), 3)
-    };
+    dy_array_t custom_shared = dy_array_create(sizeof(struct dy_core_custom_shared), DY_ALIGNOF(struct dy_core_custom_shared), 3);
 
-    dy_uv_register(&core_ctx);
-    dy_def_register(&core_ctx);
-    dy_string_register(&core_ctx);
+    dy_uv_register(&custom_shared);
+    dy_def_register(&custom_shared);
+    dy_string_register(&custom_shared);
+    dy_string_type_register(&custom_shared);
 
     struct dy_ast_to_core_ctx ast_to_core_ctx = {
-        .core_ctx = core_ctx,
-        .bound_vars = dy_array_create(sizeof(struct dy_ast_to_core_bound_var), DY_ALIGNOF(struct dy_ast_to_core_bound_var), 64)
+        .running_id = 0,
+        .variable_replacements = dy_array_create(sizeof(struct dy_variable_replacement), DY_ALIGNOF(struct dy_variable_replacement), 128)
     };
 
-    struct dy_core_expr program = dy_ast_do_block_to_core(&ast_to_core_ctx, program_ast);
+    struct dy_core_expr core = dy_ast_do_block_to_core(&ast_to_core_ctx, ast);
 
-    core_ctx = ast_to_core_ctx.core_ctx;
+    dy_ast_do_block_release(ast);
 
-    dy_ast_do_block_release(program_ast.body);
+    struct dy_core_ctx core_ctx = {
+        .running_id = ast_to_core_ctx.running_id,
+        .free_variables = dy_array_create(sizeof(struct dy_free_var), DY_ALIGNOF(struct dy_free_var), 64),
+        .captured_inference_vars = dy_array_create(sizeof(struct dy_captured_inference_var), DY_ALIGNOF(struct dy_captured_inference_var), 64),
+        .recovered_negative_inference_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 8),
+        .past_subtype_checks = dy_array_create(sizeof(struct dy_core_past_subtype_check), DY_ALIGNOF(struct dy_core_past_subtype_check), 64),
+        .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
+        .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8),
+        .constraints = dy_array_create(sizeof(struct dy_constraint), DY_ALIGNOF(struct dy_constraint), 64),
+        .custom_shared = custom_shared
+    };
 
-    struct dy_core_expr checked_program;
-    if (dy_check_expr(&core_ctx, program, &checked_program)) {
-        dy_core_expr_release(&core_ctx, program);
-        program = checked_program;
+    struct dy_core_expr new_core;
+    if (dy_check_expr(&core_ctx, core, &new_core)) {
+        dy_core_expr_release(&core_ctx, core);
+        core = new_core;
     }
 
     bool is_value = false;
-    struct dy_core_expr result = dy_eval_expr(&core_ctx, program, &is_value);
+    if (dy_eval_expr(&core_ctx, core, &is_value, &new_core)) {
+        dy_core_expr_release(&core_ctx, core);
+        core = new_core;
+    }
 
     dy_array_t stringified_expr = dy_array_create(sizeof(char), DY_ALIGNOF(char), 64);
-    dy_core_expr_to_string(&core_ctx, result, &stringified_expr);
+    dy_core_expr_to_string(&core_ctx, core, &stringified_expr);
 
-    dy_core_expr_release(&core_ctx, result);
+    dy_core_expr_release(&core_ctx, core);
 
     dy_array_add(&stringified_expr, &(char){ '\0' });
 
@@ -106,7 +105,4 @@ struct dy_stream stream_from_string(dy_string_t s)
 
 void null_stream(dy_array_t *buffer, void *env)
 {
-    (void)buffer;
-    (void)env;
-    return;
 }

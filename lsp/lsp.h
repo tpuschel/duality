@@ -11,7 +11,8 @@
 
 #include "../core/check.h"
 
-#include "../syntax/parser.h"
+#include "../syntax/utf8_to_ast.h"
+#include "../syntax/ast_to_core.h"
 
 /**
  * This file implements LSP support.
@@ -68,9 +69,6 @@ struct dy_lsp_ctx {
     dy_array_t documents;
 };
 
-static const size_t dy_lsp_ctx_pre_padding = DY_RC_PRE_PADDING(struct dy_lsp_ctx);
-static const size_t dy_lsp_ctx_post_padding = DY_RC_POST_PADDING(struct dy_lsp_ctx);
-
 static inline void dy_lsp_send(dy_lsp_ctx_t *ctx);
 
 static inline void invalid_request(const uint8_t *id, dy_string_t message, dy_array_t *json);
@@ -84,17 +82,18 @@ static inline void null_success_response(const uint8_t *id, dy_array_t *json);
 static inline void hover_result(dy_string_t contents, dy_array_t *json);
 static inline void make_position(long line, long character, dy_array_t *json);
 static inline void make_range(long start_line, long start_character, long end_line, long end_character, dy_array_t *json);
-static inline void publish_diagnostics(struct dy_core_ctx *ctx, dy_string_t uri, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json);
+static inline void publish_diagnostics(struct dy_core_ctx *ctx, dy_string_t uri, const dy_array_t *text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json);
 static inline void compute_lsp_range(dy_string_t text, struct dy_range range, dy_array_t *json);
 
 static inline void process_document(struct dy_lsp_ctx *ctx, struct document *doc);
 static inline void null_stream(dy_array_t *buffer, void *env);
 static inline bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, size_t *byte_offset);
-static inline bool produce_diagnostics(struct dy_core_ctx *ctx, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json);
+static inline bool produce_diagnostics(struct dy_core_ctx *ctx, const dy_array_t *text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json);
+static inline bool produce_solution_diagnostics(struct dy_core_ctx *ctx, const dy_array_t *text_sources, struct dy_core_solution solution, dy_string_t text, dy_array_t *json);
 static inline void compute_lsp_range(dy_string_t text, struct dy_range range, dy_array_t *json);
 static inline void make_diagnostic(dy_string_t text, struct dy_range range, long severity, dy_string_t message, dy_array_t *json);
-static inline void diagnostics_params(struct dy_core_ctx *ctx, dy_string_t uri, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json);
-static inline const struct dy_range *get_text_range(dy_array_t text_sources, size_t id);
+static inline void diagnostics_params(struct dy_core_ctx *ctx, dy_string_t uri, const dy_array_t *text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json);
+static inline const struct dy_range *get_text_range(const dy_array_t *text_sources, size_t id);
 
 static inline dy_string_t convert_json_string(const uint8_t *p);
 static inline void put_string_literal(dy_string_t s, dy_array_t *json);
@@ -105,13 +104,13 @@ static inline void put_number(long x, dy_array_t *json);
 static inline const uint8_t *skip_json_string(const uint8_t *p);
 static inline const uint8_t *json_get_member(const uint8_t *p, dy_string_t member);
 
-static inline dy_string_t array_view(dy_array_t x);
+static inline dy_string_t array_view(const dy_array_t *x);
 static inline dy_array_t view_to_array(dy_string_t s);
 static inline void replace_storage_with_view(dy_array_t *x, dy_string_t s);
 
 dy_lsp_ctx_t *dy_lsp_create(dy_lsp_send_fn send, void *env)
 {
-    struct dy_lsp_ctx *ctx = dy_rc_alloc(sizeof *ctx, dy_lsp_ctx_pre_padding, dy_lsp_ctx_post_padding);
+    struct dy_lsp_ctx *ctx = dy_rc_alloc(sizeof *ctx, DY_ALIGNOF(*ctx));
     *ctx = (struct dy_lsp_ctx){
         .output_buffer = dy_array_create(1, 1, 128),
         .send = send,
@@ -127,9 +126,9 @@ dy_lsp_ctx_t *dy_lsp_create(dy_lsp_send_fn send, void *env)
 
 void dy_lsp_destroy(dy_lsp_ctx_t *ctx)
 {
-    dy_array_destroy(ctx->documents);
-    dy_array_destroy(ctx->output_buffer);
-    dy_rc_release(ctx, dy_lsp_ctx_pre_padding, dy_lsp_ctx_post_padding);
+    dy_array_release(&ctx->documents);
+    dy_array_release(&ctx->output_buffer);
+    dy_rc_release(ctx, DY_ALIGNOF(*ctx));
 }
 
 bool dy_lsp_handle_message(dy_lsp_ctx_t *ctx, const uint8_t *message)
@@ -489,13 +488,11 @@ void dy_lsp_did_open(dy_lsp_ctx_t *ctx, dy_string_t uri, dy_string_t text)
         .text = view_to_array(text),
         .core_ctx = {
             .running_id = 0,
-            .bound_inference_vars = dy_array_create(sizeof(struct dy_bound_inference_var), DY_ALIGNOF(struct dy_bound_inference_var), 1),
-            .already_visited_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 64),
-            .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
-            .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
-            .bindings = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
+            .captured_inference_vars = dy_array_create(sizeof(struct dy_captured_inference_var), DY_ALIGNOF(struct dy_captured_inference_var), 1),
+            .recovered_negative_inference_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 8),
+            .past_subtype_checks = dy_array_create(sizeof(struct dy_core_past_subtype_check), DY_ALIGNOF(struct dy_core_past_subtype_check), 64),
+            .free_variables = dy_array_create(sizeof(struct dy_free_var), DY_ALIGNOF(struct dy_free_var), 64),
             .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
-            .subtype_implicits = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
             .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8),
             .constraints = dy_array_create(sizeof(struct dy_constraint), DY_ALIGNOF(struct dy_constraint), 64),
             .custom_shared = dy_array_create(sizeof(struct dy_core_custom_shared), DY_ALIGNOF(struct dy_core_custom_shared), 3)
@@ -503,9 +500,10 @@ void dy_lsp_did_open(dy_lsp_ctx_t *ctx, dy_string_t uri, dy_string_t text)
         .core_is_present = false
     };
 
-    dy_uv_register(&doc.core_ctx);
-    dy_def_register(&doc.core_ctx);
-    dy_string_register(&doc.core_ctx);
+    dy_uv_register(&doc.core_ctx.custom_shared);
+    dy_def_register(&doc.core_ctx.custom_shared);
+    dy_string_register(&doc.core_ctx.custom_shared);
+    dy_string_type_register(&doc.core_ctx.custom_shared);
 
     process_document(ctx, &doc);
 
@@ -515,10 +513,9 @@ void dy_lsp_did_open(dy_lsp_ctx_t *ctx, dy_string_t uri, dy_string_t text)
 void dy_lsp_did_close(dy_lsp_ctx_t *ctx, dy_string_t uri)
 {
     for (size_t i = 0, size = ctx->documents.num_elems; i < size; ++i) {
-        struct document doc;
-        dy_array_get(ctx->documents, i, &doc);
+        const struct document *doc = dy_array_pos(&ctx->documents, i);
 
-        if (dy_string_are_equal(array_view(doc.uri), uri)) {
+        if (dy_string_are_equal(array_view(&doc->uri), uri)) {
             dy_array_remove(&ctx->documents, i);
             break;
         }
@@ -528,9 +525,9 @@ void dy_lsp_did_close(dy_lsp_ctx_t *ctx, dy_string_t uri)
 void dy_lsp_did_change(dy_lsp_ctx_t *ctx, dy_string_t uri, const uint8_t *content_changes)
 {
     for (size_t i = 0, size = ctx->documents.num_elems; i < size; ++i) {
-        struct document *doc = dy_array_pos(ctx->documents, i);
+        struct document *doc = dy_array_pos(&ctx->documents, i);
 
-        if (!dy_string_are_equal(array_view(doc->uri), uri)) {
+        if (!dy_string_are_equal(array_view(&doc->uri), uri)) {
             continue;
         }
 
@@ -567,9 +564,9 @@ void dy_lsp_did_change(dy_lsp_ctx_t *ctx, dy_string_t uri, const uint8_t *conten
 void dy_lsp_hover(dy_lsp_ctx_t *ctx, const uint8_t *id, dy_string_t uri, long line_number, long utf16_char_offset, dy_array_t *json)
 {
     for (size_t i = 0, size = ctx->documents.num_elems; i < size; ++i) {
-        struct document *doc = dy_array_pos(ctx->documents, i);
+        struct document *doc = dy_array_pos(&ctx->documents, i);
 
-        if (!dy_string_are_equal(array_view(doc->uri), uri)) {
+        if (!dy_string_are_equal(array_view(&doc->uri), uri)) {
             continue;
         }
 
@@ -728,7 +725,7 @@ void hover_result(dy_string_t contents, dy_array_t *json)
     dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
-void publish_diagnostics(struct dy_core_ctx *ctx, dy_string_t uri, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json)
+void publish_diagnostics(struct dy_core_ctx *ctx, dy_string_t uri, const dy_array_t *text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json)
 {
     dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
 
@@ -751,37 +748,41 @@ void process_document(struct dy_lsp_ctx *ctx, struct document *doc)
         doc->core_is_present = false;
     }
 
-    struct dy_parser_ctx parser_ctx = {
+    struct dy_utf8_to_ast_ctx utf8_to_ast_ctx = {
         .stream = {
             .get_chars = null_stream,
             .buffer = doc->text,
             .env = NULL,
             .current_index = 0
-        },
-        .core_ctx = doc->core_ctx,
-        .bound_vars = dy_array_create(sizeof(struct dy_bound_var), DY_ALIGNOF(struct dy_bound_var), 64),
-        .text_sources = dy_array_create(sizeof(struct dy_text_source), DY_ALIGNOF(struct dy_text_source), 64)
+        }
     };
 
-    struct dy_core_expr new_core;
-    if (!dy_parse_file(&parser_ctx, &new_core)) {
+    struct dy_ast_do_block ast;
+    if (!dy_utf8_to_ast_file(&utf8_to_ast_ctx, &ast)) {
         return;
     }
 
-    doc->core_ctx = parser_ctx.core_ctx;
+    struct dy_ast_to_core_ctx ast_to_core_ctx = {
+        .running_id = doc->core_ctx.running_id,
+        .variable_replacements = dy_array_create(sizeof(struct dy_variable_replacement), DY_ALIGNOF(struct dy_variable_replacement), 128)
+    };
 
-    struct dy_core_expr checked_new_core;
-    if (dy_check_expr(&doc->core_ctx, new_core, &checked_new_core)) {
-        dy_core_expr_release(&doc->core_ctx, new_core);
-        new_core = checked_new_core;
+    struct dy_core_expr core = dy_ast_do_block_to_core(&ast_to_core_ctx, ast);
+
+    doc->core_ctx.running_id = ast_to_core_ctx.running_id;
+
+    struct dy_core_expr checked_core;
+    if (dy_check_expr(&doc->core_ctx, core, &checked_core)) {
+        dy_core_expr_release(&doc->core_ctx, core);
+        core = checked_core;
     }
 
     doc->core_is_present = true;
-    doc->core = new_core;
+    doc->core = core;
 
-    publish_diagnostics(&doc->core_ctx, array_view(doc->uri), parser_ctx.text_sources, doc->core, array_view(doc->text), &ctx->output_buffer);
+    //publish_diagnostics(&doc->core_ctx, array_view(&doc->uri), &parser_ctx.text_sources, doc->core, array_view(&doc->text), &ctx->output_buffer);
 
-    dy_lsp_send(ctx);
+    //dy_lsp_send(ctx);
 }
 
 void null_stream(dy_array_t *buffer, void *env)
@@ -832,79 +833,66 @@ bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, 
     return true;
 }
 
-bool produce_diagnostics(struct dy_core_ctx *ctx, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json)
+bool produce_diagnostics(struct dy_core_ctx *ctx, const dy_array_t *text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EQUALITY_MAP: {
-        bool b1 = produce_diagnostics(ctx, text_sources, *expr.equality_map.e1, text, json);
-        bool b2 = produce_diagnostics(ctx, text_sources, *expr.equality_map.e2, text, json);
-        return b1 && b2;
-    }
-    case DY_CORE_EXPR_TYPE_MAP: {
-        bool b1 = produce_diagnostics(ctx, text_sources, *expr.type_map.type, text, json);
-        bool b2 = produce_diagnostics(ctx, text_sources, *expr.type_map.expr, text, json);
-        return b1 && b2;
-    }
-    case DY_CORE_EXPR_EQUALITY_MAP_ELIM: {
-        bool err1 = produce_diagnostics(ctx, text_sources, *expr.equality_map_elim.expr, text, json);
-        bool err2 = produce_diagnostics(ctx, text_sources, *expr.equality_map_elim.map.e1, text, json);
-        bool err3 = produce_diagnostics(ctx, text_sources, *expr.equality_map_elim.map.e2, text, json);
-
-        if (expr.equality_map_elim.check_result == DY_NO || !err1) {
-            const struct dy_range *r = get_text_range(text_sources, expr.equality_map_elim.id);
-            if (r == NULL) {
-                return false;
-            }
-
-            make_diagnostic(text, *r, 1, DY_STR_LIT("Message placeholder"), json);
+    case DY_CORE_EXPR_PROBLEM:
+        switch (expr.problem.tag) {
+        case DY_CORE_FUNCTION: {
+            bool b1 = produce_diagnostics(ctx, text_sources, *expr.problem.function.type, text, json);
+            bool b2 = produce_diagnostics(ctx, text_sources, *expr.problem.function.expr, text, json);
+            return b1 && b2;
+        }
+        case DY_CORE_PAIR: {
+            bool b1 = produce_diagnostics(ctx, text_sources, *expr.problem.pair.left, text, json);
+            bool b2 = produce_diagnostics(ctx, text_sources, *expr.problem.pair.right, text, json);
+            return b1 && b2;
+        }
+        case DY_CORE_RECURSION:
+            return produce_diagnostics(ctx, text_sources, *expr.problem.recursion.expr, text, json);
         }
 
-        return err2 && err3;
-    }
-    case DY_CORE_EXPR_TYPE_MAP_ELIM: {
-        bool b1 = produce_diagnostics(ctx, text_sources, *expr.type_map_elim.expr, text, json);
-        bool b2 = produce_diagnostics(ctx, text_sources, *expr.type_map_elim.map.type, text, json);
-        bool b3 = produce_diagnostics(ctx, text_sources, *expr.type_map_elim.map.expr, text, json);
-        return b1 && b2 && b3;
-    }
-    case DY_CORE_EXPR_JUNCTION: {
-        bool b1 = produce_diagnostics(ctx, text_sources, *expr.junction.e1, text, json);
-        bool b2 = produce_diagnostics(ctx, text_sources, *expr.junction.e2, text, json);
-        return b1 && b2;
-    }
-    case DY_CORE_EXPR_ALTERNATIVE: {
-        bool b1 = produce_diagnostics(ctx, text_sources, *expr.alternative.first, text, json);
-        bool b2 = produce_diagnostics(ctx, text_sources, *expr.alternative.second, text, json);
-        return b1 && b2;
-    }
+        dy_bail("impossible");
+    case DY_CORE_EXPR_SOLUTION:
+        return produce_solution_diagnostics(ctx, text_sources, expr.solution, text, json);
+    case DY_CORE_EXPR_APPLICATION: {
+            bool b1 = produce_diagnostics(ctx, text_sources, *expr.application.expr, text, json);
+            bool b2 = produce_solution_diagnostics(ctx, text_sources, expr.application.solution, text, json);
+            return b1 && b2;
+        }
     case DY_CORE_EXPR_VARIABLE:
-        return true;
-    case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        dy_bail("should never be reached");
-    case DY_CORE_EXPR_RECURSION: {
-        bool b1 = produce_diagnostics(ctx, text_sources, *expr.recursion.type, text, json);
-        bool b2 = produce_diagnostics(ctx, text_sources, *expr.recursion.expr, text, json);
-        return b1 && b2;
-    }
-    case DY_CORE_EXPR_END:
+    case DY_CORE_EXPR_ANY:
+    case DY_CORE_EXPR_VOID:
+    case DY_CORE_EXPR_INFERENCE_VAR:
         return true;
     case DY_CORE_EXPR_CUSTOM:
         // TODO: Add diagnostics callback to custom exprs.
         return true;
-    case DY_CORE_EXPR_SYMBOL:
-        return true;
+    case DY_CORE_EXPR_INFERENCE_CTX:
+        dy_bail("impossible");
     }
 
-    dy_bail("Impossible core type.");
+    dy_bail("impossible");
 }
 
-const struct dy_range *get_text_range(dy_array_t text_sources, size_t id)
+bool produce_solution_diagnostics(struct dy_core_ctx *ctx, const dy_array_t *text_sources, struct dy_core_solution solution, dy_string_t text, dy_array_t *json)
 {
-    for (size_t i = 0, size = text_sources.num_elems; i < size; ++i) {
-        const struct dy_text_source *p = dy_array_pos(text_sources, i);
+    if (solution.tag == DY_CORE_FUNCTION) {
+        bool b1 = produce_diagnostics(ctx, text_sources, *solution.expr, text, json);
+        bool b2 = produce_diagnostics(ctx, text_sources, *solution.out, text, json);
+        return b1 && b2;
+    } else {
+        return produce_diagnostics(ctx, text_sources, *solution.out, text, json);
+    }
+}
+
+const struct dy_range *get_text_range(const dy_array_t *text_sources, size_t id)
+{
+    for (size_t i = 0, size = text_sources->num_elems; i < size; ++i) {
+        /*const struct dy_text_source *p = dy_array_pos(text_sources, i);
         if (p->id == id) {
             return &p->text_range;
-        }
+        }*/
     }
 
     return NULL;
@@ -955,7 +943,7 @@ void make_diagnostic(dy_string_t text, struct dy_range range, long severity, dy_
     dy_array_add(json, &(uint8_t){ DY_JSON_END });
 }
 
-void diagnostics_params(struct dy_core_ctx *ctx, dy_string_t uri, dy_array_t text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json)
+void diagnostics_params(struct dy_core_ctx *ctx, dy_string_t uri, const dy_array_t *text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json)
 {
     dy_array_add(json, &(uint8_t){ DY_JSON_OBJECT });
 
@@ -1151,11 +1139,11 @@ void put_number(long x, dy_array_t *json)
     }
 }
 
-dy_string_t array_view(dy_array_t x)
+dy_string_t array_view(const dy_array_t *x)
 {
     return (dy_string_t){
-        .ptr = x.buffer,
-        .size = x.num_elems
+        .ptr = x->buffer,
+        .size = x->num_elems
     };
 }
 

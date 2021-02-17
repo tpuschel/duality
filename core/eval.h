@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2021 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
@@ -7,314 +7,226 @@
 #pragma once
 
 #include "core.h"
-#include "substitute.h"
 #include "type_of.h"
-#include "constraint.h"
 #include "is_subtype.h"
 
-/**
- * Evaluates/reduces/normalizes/executes/whatever the given expression.
- * Returns the new expression and if that new expression is a value (fully reduced) or not.
- */
+static inline bool dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value, struct dy_core_expr *result);
 
-static inline struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value);
+static inline bool dy_eval_application(struct dy_core_ctx *ctx, struct dy_core_application app, bool *is_value, struct dy_core_expr *result);
 
-static inline struct dy_core_expr dy_eval_equality_map(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, bool *is_value);
+static inline bool dy_eval_solution(struct dy_core_ctx *ctx, struct dy_core_solution solution, bool *is_value, struct dy_core_solution *result);
 
-static inline struct dy_core_expr dy_eval_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map, bool *is_value);
+static inline bool dy_eval_app_single_step(struct dy_core_ctx *ctx, struct dy_core_application app, struct dy_core_expr *result);
 
-static inline struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim, bool *is_value);
-
-static inline struct dy_core_expr dy_eval_type_map_elim(struct dy_core_ctx *ctx, struct dy_core_type_map_elim elim, bool *is_value);
-
-static inline struct dy_core_expr dy_eval_junction(struct dy_core_ctx *ctx, struct dy_core_junction junction, bool *is_value);
-
-static inline struct dy_core_expr dy_eval_alternative(struct dy_core_ctx *ctx, struct dy_core_alternative alternative, bool *is_value);
-
-static inline struct dy_core_expr dy_eval_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion rec, bool *is_value);
-
-struct dy_core_expr dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value)
+bool dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value, struct dy_core_expr *result)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EQUALITY_MAP:
-        return dy_eval_equality_map(ctx, expr.equality_map, is_value);
-    case DY_CORE_EXPR_TYPE_MAP:
-        return dy_eval_type_map(ctx, expr.type_map, is_value);
-    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
-        return dy_eval_equality_map_elim(ctx, expr.equality_map_elim, is_value);
-    case DY_CORE_EXPR_TYPE_MAP_ELIM:
-        return dy_eval_type_map_elim(ctx, expr.type_map_elim, is_value);
-    case DY_CORE_EXPR_JUNCTION:
-        return dy_eval_junction(ctx, expr.junction, is_value);
-    case DY_CORE_EXPR_ALTERNATIVE:
-        return dy_eval_alternative(ctx, expr.alternative, is_value);
+    case DY_CORE_EXPR_PROBLEM:
+        switch (expr.problem.tag) {
+        case DY_CORE_FUNCTION: {
+            struct dy_core_expr new_type;
+            if (!dy_eval_expr(ctx, *expr.problem.function.type, is_value, &new_type)) {
+                return false;
+            }
+
+            expr.problem.function.type = dy_core_expr_new(new_type);
+            dy_core_expr_retain_ptr(ctx, expr.problem.function.expr);
+            *result = expr;
+            return true;
+        }
+        case DY_CORE_PAIR:
+            *is_value = true;
+            return false;
+        case DY_CORE_RECURSION:
+            *is_value = true;
+            return false;
+        }
+
+        dy_bail("impossible");
+    case DY_CORE_EXPR_SOLUTION:
+        return dy_eval_solution(ctx, expr.solution, is_value, &expr.solution);
+    case DY_CORE_EXPR_APPLICATION:
+        return dy_eval_application(ctx, expr.application, is_value, result);
     case DY_CORE_EXPR_VARIABLE:
+    case DY_CORE_EXPR_ANY:
+    case DY_CORE_EXPR_VOID:
+    case DY_CORE_EXPR_INFERENCE_VAR:
         *is_value = true;
-        return dy_core_expr_retain(ctx, expr);
-    case DY_CORE_EXPR_END:
-        *is_value = true;
-        return dy_core_expr_retain(ctx, expr);
-    case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        dy_bail("Should not happen");
-    case DY_CORE_EXPR_RECURSION:
-        return dy_eval_recursion(ctx, expr.recursion, is_value);
+        return false;
+    case DY_CORE_EXPR_INFERENCE_CTX:
+        dy_bail("impossible");
     case DY_CORE_EXPR_CUSTOM: {
-        const struct dy_core_custom_shared *s = dy_array_pos(ctx->custom_shared, expr.custom.id);
-        return s->eval(expr.custom.data, ctx, is_value);
+        const struct dy_core_custom_shared *s = dy_array_pos(&ctx->custom_shared, expr.custom.id);
+        return s->eval(ctx, expr.custom.data, is_value, result);
     }
-    case DY_CORE_EXPR_SYMBOL:
-        *is_value = true;
-        return dy_core_expr_retain(ctx, expr);
     }
 
     dy_bail("Impossible object type.");
 }
 
-struct dy_core_expr dy_eval_equality_map(struct dy_core_ctx *ctx, struct dy_core_equality_map equality_map, bool *is_value)
+bool dy_eval_application(struct dy_core_ctx *ctx, struct dy_core_application app, bool *is_value, struct dy_core_expr *result)
 {
-    equality_map.e1 = dy_core_expr_new(dy_eval_expr(ctx, *equality_map.e1, is_value));
-    dy_core_expr_retain_ptr(equality_map.e2);
+    bool expr_is_value;
+    struct dy_core_expr new_expr;
+    bool expr_is_new = dy_eval_expr(ctx, *app.expr, &expr_is_value, &new_expr);
 
-    return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_EQUALITY_MAP,
-        .equality_map = equality_map
-    };
-}
+    bool solution_is_value;
+    struct dy_core_solution new_solution;
+    bool solution_is_new = dy_eval_solution(ctx, app.solution, &solution_is_value, &new_solution);
 
-struct dy_core_expr dy_eval_type_map(struct dy_core_ctx *ctx, struct dy_core_type_map type_map, bool *is_value)
-{
-    type_map.type = dy_core_expr_new(dy_eval_expr(ctx, *type_map.type, is_value));
-    dy_core_expr_retain_ptr(type_map.expr);
+    if (!expr_is_value || !solution_is_value) {
+        *is_value = false;
 
-    return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_TYPE_MAP,
-        .type_map = type_map
-    };
-}
+        if (!expr_is_new && !solution_is_new) {
+            return false;
+        }
 
-struct dy_core_expr dy_eval_equality_map_elim(struct dy_core_ctx *ctx, struct dy_core_equality_map_elim elim, bool *is_value)
-{
-    if (elim.check_result == DY_NO) {
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
-            .equality_map_elim = elim
+        if (expr_is_new) {
+            app.expr = dy_core_expr_new(new_expr);
+        } else {
+            dy_core_expr_retain_ptr(ctx, app.expr);
+        }
+
+        if (solution_is_new) {
+            app.solution = new_solution;
+        } else {
+            dy_core_solution_retain(ctx, app.solution);
+        }
+
+        *result = (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_APPLICATION,
+            .application = app
         };
+        return true;
     }
 
-    bool left_is_value = false;
-    struct dy_core_expr left = dy_eval_expr(ctx, *elim.expr, &left_is_value);
+    if (!expr_is_new) {
+        new_expr = dy_core_expr_retain(ctx, *app.expr);
+    }
 
-    bool right_is_value = false;
-    struct dy_core_expr right = dy_eval_expr(ctx, *elim.map.e1, &right_is_value);
+    if (!solution_is_new) {
+        new_solution = dy_core_solution_retain(ctx, app.solution);
+    }
 
-    bool type_is_value = false;
-    struct dy_core_expr type = dy_eval_expr(ctx, *elim.map.e2, &type_is_value);
+    bool did_transform = false;
+    bool changed_check_result = false;
+    if (app.check_result == DY_MAYBE) {
+        struct dy_core_expr subtype = dy_type_of(ctx, new_expr);
 
-    struct dy_core_expr equality_map = {
-        .tag = DY_CORE_EXPR_EQUALITY_MAP,
-        .equality_map = {
-            .e1 = dy_core_expr_new(dy_core_expr_retain(ctx, right)),
-            .e2 = dy_core_expr_new(dy_core_expr_retain(ctx, type)),
-            .polarity = elim.map.polarity,
-            .is_implicit = elim.map.is_implicit
-        }
-    };
+        struct dy_core_expr supertype = {
+            .tag = DY_CORE_EXPR_SOLUTION,
+            .solution = new_solution
+        };
 
-    if (!left_is_value || !right_is_value || !type_is_value) {
-        dy_core_expr_release(ctx, right);
-        dy_core_expr_release(ctx, type);
+        dy_ternary_t old_check_result = app.check_result;
 
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
-            .equality_map_elim = {
-                .expr = dy_core_expr_new(left),
-                .map = equality_map.equality_map,
-                .check_result = elim.check_result,
-                .id = elim.id
+        struct dy_core_expr new_new_expr;
+        app.check_result = dy_is_subtype(ctx, subtype, supertype, new_expr, &new_new_expr, &did_transform);
+
+        if (did_transform) {
+            dy_core_expr_release(ctx, new_expr);
+
+            if (dy_eval_expr(ctx, new_new_expr, &expr_is_value, &new_expr)) {
+                dy_core_expr_release(ctx, new_new_expr);
+                new_new_expr = new_expr;
             }
-        };
+
+            new_expr = new_new_expr;
+        }
+
+        dy_core_expr_release(ctx, subtype);
+
+        changed_check_result = old_check_result != app.check_result;
     }
 
-    dy_core_expr_release(ctx, type);
+    app.expr = dy_core_expr_new(new_expr);
+    app.solution = new_solution;
 
-    if (elim.check_result == DY_MAYBE) {
-        struct dy_core_expr type_of_left = dy_type_of(ctx, left);
+    struct dy_core_expr app_expr = {
+        .tag = DY_CORE_EXPR_APPLICATION,
+        .application = app
+    };
 
-        size_t x = ctx->constraints.num_elems;
-        elim.check_result = dy_is_subtype_no_transformation(ctx, type_of_left, equality_map);
+    struct dy_core_expr res;
+    if (!dy_eval_app_single_step(ctx, app, &res)) {
+        *is_value = false;
 
-        assert(x == ctx->constraints.num_elems);
-
-        dy_core_expr_release(ctx, type_of_left);
+        if (!expr_is_new && !solution_is_new && !did_transform && !changed_check_result) {
+            dy_core_expr_release(ctx, app_expr);
+            return false;
+        } else {
+            *result = app_expr;
+            return true;
+        }
     }
 
-    if (elim.check_result != DY_YES) {
-        dy_core_expr_release(ctx, right);
+    dy_core_expr_release(ctx, app_expr);
 
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
-            .equality_map_elim = {
-                .expr = dy_core_expr_new(left),
-                .map = equality_map.equality_map,
-                .check_result = elim.check_result,
-                .id = elim.id
+    if (dy_eval_expr(ctx, res, is_value, result)) {
+        dy_core_expr_release(ctx, res);
+    } else {
+        *result = res;
+    }
+
+    return true;
+}
+
+bool dy_eval_solution(struct dy_core_ctx *ctx, struct dy_core_solution solution, bool *is_value, struct dy_core_solution *result)
+{
+    if (solution.tag == DY_CORE_FUNCTION) {
+        struct dy_core_expr expr;
+        if (dy_eval_expr(ctx, *solution.expr, is_value, &expr)) {
+            solution.expr = dy_core_expr_new(expr);
+            dy_core_expr_retain_ptr(ctx, solution.out);
+            *result = solution;
+            return true;
+        } else {
+            return false;
+        }
+
+    } else {
+        *is_value = true;
+        return false;
+    }
+}
+
+bool dy_eval_app_single_step(struct dy_core_ctx *ctx, struct dy_core_application app, struct dy_core_expr *result)
+{
+    if (app.check_result != DY_YES) {
+        return false;
+    }
+
+    if (app.expr->tag == DY_CORE_EXPR_PROBLEM) {
+        switch (app.expr->problem.tag) {
+        case DY_CORE_FUNCTION:
+            if (!dy_substitute(ctx, *app.expr->problem.function.expr, app.expr->problem.function.id, *app.solution.expr, result)) {
+                *result = dy_core_expr_retain(ctx, *app.expr->problem.function.expr);
             }
-        };
-    }
 
-    if (left.tag == DY_CORE_EXPR_EQUALITY_MAP) {
-        if (left.equality_map.is_implicit != elim.map.is_implicit) {
-            dy_bail("Bug: Implicitness mismatch!");
+            return true;
+        case DY_CORE_PAIR:
+            if (app.solution.direction == DY_LEFT) {
+                *result = dy_core_expr_retain(ctx, *app.expr->problem.pair.left);
+            } else {
+                *result = dy_core_expr_retain(ctx, *app.expr->problem.pair.right);
+            }
+
+            return true;
+        case DY_CORE_RECURSION:
+            if (!dy_substitute(ctx, *app.expr->problem.recursion.expr, app.expr->problem.recursion.id, *app.expr, result)) {
+                *result = dy_core_expr_retain(ctx, *app.expr->problem.recursion.expr);
+            }
+
+            return true;
         }
 
-        dy_core_expr_release(ctx, equality_map);
-        dy_core_expr_release(ctx, right);
-
-        struct dy_core_expr new_expr = dy_eval_expr(ctx, *left.equality_map.e2, is_value);
-
-        dy_core_expr_release(ctx, left);
-
-        return new_expr;
+        dy_bail("impossible");
     }
 
-    if (left.tag == DY_CORE_EXPR_TYPE_MAP) {
-        if (left.type_map.is_implicit != elim.map.is_implicit) {
-            dy_bail("Bug: Implicitness mismatch!");
-        }
-
-        dy_core_expr_release(ctx, equality_map);
-
-        struct dy_core_expr e;
-        if (!substitute(ctx, *left.type_map.expr, left.type_map.id, right, &e)) {
-            e = dy_core_expr_retain(ctx, *left.type_map.expr);
-        }
-
-        dy_core_expr_release(ctx, left);
-        dy_core_expr_release(ctx, right);
-
-        struct dy_core_expr new_expr = dy_eval_expr(ctx, e, is_value);
-
-        dy_core_expr_release(ctx, e);
-
-        return new_expr;
+    if (app.expr->tag == DY_CORE_EXPR_SOLUTION) {
+        *result = dy_core_expr_retain(ctx, *app.expr->solution.out);
+        return true;
     }
 
-    dy_core_expr_release(ctx, right);
-
-    if (left.tag == DY_CORE_EXPR_JUNCTION) {
-        struct dy_core_expr type_of_junction_e1 = dy_type_of(ctx, *left.junction.e1);
-
-        size_t x = ctx->constraints.num_elems;
-        dy_ternary_t res1 = dy_is_subtype_no_transformation(ctx, type_of_junction_e1, equality_map);
-        assert(x == ctx->constraints.num_elems);
-
-        dy_core_expr_release(ctx, type_of_junction_e1);
-
-        if (res1 == DY_YES) {
-            dy_core_expr_release_ptr(ctx, left.junction.e2);
-
-            struct dy_core_equality_map_elim new_elim = {
-                .expr = left.junction.e1,
-                .map = equality_map.equality_map,
-                .check_result = DY_YES
-            };
-
-            return dy_eval_equality_map_elim(ctx, new_elim, is_value);
-        }
-
-        dy_core_expr_release_ptr(ctx, left.junction.e1);
-
-        struct dy_core_equality_map_elim new_elim = {
-            .expr = left.junction.e2,
-            .map = equality_map.equality_map,
-            .check_result = DY_YES
-        };
-
-        return dy_eval_equality_map_elim(ctx, new_elim, is_value);
-    }
-
-    if (left.tag == DY_CORE_EXPR_CUSTOM) {
-        const struct dy_core_custom_shared *s = dy_array_pos(ctx->custom_shared, left.custom.id);
-        if (s->can_be_eliminated) {
-            return s->eliminate(left.custom.data, ctx, right, is_value);
-        }
-    }
-
-    return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_EQUALITY_MAP_ELIM,
-        .equality_map_elim = {
-            .expr = dy_core_expr_new(left),
-            .map = equality_map.equality_map,
-            .check_result = elim.check_result,
-            .id = elim.id
-        }
-    };
-}
-
-struct dy_core_expr dy_eval_type_map_elim(struct dy_core_ctx *ctx, struct dy_core_type_map_elim elim, bool *is_value)
-{
-    dy_bail("Not yet implemented.");
-}
-
-struct dy_core_expr dy_eval_junction(struct dy_core_ctx *ctx, struct dy_core_junction junction, bool *is_value)
-{
-    bool e1_is_value = false;
-    junction.e1 = dy_core_expr_new(dy_eval_expr(ctx, *junction.e1, &e1_is_value));
-
-    bool e2_is_value = false;
-    junction.e2 = dy_core_expr_new(dy_eval_expr(ctx, *junction.e2, &e2_is_value));
-
-    *is_value = e1_is_value && e2_is_value;
-
-    return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_JUNCTION,
-        .junction = junction
-    };
-}
-
-struct dy_core_expr dy_eval_alternative(struct dy_core_ctx *ctx, struct dy_core_alternative alternative, bool *is_value)
-{
-    bool first_is_value = false;
-    struct dy_core_expr first = dy_eval_expr(ctx, *alternative.first, &first_is_value);
-    if (first_is_value) {
-        *is_value = true;
-        return first;
-    }
-
-    bool second_is_value = false;
-    struct dy_core_expr second = dy_eval_expr(ctx, *alternative.second, &second_is_value);
-    if (second_is_value) {
-        dy_core_expr_release(ctx, first);
-        *is_value = true;
-        return second;
-    }
-
-    alternative.first = dy_core_expr_new(first);
-    alternative.second = dy_core_expr_new(second);
-
-    return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_ALTERNATIVE,
-        .alternative = alternative
-    };
-}
-
-struct dy_core_expr dy_eval_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, bool *is_value)
-{
-    struct dy_core_expr evaled_body = dy_eval_expr(ctx, *recursion.expr, is_value);
-
-    recursion.expr = dy_core_expr_new(evaled_body);
-
-    struct dy_core_expr rec_expr = {
-        .tag = DY_CORE_EXPR_RECURSION,
-        .recursion = recursion
-    };
-
-    struct dy_core_expr substituted_body;
-    if (!substitute(ctx, evaled_body, recursion.id, rec_expr, &substituted_body)) {
-        substituted_body = dy_core_expr_retain(ctx, evaled_body);
-    }
-
-    dy_core_expr_release_ptr(ctx, recursion.expr);
-
-    return substituted_body;
+    return false;
 }

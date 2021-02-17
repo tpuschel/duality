@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2021 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
@@ -16,121 +16,77 @@ static inline struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_
 struct dy_core_expr dy_type_of(struct dy_core_ctx *ctx, struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EQUALITY_MAP:
-        if (dy_core_expr_is_computation(ctx, *expr.equality_map.e1)) {
-            return (struct dy_core_expr){
-                .tag = DY_CORE_EXPR_TYPE_MAP,
-                .type_map = {
-                    .id = ctx->running_id++,
-                    .type = dy_core_expr_new(dy_type_of(ctx, *expr.equality_map.e1)),
-                    .expr = dy_core_expr_new(dy_type_of(ctx, *expr.equality_map.e2)),
-                    .polarity = DY_CORE_POLARITY_POSITIVE,
-                    .is_implicit = expr.equality_map.is_implicit,
+    case DY_CORE_EXPR_PROBLEM:
+        expr.problem.polarity = DY_POLARITY_POSITIVE;
+
+        switch (expr.problem.tag) {
+        case DY_CORE_FUNCTION:
+            dy_core_expr_retain_ptr(ctx, expr.problem.function.type);
+
+            dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+                .id = expr.problem.function.id,
+                .type = *expr.problem.function.type
+            });
+
+            expr.problem.function.expr = dy_core_expr_new(dy_type_of(ctx, *expr.problem.function.expr));
+
+            ctx->free_variables.num_elems--;
+
+            return expr;
+        case DY_CORE_PAIR:
+            expr.problem.pair.left = dy_core_expr_new(dy_type_of(ctx, *expr.problem.pair.left));
+            expr.problem.pair.right = dy_core_expr_new(dy_type_of(ctx, *expr.problem.pair.right));
+            return expr;
+        case DY_CORE_RECURSION:
+            dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+                .id = expr.problem.recursion.id,
+                .type = {
+                    .tag = DY_CORE_EXPR_VARIABLE,
+                    .variable_id = expr.problem.recursion.id
                 }
-            };
-        } else {
-            dy_core_expr_retain_ptr(expr.equality_map.e1);
-            expr.equality_map.e2 = dy_core_expr_new(dy_type_of(ctx, *expr.equality_map.e2));
-            expr.equality_map.polarity = DY_CORE_POLARITY_POSITIVE;
+            });
+
+            expr.problem.recursion.expr = dy_core_expr_new(dy_type_of(ctx, *expr.problem.recursion.expr));
+
+            ctx->free_variables.num_elems--;
+
             return expr;
         }
-    case DY_CORE_EXPR_TYPE_MAP:
-        dy_array_add(&ctx->bindings, &(struct dy_core_binding){
-            .id = expr.type_map.id,
-            .type = *expr.type_map.type,
-            .is_inference_var = false
-        });
 
-        dy_core_expr_retain_ptr(expr.type_map.type);
-        expr.type_map.expr = dy_core_expr_new(dy_type_of(ctx, *expr.type_map.expr));
-        expr.type_map.polarity = DY_CORE_POLARITY_POSITIVE;
+        dy_bail("impossible");
+    case DY_CORE_EXPR_SOLUTION:
+        if (expr.solution.tag == DY_CORE_FUNCTION) {
+            dy_core_expr_retain_ptr(ctx, expr.solution.expr);
+        }
 
-        --ctx->bindings.num_elems;
-
+        expr.solution.out = dy_core_expr_new(dy_type_of(ctx, *expr.solution.out));
         return expr;
-    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
-        return dy_core_expr_retain(ctx, *expr.equality_map_elim.map.e2);
-    case DY_CORE_EXPR_TYPE_MAP_ELIM:
-        return dy_core_expr_retain(ctx, *expr.type_map_elim.map.expr);
-    case DY_CORE_EXPR_JUNCTION:
-        expr.junction.e1 = dy_core_expr_new(dy_type_of(ctx, *expr.junction.e1));
-        expr.junction.e2 = dy_core_expr_new(dy_type_of(ctx, *expr.junction.e2));
-        expr.junction.polarity = DY_CORE_POLARITY_POSITIVE;
-        return expr;
-    case DY_CORE_EXPR_ALTERNATIVE:
-        return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_JUNCTION,
-            .junction = {
-                .e1 = dy_core_expr_new(dy_type_of(ctx, *expr.alternative.first)),
-                .e2 = dy_core_expr_new(dy_type_of(ctx, *expr.alternative.second)),
-                .polarity = DY_CORE_POLARITY_NEGATIVE,
-            }
-        };
+    case DY_CORE_EXPR_APPLICATION:
+        return dy_core_expr_retain(ctx, *expr.application.solution.out);
     case DY_CORE_EXPR_VARIABLE:
-        for (size_t i = 0, size = ctx->bindings.num_elems; i < size; ++i) {
-            const struct dy_core_binding *b = dy_array_pos(ctx->bindings, i);
-            if (b->id == expr.variable_id) {
-                return dy_core_expr_retain(ctx, b->type);
+        for (size_t i = ctx->free_variables.num_elems; i-- > 0;) {
+            const struct dy_free_var *free_var = dy_array_pos(&ctx->free_variables, i);
+            if (free_var->id == expr.variable_id) {
+                return dy_core_expr_retain(ctx, free_var->type);
             }
         }
 
-        for (size_t i = 0, size = ctx->subtype_implicits.num_elems; i < size; ++i) {
-            const struct dy_core_binding *b = dy_array_pos(ctx->subtype_implicits, i);
-            if (b->id == expr.variable_id) {
-                return dy_core_expr_retain(ctx, b->type);
-            }
-        }
-
-        for (size_t i = 0, size = ctx->bound_inference_vars.num_elems; i < size; ++i) {
-            const struct dy_bound_inference_var *bc = dy_array_pos(ctx->bound_inference_vars, i);
-            if (bc->id == expr.variable_id) {
-                return dy_core_expr_retain(ctx, bc->type);
-            }
-        }
-
-        dy_bail("Unbound variable!");
-    case DY_CORE_EXPR_CUSTOM: {
-        const struct dy_core_custom_shared *s = dy_array_pos(ctx->custom_shared, expr.custom.id);
-        return s->type_of(expr.custom.data, ctx);
-    }
-    case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        dy_bail("Should not happen\n");
-    case DY_CORE_EXPR_RECURSION: {
-        struct dy_core_expr any = {
-            .tag = DY_CORE_EXPR_END,
-            .end_polarity = DY_CORE_POLARITY_NEGATIVE
-        };
-
-        struct dy_core_expr self_type = {
-            .tag = DY_CORE_EXPR_VARIABLE,
-            .variable_id = expr.recursion.id
-        };
-
-        dy_array_add(&ctx->bindings, &(struct dy_core_binding){
-            .id = expr.recursion.id,
-            .type = self_type,
-            .is_inference_var = false
-        });
-
-        struct dy_core_expr type = dy_type_of(ctx, *expr.recursion.expr);
-
-        --ctx->bindings.num_elems;
-
-        if (dy_core_expr_is_bound(ctx, expr.recursion.id, type)) {
-            expr.recursion.type = dy_core_expr_new(any);
-            expr.recursion.expr = dy_core_expr_new(type);
-            expr.recursion.polarity = DY_CORE_POLARITY_POSITIVE;
-            return expr;
-        } else {
-            return type;
-        }
-    }
-    case DY_CORE_EXPR_END:
-        // fallthrough
-    case DY_CORE_EXPR_SYMBOL:
+        dy_bail("impossible");
+    case DY_CORE_EXPR_ANY:
+    case DY_CORE_EXPR_VOID:
         return (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_SYMBOL,
+            .tag = DY_CORE_EXPR_VOID
         };
+    case DY_CORE_EXPR_INFERENCE_CTX:
+        dy_bail("impossible");
+    case DY_CORE_EXPR_INFERENCE_VAR:
+        return (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_ANY
+        };
+    case DY_CORE_EXPR_CUSTOM: {
+        const struct dy_core_custom_shared *s = dy_array_pos(&ctx->custom_shared, expr.custom.id);
+        return s->type_of(ctx, expr.custom.data);
+    }
     }
 
     dy_bail("Impossible object type.");

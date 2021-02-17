@@ -48,11 +48,11 @@ struct mem_slot {
  * Pass these two constant variables as the pre_ and post_padding to alloc/retain/release/change.
  */
 
-#define MEM_SLOT_PRE_PADDING(type) \
-    DY_COMPUTE_PADDING(sizeof(struct mem_slot), DY_ALIGNOF(type))
+#define MEM_SLOT_PRE_PADDING(align) \
+    DY_COMPUTE_PADDING(sizeof(struct mem_slot), align)
 
-#define MEM_SLOT_POST_PADDING(type) \
-    DY_COMPUTE_PADDING(sizeof(struct mem_slot) + MEM_SLOT_PRE_PADDING(type) + sizeof(type), DY_ALIGNOF(struct mem_slot))
+#define MEM_SLOT_ACTUAL_SIZE(size) \
+    ((size) + DY_COMPUTE_PADDING(size, DY_ALIGNOF(struct mem_slot)))
 
 /** The header of a memory block. */
 struct mem_blk {
@@ -65,13 +65,13 @@ static struct mem_blk *mem_first_block = NULL;
 
 static inline void mem_init(char *map, size_t map_size, size_t descriptor_size, void **first_mib_region, size_t first_mib_region_min_size);
 
-static inline void *mem_alloc(size_t size, size_t pre_padding, size_t post_padding);
+static inline void *mem_alloc(size_t size, size_t alignment);
 
-static inline void *mem_retain(const void *ptr, size_t pre_padding, size_t post_padding);
+static inline void *mem_retain(const void *ptr, size_t alignment);
 
-static inline size_t mem_release(const void *ptr, size_t pre_padding, size_t post_padding);
+static inline size_t mem_release(const void *ptr, size_t alignment);
 
-static inline bool mem_change(void *ptr, size_t new_size, size_t pre_padding, size_t post_padding);
+static inline bool mem_change(void *ptr, size_t new_size, size_t alignment);
 
 void mem_init(char *map, size_t map_size, size_t descriptor_size, void **first_mib_region, size_t first_mib_region_min_size)
 {
@@ -125,25 +125,27 @@ void mem_init(char *map, size_t map_size, size_t descriptor_size, void **first_m
     }
 }
 
-void *mem_alloc(size_t size, size_t pre_padding, size_t post_padding)
+void *mem_alloc(size_t size, size_t alignment)
 {
-    size_t actual_size = pre_padding + size + post_padding;
+    size_t pre_padding = MEM_SLOT_PRE_PADDING(alignment);
+
+    size_t allocated_size = pre_padding + size;
 
     for (struct mem_blk *blk = mem_first_block; blk != NULL; blk = blk->next_block) {
-        for (struct mem_slot *slot = &blk->first_slot; !slot->is_end; slot = (char *)(slot + 1) + slot->size) {
+        for (struct mem_slot *slot = &blk->first_slot; !slot->is_end; slot = (char *)(slot + 1) + MEM_SLOT_ACTUAL_SIZE(slot->size)) {
             if (slot->ref_cnt != 0) {
                 continue;
             }
 
-            if (slot->size < actual_size) {
+            if (slot->size < allocated_size) {
                 continue;
             }
 
-            size_t rest_size = slot->size - actual_size;
+            size_t rest_size = slot->size - allocated_size;
 
             if (rest_size == 0) {
                 slot->ref_cnt = 1;
-                slot->size = actual_size;
+                slot->size = allocated_size;
                 slot->is_end = 0;
                 return (char *)(slot + 1) + pre_padding;
             }
@@ -152,13 +154,13 @@ void *mem_alloc(size_t size, size_t pre_padding, size_t post_padding)
                 continue;
             }
 
-            struct mem_slot *new_slot = (char *)(slot + 1) + actual_size;
+            struct mem_slot *new_slot = (char *)(slot + 1) + MEM_SLOT_ACTUAL_SIZE(allocated_size);
             new_slot->ref_cnt = 0;
             new_slot->size = rest_size;
             new_slot->is_end = 0;
 
             slot->ref_cnt = 1;
-            slot->size = actual_size;
+            slot->size = allocated_size;
             slot->is_end = 0;
 
             return (char *)(slot + 1) + pre_padding;
@@ -168,8 +170,10 @@ void *mem_alloc(size_t size, size_t pre_padding, size_t post_padding)
     return NULL;
 }
 
-void *mem_retain(const void *ptr, size_t pre_padding, size_t post_padding)
+void *mem_retain(const void *ptr, size_t alignment)
 {
+    size_t pre_padding = MEM_SLOT_PRE_PADDING(alignment);
+
     struct mem_slot *slot = (const char *)ptr - pre_padding - sizeof *slot;
 
     slot->ref_cnt++;
@@ -177,18 +181,22 @@ void *mem_retain(const void *ptr, size_t pre_padding, size_t post_padding)
     return ptr;
 }
 
-size_t mem_release(const void *ptr, size_t pre_padding, size_t post_padding)
+size_t mem_release(const void *ptr, size_t alignment)
 {
+    size_t pre_padding = MEM_SLOT_PRE_PADDING(alignment);
+
     struct mem_slot *slot = (const char *)ptr - pre_padding - sizeof *slot;
 
     return --slot->ref_cnt;
 }
 
-bool mem_change(void *ptr, size_t new_size, size_t pre_padding, size_t post_padding)
+bool mem_change(void *ptr, size_t new_size, size_t alignment)
 {
+    size_t pre_padding = MEM_SLOT_PRE_PADDING(alignment);
+
     struct mem_slot *slot = (char *)ptr - pre_padding - sizeof *slot;
 
-    size_t old_size = slot->size - pre_padding - post_padding;
+    size_t old_size = slot->size - pre_padding;
 
     if (old_size < new_size) {
         // Growing.

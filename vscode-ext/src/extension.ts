@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { LanguageClient, Executable, LanguageClientOptions } from 'vscode-languageclient'
+import { LanguageClient, Executable, LanguageClientOptions } from 'vscode-languageclient/node'
 
 class Debugger implements vscode.DebugAdapterDescriptorFactory {
 	path: string

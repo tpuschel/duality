@@ -73,7 +73,7 @@ int dy_dap_run_server(FILE *in, FILE *out)
 
     for (;;) {
         if (!dy_dap_process_message(&stream, &json)) {
-            dy_array_destroy(json);
+            dy_array_release(&json);
             return -1;
         }
     }
@@ -165,7 +165,7 @@ void stream_callback(dy_array_t *buffer, void *env)
 
         dy_array_set_excess_capacity(buffer, state->bound_size_in_bytes);
 
-        size_t num_bytes_read = fread(dy_array_excess_buffer(*buffer), sizeof(char), state->bound_size_in_bytes, stdin);
+        size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), state->bound_size_in_bytes, stdin);
 
         dy_array_add_to_size(buffer, num_bytes_read);
 
@@ -173,7 +173,7 @@ void stream_callback(dy_array_t *buffer, void *env)
     } else {
         dy_array_set_excess_capacity(buffer, 1);
 
-        size_t num_bytes_read = fread(dy_array_excess_buffer(*buffer), sizeof(char), 1, stdin);
+        size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), 1, stdin);
 
         dy_array_add_to_size(buffer, num_bytes_read);
     }
@@ -196,10 +196,10 @@ void write_size_t(FILE *file, size_t x)
     }
 
     for (size_t i = buffer.num_elems; i-- > 0;) {
-        fprintf(file, "%c", *(char *)dy_array_pos(buffer, i));
+        fprintf(file, "%c", *(char *)dy_array_pos(&buffer, i));
     }
 
-    dy_array_destroy(buffer);
+    dy_array_release(&buffer);
 }
 
 void set_file_to_binary(FILE *file)

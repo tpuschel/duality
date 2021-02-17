@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2021 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
@@ -11,20 +11,22 @@
 #include "string.h"
 
 /**
- * This file implements dynamically
- * growable arrays.
+ * This file implements dynamically growable arrays.
  */
 
 typedef struct dy_array {
     void *buffer;
     size_t elem_size;
+    size_t elem_alignment;
     size_t num_elems;
     size_t capacity;
-    size_t pre_padding;
-    size_t post_padding;
 } dy_array_t;
 
 static inline dy_array_t dy_array_create(size_t elem_size, size_t alignment, size_t capacity);
+
+static inline void dy_array_retain(const dy_array_t *array);
+
+static inline void dy_array_release(dy_array_t *array);
 
 static inline size_t dy_array_add(dy_array_t *array, const void *value);
 
@@ -34,24 +36,19 @@ static inline void dy_array_remove(dy_array_t *array, size_t index);
 
 static inline void dy_array_remove_keep_order(dy_array_t *array, size_t index);
 
-static inline void dy_array_get(dy_array_t array, size_t index, void *value);
-
-static inline void dy_array_set(dy_array_t array, size_t index, const void *value);
-
 static inline void dy_array_insert_keep_order(dy_array_t *array, size_t index, const void *value);
 
 static inline void dy_array_set_excess_capacity(dy_array_t *array, size_t excess_capacity);
 
-static inline void *dy_array_excess_buffer(dy_array_t array);
+static inline void *dy_array_excess_buffer(const dy_array_t *array);
 
 static inline void dy_array_add_to_size(dy_array_t *array, size_t added_size);
 
 static inline size_t dy_array_pop(dy_array_t *array, void *value);
 
-static inline void dy_array_destroy(dy_array_t array);
-
-static inline void *dy_array_pos(dy_array_t array, size_t i);
-static inline void *dy_array_last(dy_array_t array);
+static inline void *dy_array_pos(const dy_array_t *array, size_t i);
+static inline void *dy_array_pos_uninit(const dy_array_t *array, size_t i);
+static inline void *dy_array_last(const dy_array_t *array);
 
 static inline dy_string_t dy_array_view(const dy_array_t *array);
 
@@ -62,16 +59,12 @@ dy_array_t dy_array_create(size_t elem_size, size_t alignment, size_t capacity)
     size_t capacity_in_bytes;
     assert(!dy_size_t_mul_overflow(elem_size, capacity, &capacity_in_bytes));
 
-    size_t pre_padding = DY_COMPUTE_PADDING(sizeof(size_t), alignment);
-    size_t post_padding = DY_COMPUTE_PADDING(sizeof(size_t) + pre_padding + elem_size, DY_ALIGNOF(size_t));
-
     return (dy_array_t){
-        .buffer = dy_rc_alloc(capacity_in_bytes, pre_padding, post_padding),
+        .buffer = dy_rc_alloc(capacity_in_bytes, alignment),
         .elem_size = elem_size,
+        .elem_alignment = alignment,
         .num_elems = 0,
-        .capacity = capacity,
-        .pre_padding = pre_padding,
-        .post_padding = post_padding
+        .capacity = capacity
     };
 }
 
@@ -89,13 +82,13 @@ void dy_array_prepend_keep_order(dy_array_t *array, const void *value)
 
 void dy_array_remove(dy_array_t *array, size_t index)
 {
-    memmove(dy_array_pos(*array, index), dy_array_last(*array), array->elem_size);
+    memmove(dy_array_pos(array, index), dy_array_last(array), array->elem_size);
     --array->num_elems;
 }
 
 void dy_array_remove_keep_order(dy_array_t *array, size_t index)
 {
-    memcpy(dy_array_pos(*array, index), dy_array_pos(*array, index + 1), array->elem_size * (array->num_elems - index - 1));
+    memmove(dy_array_pos(array, index), dy_array_pos(array, index + 1), array->elem_size * (array->num_elems - index - 1));
     --array->num_elems;
 }
 
@@ -113,22 +106,12 @@ void dy_array_insert_keep_order(dy_array_t *array, size_t index, const void *val
         size_t capacity_in_bytes;
         assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
 
-        array->buffer = dy_rc_realloc(array->buffer, capacity_in_bytes, array->pre_padding, array->post_padding);
+        array->buffer = dy_rc_realloc(array->buffer, capacity_in_bytes, array->elem_alignment);
     }
 
-    memmove(dy_array_pos(*array, index + 1), dy_array_pos(*array, index), array->elem_size * (array->num_elems - index));
-    memcpy(dy_array_pos(*array, index), value, array->elem_size);
+    memmove(dy_array_pos_uninit(array, index + 1), dy_array_pos_uninit(array, index), array->elem_size * (array->num_elems - index));
+    memmove(dy_array_pos_uninit(array, index), value, array->elem_size);
     ++array->num_elems;
-}
-
-void dy_array_get(dy_array_t array, size_t index, void *value)
-{
-    memcpy(value, dy_array_pos(array, index), array.elem_size);
-}
-
-void dy_array_set(dy_array_t array, size_t index, const void *value)
-{
-    memcpy(dy_array_pos(array, index), value, array.elem_size);
 }
 
 void dy_array_set_excess_capacity(dy_array_t *array, size_t excess_capacity)
@@ -146,7 +129,7 @@ void dy_array_set_excess_capacity(dy_array_t *array, size_t excess_capacity)
     size_t capacity_in_bytes;
     assert(!dy_size_t_mul_overflow(array->elem_size, array->capacity, &capacity_in_bytes));
 
-    array->buffer = dy_rc_realloc(array->buffer, capacity_in_bytes, array->pre_padding, array->post_padding);
+    array->buffer = dy_rc_realloc(array->buffer, capacity_in_bytes, array->elem_alignment);
 }
 
 void dy_array_add_to_size(dy_array_t *array, size_t added_size)
@@ -154,32 +137,43 @@ void dy_array_add_to_size(dy_array_t *array, size_t added_size)
     assert(!dy_size_t_add_overflow(array->num_elems, added_size, &array->num_elems));
 }
 
-void *dy_array_excess_buffer(dy_array_t array)
+void *dy_array_excess_buffer(const dy_array_t *array)
 {
-    return dy_array_pos(array, array.num_elems);
+    return dy_array_pos_uninit(array, array->num_elems);
 }
 
 size_t dy_array_pop(dy_array_t *array, void *value)
 {
-    memcpy(value, dy_array_last(*array), array->elem_size);
+    memmove(value, dy_array_last(array), array->elem_size);
     --array->num_elems;
     return array->num_elems;
 }
 
-void *dy_array_pos(dy_array_t array, size_t i)
+void *dy_array_pos(const dy_array_t *array, size_t i)
 {
-    assert(i < array.capacity + 1);
-    return (char *)array.buffer + (i * array.elem_size);
+    assert(i < array->num_elems + 1);
+    return dy_array_pos_uninit(array, i);
 }
 
-void *dy_array_last(dy_array_t array)
+void *dy_array_pos_uninit(const dy_array_t *array, size_t i)
 {
-    return dy_array_pos(array, array.num_elems - 1);
+    assert(i < array->capacity + 1);
+    return (char *)array->buffer + (i * array->elem_size);
 }
 
-void dy_array_destroy(dy_array_t array)
+void *dy_array_last(const dy_array_t *array)
 {
-    dy_rc_release(array.buffer, array.pre_padding, array.post_padding);
+    return dy_array_pos(array, array->num_elems - 1);
+}
+
+void dy_array_retain(const dy_array_t *array)
+{
+    dy_rc_retain(array->buffer, array->elem_alignment);
+}
+
+void dy_array_release(dy_array_t *array)
+{
+    dy_rc_release(array->buffer, array->elem_alignment);
 }
 
 dy_string_t dy_array_view(const dy_array_t *array)

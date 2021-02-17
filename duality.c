@@ -1,22 +1,16 @@
 /*
- * Copyright 2017-2020 Thorben Hasenpusch <t.hasenpusch@icloud.com>
+ * Copyright 2017-2021 Thorben Hasenpusch <t.hasenpusch@icloud.com>
  *
  * SPDX-License-Identifier: MIT
  */
 
-#define _GNU_SOURCE // For glibc's asprintf.
-
-#include "syntax/parser.h"
+#include "syntax/utf8_to_ast.h"
+#include "syntax/ast_to_core.h"
 
 #include "core/check.h"
 #include "core/eval.h"
-#include "core/constraint.h"
 
 #include "lsp/server.h"
-
-#include "support/bail.h"
-
-#include <string.h>
 
 static void read_chunk(dy_array_t *buffer, void *env);
 
@@ -45,78 +39,90 @@ int main(int argc, const char *argv[])
     if (argc > 1) {
         stream = fopen(argv[1], "r");
         if (stream == NULL) {
-            perror("Error reading file: ");
+            perror("Error reading file");
             return -1;
         }
     } else {
         stream = stdin;
     }
 
-    struct dy_core_ctx core_ctx = {
-        .running_id = 0,
-        .bound_inference_vars = dy_array_create(sizeof(struct dy_bound_inference_var), DY_ALIGNOF(struct dy_bound_inference_var), 64),
-        .already_visited_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 64),
-        .subtype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
-        .supertype_assumption_cache = dy_array_create(sizeof(struct dy_subtype_assumption), DY_ALIGNOF(struct dy_subtype_assumption), 64),
-        .bindings = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
-        .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
-        .subtype_implicits = dy_array_create(sizeof(struct dy_core_binding), DY_ALIGNOF(struct dy_core_binding), 64),
-        .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8),
-        .constraints = dy_array_create(sizeof(struct dy_constraint), DY_ALIGNOF(struct dy_constraint), 64),
-        .custom_shared = dy_array_create(sizeof(struct dy_core_custom_shared), DY_ALIGNOF(struct dy_core_custom_shared), 3)
-    };
-
-    dy_uv_register(&core_ctx);
-    dy_def_register(&core_ctx);
-    dy_string_register(&core_ctx);
-
-    struct dy_parser_ctx parser_ctx = {
+    struct dy_utf8_to_ast_ctx utf8_to_ast_ctx = {
         .stream = {
             .get_chars = read_chunk,
             .buffer = dy_array_create(sizeof(char), DY_ALIGNOF(char), CHUNK_SIZE),
             .env = stream,
-            .current_index = 0,
-        },
-        .core_ctx = core_ctx,
-        .bound_vars = dy_array_create(sizeof(struct dy_bound_var), DY_ALIGNOF(struct dy_bound_var), 64),
-        .text_sources = dy_array_create(sizeof(struct dy_text_source), DY_ALIGNOF(struct dy_text_source), 64),
+            .current_index = 0
+        }
     };
 
-    struct dy_core_expr program;
-    if (!dy_parse_file(&parser_ctx, &program)) {
+    struct dy_ast_do_block ast;
+    if (!dy_utf8_to_ast_file(&utf8_to_ast_ctx, &ast)) {
         fprintf(stderr, "Failed to parse program.\n");
         return -1;
     }
 
-    core_ctx = parser_ctx.core_ctx;
+    dy_array_t custom_shared = dy_array_create(sizeof(struct dy_core_custom_shared), DY_ALIGNOF(struct dy_core_custom_shared), 3);
 
-    size_t constraint_start = core_ctx.constraints.num_elems;
-    struct dy_core_expr checked_program;
-    if (dy_check_expr(&core_ctx, program, &checked_program)) {
-        dy_core_expr_release(&core_ctx, program);
-        program = checked_program;
+    dy_uv_register(&custom_shared);
+    dy_def_register(&custom_shared);
+    dy_string_register(&custom_shared);
+    dy_string_type_register(&custom_shared);
+
+    struct dy_ast_to_core_ctx ast_to_core_ctx = {
+        .running_id = 0,
+        .variable_replacements = dy_array_create(sizeof(struct dy_variable_replacement), DY_ALIGNOF(struct dy_variable_replacement), 128)
+    };
+
+    struct dy_core_expr core = dy_ast_do_block_to_core(&ast_to_core_ctx, ast);
+
+    dy_ast_do_block_release(ast);
+
+    struct dy_core_ctx core_ctx = {
+        .running_id = ast_to_core_ctx.running_id,
+        .free_variables = dy_array_create(sizeof(struct dy_free_var), DY_ALIGNOF(struct dy_free_var), 64),
+        .captured_inference_vars = dy_array_create(sizeof(struct dy_captured_inference_var), DY_ALIGNOF(struct dy_captured_inference_var), 64),
+        .recovered_negative_inference_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 8),
+        .past_subtype_checks = dy_array_create(sizeof(struct dy_core_past_subtype_check), DY_ALIGNOF(struct dy_core_past_subtype_check), 64),
+        .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
+        .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8),
+        .constraints = dy_array_create(sizeof(struct dy_constraint), DY_ALIGNOF(struct dy_constraint), 64),
+        .custom_shared = custom_shared
+    };
+
+    printf("=== Pre-checked Core ====\n\n");
+    print_core_expr(&core_ctx, stdout, core);
+    printf("\n\n");
+
+    struct dy_core_expr checked_core;
+    if (dy_check_expr(&core_ctx, core, &checked_core)) {
+        dy_core_expr_release(&core_ctx, core);
+        core = checked_core;
     }
-    assert(constraint_start == core_ctx.constraints.num_elems);
 
-    if (core_has_error(program)) {
-        fprintf(stderr, "Errors:\n");
-        print_core_errors(parser_ctx.text_sources, stderr, program, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
+    printf("=== Checked Core ====\n\n");
+    print_core_expr(&core_ctx, stdout, core);
+    printf("\n\n");
+
+    if (core_has_error(core)) {
+        fprintf(stderr, "*** Encountered errors. Aborting. ***\n");
         return -1;
     }
 
     bool is_value = false;
-    struct dy_core_expr result = dy_eval_expr(&core_ctx, program, &is_value);
+    struct dy_core_expr result = core;
+    dy_eval_expr(&core_ctx, core, &is_value, &result);
 
+    printf("=== Evaluated Core ====\n\n");
     print_core_expr(&core_ctx, stdout, result);
     printf("\n");
 
     if (!is_value) {
-        fprintf(stderr, "Unable to fully evaluate the program.\n");
-
         if (core_has_error(result)) {
-            fprintf(stderr, "Errors:\n");
-            print_core_errors(parser_ctx.text_sources, stderr, result, parser_ctx.stream.buffer.buffer, parser_ctx.stream.buffer.num_elems);
+            fprintf(stderr, "*** Encountered errors. Aborting. ***\n");
+        } else {
+            fprintf(stderr, "*** Unable to continue evaluating. ***\n");
         }
+
         return -1;
     } else {
         return 0;
@@ -129,12 +135,11 @@ void print_core_expr(struct dy_core_ctx *ctx, FILE *file, struct dy_core_expr ex
     dy_core_expr_to_string(ctx, expr, &s);
 
     for (size_t i = 0; i < s.num_elems; ++i) {
-        char c;
-        dy_array_get(s, i, &c);
+        char c = *(char *)dy_array_pos(&s, i);
         fprintf(file, "%c", c);
     }
 
-    dy_array_destroy(s);
+    dy_array_release(&s);
 }
 
 void read_chunk(dy_array_t *buffer, void *env)
@@ -147,7 +152,7 @@ void read_chunk(dy_array_t *buffer, void *env)
 
     dy_array_set_excess_capacity(buffer, CHUNK_SIZE);
 
-    size_t num_bytes_read = fread(dy_array_excess_buffer(*buffer), sizeof(char), CHUNK_SIZE, stream);
+    size_t num_bytes_read = fread(dy_array_excess_buffer(buffer), sizeof(char), CHUNK_SIZE, stream);
 
     dy_array_add_to_size(buffer, num_bytes_read);
 }
@@ -155,55 +160,48 @@ void read_chunk(dy_array_t *buffer, void *env)
 bool core_has_error(struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_EQUALITY_MAP:
-        return core_has_error(*expr.equality_map.e1) || core_has_error(*expr.equality_map.e2);
-    case DY_CORE_EXPR_TYPE_MAP:
-        return core_has_error(*expr.type_map.type) || core_has_error(*expr.type_map.expr);
-    case DY_CORE_EXPR_EQUALITY_MAP_ELIM:
-        if (expr.equality_map_elim.check_result == DY_NO) {
-            return true;
+    case DY_CORE_EXPR_PROBLEM:
+        switch (expr.problem.tag) {
+        case DY_CORE_FUNCTION:
+            return core_has_error(*expr.problem.function.type)
+                || core_has_error(*expr.problem.function.expr);
+        case DY_CORE_PAIR:
+            return core_has_error(*expr.problem.pair.left)
+                || core_has_error(*expr.problem.pair.right);
+        case DY_CORE_RECURSION:
+            return core_has_error(*expr.problem.recursion.expr);
         }
 
-        return core_has_error(*expr.equality_map_elim.expr) || core_has_error(*expr.equality_map_elim.map.e1)
-               || core_has_error(*expr.equality_map_elim.map.e2);
-    case DY_CORE_EXPR_TYPE_MAP_ELIM:
-        if (expr.type_map_elim.check_result == DY_NO) {
-            return true;
-        }
-
-        return core_has_error(*expr.type_map_elim.expr) || core_has_error(*expr.type_map_elim.map.type)
-               || core_has_error(*expr.type_map_elim.map.expr);
-    case DY_CORE_EXPR_JUNCTION:
-        return core_has_error(*expr.junction.e1) || core_has_error(*expr.junction.e2);
-    case DY_CORE_EXPR_ALTERNATIVE:
-        return core_has_error(*expr.alternative.first) || core_has_error(*expr.alternative.second);
+        dy_bail("impossible");
+    case DY_CORE_EXPR_SOLUTION:
+        return (expr.solution.tag == DY_CORE_FUNCTION && core_has_error(*expr.solution.expr))
+            || core_has_error(*expr.solution.out);
+    case DY_CORE_EXPR_APPLICATION:
+        return expr.application.check_result == DY_NO
+            || core_has_error(*expr.application.expr)
+            || (expr.application.solution.tag == DY_CORE_FUNCTION && core_has_error(*expr.application.solution.expr))
+            || core_has_error(*expr.application.solution.out);
     case DY_CORE_EXPR_VARIABLE:
+    case DY_CORE_EXPR_ANY:
+    case DY_CORE_EXPR_VOID:
+        return false;
+    case DY_CORE_EXPR_INFERENCE_CTX:
+        return core_has_error(*expr.inference_ctx.expr);
+    case DY_CORE_EXPR_INFERENCE_VAR:
         return false;
     case DY_CORE_EXPR_CUSTOM:
         if (expr.custom.id == dy_uv_id) {
             return true;
         }
 
-        if (expr.custom.id == dy_def_id) {
-            struct dy_def_data *data = expr.custom.data;
+        // XXX: Add custom hook for error detection & reporting.
 
-            return core_has_error(data->arg) || core_has_error(data->body);
-        }
-
-        return false;
-    case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
-        dy_bail("should never be reached");
-    case DY_CORE_EXPR_RECURSION:
-        return core_has_error(*expr.recursion.type) || core_has_error(*expr.recursion.expr);
-    case DY_CORE_EXPR_END:
-        // fallthrough
-    case DY_CORE_EXPR_SYMBOL:
         return false;
     }
 
-    dy_bail("Impossible object type.");
+    dy_bail("impossible");
 }
-
+/*
 bool print_core_errors(dy_array_t text_sources, FILE *file, struct dy_core_expr expr, const char *text, size_t text_size)
 {
     switch (expr.tag) {
@@ -229,10 +227,14 @@ bool print_core_errors(dy_array_t text_sources, FILE *file, struct dy_core_expr 
 
         return err2 && err3;
     }
-    case DY_CORE_EXPR_TYPE_MAP_ELIM:
-        return print_core_errors(text_sources, file, *expr.type_map_elim.expr, text, text_size)
-        && print_core_errors(text_sources, file, *expr.type_map_elim.map.type, text, text_size)
-        && print_core_errors(text_sources, file, *expr.type_map_elim.map.expr, text, text_size);
+    case DY_CORE_EXPR_PART_ELIM: {
+        bool err1 = print_core_errors(text_sources, file, *expr.part_elim.expr, text, text_size);
+        bool err2 = print_core_errors(text_sources, file, *expr.part_elim.type, text, text_size);
+
+        return err1 && err2;
+    }
+    case DY_CORE_EXPR_PART:
+        return print_core_errors(text_sources, file, *expr.part.expr, text, text_size);
     case DY_CORE_EXPR_JUNCTION:
         return print_core_errors(text_sources, file, *expr.junction.e1, text, text_size)
         && print_core_errors(text_sources, file, *expr.junction.e2, text, text_size);
@@ -241,7 +243,7 @@ bool print_core_errors(dy_array_t text_sources, FILE *file, struct dy_core_expr 
         && print_core_errors(text_sources, file, *expr.alternative.second, text, text_size);
     case DY_CORE_EXPR_VARIABLE:
         return true;
-    case DY_CORE_EXPR_INFERENCE_TYPE_MAP:
+    case DY_CORE_EXPR_INFERENCE_CTX:
         dy_bail("should never be reached");
     case DY_CORE_EXPR_RECURSION:
         return print_core_errors(text_sources, file, *expr.recursion.type, text, text_size)
@@ -250,7 +252,7 @@ bool print_core_errors(dy_array_t text_sources, FILE *file, struct dy_core_expr 
         return true;
     case DY_CORE_EXPR_CUSTOM:
         if (expr.custom.id == dy_uv_id) {
-            struct dy_uv_data *data = expr.custom.data;
+            //struct dy_uv_data *data = expr.custom.data;
 
             fprintf(file, "Unbound variable\n");
             //print_error_fragment(file, data->var.text_range, text, text_size);
@@ -281,3 +283,4 @@ void print_error_fragment(FILE *file, struct dy_range range, const char *text, s
     }
     fprintf(file, "\n");
 }
+*/

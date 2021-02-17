@@ -20,39 +20,39 @@
 
 static inline const uint8_t *dy_json_to_utf8(const uint8_t *json, dy_array_t *utf8);
 
-static inline void dy_utf8_literal(dy_string_t s, dy_array_t *utf8);
-static inline const uint8_t *dy_array_to_utf8(const uint8_t *json, dy_array_t *utf8);
-static inline const uint8_t *dy_object_to_utf8(const uint8_t *json, dy_array_t *utf8);
-static inline void dy_number_to_utf8(const uint8_t *json, dy_array_t *utf8);
-static inline const uint8_t *dy_string_to_utf8(const uint8_t *json, dy_array_t *utf8);
+static inline void dy_json_utf8_literal(dy_string_t s, dy_array_t *utf8);
+static inline const uint8_t *dy_json_array_to_utf8(const uint8_t *json, dy_array_t *utf8);
+static inline const uint8_t *dy_json_object_to_utf8(const uint8_t *json, dy_array_t *utf8);
+static inline void dy_json_number_to_utf8(const uint8_t *json, dy_array_t *utf8);
+static inline const uint8_t *dy_json_string_to_utf8(const uint8_t *json, dy_array_t *utf8);
 
 const uint8_t *dy_json_to_utf8(const uint8_t *json, dy_array_t *utf8)
 {
     switch (*json) {
     case DY_JSON_TRUE:
-        dy_utf8_literal(DY_STR_LIT("true"), utf8);
+        dy_json_utf8_literal(DY_STR_LIT("true"), utf8);
         return json + 1;
     case DY_JSON_FALSE:
-        dy_utf8_literal(DY_STR_LIT("false"), utf8);
+        dy_json_utf8_literal(DY_STR_LIT("false"), utf8);
         return json + 1;
     case DY_JSON_NULL:
-        dy_utf8_literal(DY_STR_LIT("null"), utf8);
+        dy_json_utf8_literal(DY_STR_LIT("null"), utf8);
         return json + 1;
     case DY_JSON_ARRAY:
-        return dy_array_to_utf8(json + 1, utf8);
+        return dy_json_array_to_utf8(json + 1, utf8);
     case DY_JSON_OBJECT:
-        return dy_object_to_utf8(json + 1, utf8);
+        return dy_json_object_to_utf8(json + 1, utf8);
     case DY_JSON_NUMBER:
-        dy_number_to_utf8(json + 1, utf8);
+        dy_json_number_to_utf8(json + 1, utf8);
         return json + 1 + sizeof(long);
     case DY_JSON_STRING:
-        return dy_string_to_utf8(json + 1, utf8);
+        return dy_json_string_to_utf8(json + 1, utf8);
     }
 
     dy_bail("Invalid enum tag.");
 }
 
-void dy_utf8_literal(dy_string_t s, dy_array_t *utf8)
+void dy_json_utf8_literal(dy_string_t s, dy_array_t *utf8)
 {
     for (size_t i = 0; i < s.size; ++i) {
         if (s.ptr[i] == '\"') {
@@ -65,7 +65,7 @@ void dy_utf8_literal(dy_string_t s, dy_array_t *utf8)
     }
 }
 
-const uint8_t *dy_array_to_utf8(const uint8_t *json, dy_array_t *utf8)
+const uint8_t *dy_json_array_to_utf8(const uint8_t *json, dy_array_t *utf8)
 {
     dy_array_add(utf8, &(char){ '[' });
 
@@ -86,13 +86,13 @@ const uint8_t *dy_array_to_utf8(const uint8_t *json, dy_array_t *utf8)
     return json + 1;
 }
 
-const uint8_t *dy_object_to_utf8(const uint8_t *json, dy_array_t *utf8)
+const uint8_t *dy_json_object_to_utf8(const uint8_t *json, dy_array_t *utf8)
 {
     dy_array_add(utf8, &(char){ '{' });
 
     if (*json != DY_JSON_END) {
         for (;;) {
-            json = dy_string_to_utf8(json + 1, utf8);
+            json = dy_json_string_to_utf8(json + 1, utf8);
             dy_array_add(utf8, &(char){ ':' });
             json = dy_json_to_utf8(json, utf8);
 
@@ -109,7 +109,7 @@ const uint8_t *dy_object_to_utf8(const uint8_t *json, dy_array_t *utf8)
     return json + 1;
 }
 
-void dy_number_to_utf8(const uint8_t *json, dy_array_t *utf8)
+void dy_json_number_to_utf8(const uint8_t *json, dy_array_t *utf8)
 {
     long number;
     memcpy(&number, json, sizeof(number));
@@ -134,13 +134,13 @@ void dy_number_to_utf8(const uint8_t *json, dy_array_t *utf8)
     }
 
     for (size_t i = local.num_elems; i-- > 0;) {
-        dy_array_add(utf8, dy_array_pos(local, i));
+        dy_array_add(utf8, dy_array_pos(&local, i));
     }
 
-    dy_array_destroy(local);
+    dy_array_release(&local);
 }
 
-const uint8_t *dy_string_to_utf8(const uint8_t *json, dy_array_t *utf8)
+const uint8_t *dy_json_string_to_utf8(const uint8_t *json, dy_array_t *utf8)
 {
     dy_array_add(utf8, &(char){ '\"' });
 

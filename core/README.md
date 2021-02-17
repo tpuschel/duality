@@ -1,5 +1,8 @@
 # Core - The Duality Core Calculus
 
+
+**!!! Currently outdated and in the process of being rewitten !!!**
+
 The files in this folder implement the Duality Core Calculus (DCC),
 and depend on the files in the 'support' folder.
 

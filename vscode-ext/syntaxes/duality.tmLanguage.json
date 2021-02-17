@@ -20,7 +20,7 @@
 			"patterns": [
 				{
 					"name": "keyword.control.duality",
-					"match": "\\b(list|try|let|def|choice|do|prec|nrec|invert)\\b"
+					"match": "\\b(list|let|def|union|fun|ex|do|inf|fin|inv|max|Any|Void|String)\\b"
 				}
 			]
 		},
@@ -39,20 +39,12 @@
 		},
 		"strings": {
 			"name": "string.quoted.double.duality",
-			"begin": "\"",
-			"end": "\"",
+			"begin": "'",
+			"end": "'",
 			"patterns": [
 				{
 					"name": "constant.character.escape.duality",
 					"match": "\\\\."
-				}
-			]
-		},
-		"variables": {
-			"patterns": [
-				{
-					"name": "variable.language.duality",
-					"match": "\\b(Symbol|Any|All)\\b"
 				}
 			]
 		}
