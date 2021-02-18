@@ -1509,7 +1509,7 @@ dy_ternary_t dy_recursion_is_subtype_of_solution(struct dy_core_ctx *ctx, struct
 
     struct dy_core_expr unfolded_subtype;
     if (!dy_substitute(ctx, *subtype.expr, subtype.id, subtype_wrap, &unfolded_subtype)) {
-        unfolded_subtype = dy_core_expr_retain(ctx, subtype_wrap);
+        unfolded_subtype = dy_core_expr_retain(ctx, *subtype.expr);
     }
 
     struct dy_core_expr unfold = {
