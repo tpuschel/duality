@@ -56,7 +56,7 @@ bool dy_constraint_get(struct dy_core_ctx *ctx, size_t id, enum dy_polarity pola
                     .tag = DY_CORE_EXPR_PROBLEM,
                     .problem = {
                         .is_implicit = true,
-                        .polarity = DY_POLARITY_POSITIVE,
+                        .polarity = DY_POLARITY_NEGATIVE,
                         .tag = DY_CORE_RECURSION,
                         .recursion = {
                             .id = id,
@@ -78,7 +78,7 @@ bool dy_constraint_get(struct dy_core_ctx *ctx, size_t id, enum dy_polarity pola
                     .tag = DY_CORE_EXPR_PROBLEM,
                     .problem = {
                         .is_implicit = true,
-                        .polarity = DY_POLARITY_NEGATIVE,
+                        .polarity = DY_POLARITY_POSITIVE,
                         .tag = DY_CORE_RECURSION,
                         .recursion = {
                             .id = id,
@@ -116,7 +116,7 @@ void dy_join_constraints(struct dy_core_ctx *ctx, size_t start1, size_t start2, 
                     c2->lower = (struct dy_core_expr){
                         .tag = DY_CORE_EXPR_PROBLEM,
                         .problem = {
-                            .polarity = dy_flip_polarity(polarity),
+                            .polarity = polarity,
                             .is_implicit = true,
                             .tag = DY_CORE_PAIR,
                             .pair = {
