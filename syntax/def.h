@@ -134,7 +134,7 @@ bool dy_def_check(struct dy_core_ctx *ctx, void *data, struct dy_core_expr *resu
             new_body = checked_body;
         }
 
-        dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_POLARITY_POSITIVE);
+        dy_join_constraints(ctx, constraint_start1, constraint_start2);
 
         *result = new_body;
 
@@ -155,7 +155,7 @@ bool dy_def_check(struct dy_core_ctx *ctx, void *data, struct dy_core_expr *resu
 
         --ctx->free_variables.num_elems;
 
-        dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_POLARITY_POSITIVE);
+        dy_join_constraints(ctx, constraint_start1, constraint_start2);
 
         dy_core_expr_release(ctx, type_of_arg);
 

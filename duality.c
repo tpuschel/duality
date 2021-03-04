@@ -26,17 +26,17 @@ static void print_error_fragment(FILE *file, struct dy_range range, const char *
 
 int main(int argc, const char *argv[])
 {
-    if (argc > 1 && strcmp(argv[1], "--server") == 0) {
-        return dy_lsp_run_server(stdin, stdout);
-    }
-
-    if (argc > 1 && strcmp(argv[1], "--debugger") == 0) {
-        fprintf(stderr, "DAP not yet implemented!\n");
-        return -1;
-    }
-
     FILE *stream;
     if (argc > 1) {
+        if (strcmp(argv[1], "--server") == 0) {
+            return dy_lsp_run_server(stdin, stdout);
+        }
+
+        if (strcmp(argv[1], "--debugger") == 0) {
+            fprintf(stderr, "DAP not yet implemented!\n");
+            return -1;
+        }
+
         stream = fopen(argv[1], "r");
         if (stream == NULL) {
             perror("Error reading file");
@@ -82,6 +82,7 @@ int main(int argc, const char *argv[])
         .free_variables = dy_array_create(sizeof(struct dy_free_var), DY_ALIGNOF(struct dy_free_var), 64),
         .captured_inference_vars = dy_array_create(sizeof(struct dy_captured_inference_var), DY_ALIGNOF(struct dy_captured_inference_var), 64),
         .recovered_negative_inference_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 8),
+        .recovered_positive_inference_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 8),
         .past_subtype_checks = dy_array_create(sizeof(struct dy_core_past_subtype_check), DY_ALIGNOF(struct dy_core_past_subtype_check), 64),
         .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
         .free_ids_arrays = dy_array_create(sizeof(dy_array_t), DY_ALIGNOF(dy_array_t), 8),
@@ -124,9 +125,9 @@ int main(int argc, const char *argv[])
         }
 
         return -1;
-    } else {
-        return 0;
     }
+
+    return 0;
 }
 
 void print_core_expr(struct dy_core_ctx *ctx, FILE *file, struct dy_core_expr expr)
@@ -160,27 +161,32 @@ void read_chunk(dy_array_t *buffer, void *env)
 bool core_has_error(struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_PROBLEM:
-        switch (expr.problem.tag) {
-        case DY_CORE_FUNCTION:
-            return core_has_error(*expr.problem.function.type)
-                || core_has_error(*expr.problem.function.expr);
-        case DY_CORE_PAIR:
-            return core_has_error(*expr.problem.pair.left)
-                || core_has_error(*expr.problem.pair.right);
-        case DY_CORE_RECURSION:
-            return core_has_error(*expr.problem.recursion.expr);
+    case DY_CORE_EXPR_INTRO:
+        switch (expr.intro.tag) {
+        case DY_CORE_INTRO_COMPLEX:
+            switch (expr.intro.complex.tag) {
+            case DY_CORE_COMPLEX_ASSUMPTION:
+                return core_has_error(*expr.intro.complex.assumption.type)
+                    || core_has_error(*expr.intro.complex.assumption.expr);
+            case DY_CORE_COMPLEX_CHOICE:
+                return core_has_error(*expr.intro.complex.choice.left)
+                    || core_has_error(*expr.intro.complex.choice.right);
+            case DY_CORE_COMPLEX_RECURSION:
+                return core_has_error(*expr.intro.complex.recursion.expr);
+            }
+
+            dy_bail("impossible");
+        case DY_CORE_INTRO_SIMPLE:
+            return (expr.intro.simple.tag == DY_CORE_SIMPLE_PROOF && core_has_error(*expr.intro.simple.proof))
+                || core_has_error(*expr.intro.simple.out);
         }
 
         dy_bail("impossible");
-    case DY_CORE_EXPR_SOLUTION:
-        return (expr.solution.tag == DY_CORE_FUNCTION && core_has_error(*expr.solution.expr))
-            || core_has_error(*expr.solution.out);
-    case DY_CORE_EXPR_APPLICATION:
-        return expr.application.check_result == DY_NO
-            || core_has_error(*expr.application.expr)
-            || (expr.application.solution.tag == DY_CORE_FUNCTION && core_has_error(*expr.application.solution.expr))
-            || core_has_error(*expr.application.solution.out);
+    case DY_CORE_EXPR_ELIM:
+        return expr.elim.check_result == DY_NO
+            || core_has_error(*expr.elim.expr)
+            || (expr.elim.simple.tag == DY_CORE_SIMPLE_PROOF && core_has_error(*expr.elim.simple.proof))
+            || core_has_error(*expr.elim.simple.out);
     case DY_CORE_EXPR_VARIABLE:
     case DY_CORE_EXPR_ANY:
     case DY_CORE_EXPR_VOID:
@@ -189,6 +195,27 @@ bool core_has_error(struct dy_core_expr expr)
         return core_has_error(*expr.inference_ctx.expr);
     case DY_CORE_EXPR_INFERENCE_VAR:
         return false;
+    case DY_CORE_EXPR_MAP:
+        switch (expr.map.tag) {
+        case DY_CORE_MAP_ASSUMPTION:
+            return expr.map.assumption.dependence == DY_CORE_MAP_DEPENDENCE_DEPENDENT
+                || core_has_error(*expr.map.assumption.type)
+                || core_has_error(*expr.map.assumption.assumption.type)
+                || core_has_error(*expr.map.assumption.assumption.expr);
+        case DY_CORE_MAP_CHOICE:
+            return expr.map.choice.left_dependence == DY_CORE_MAP_DEPENDENCE_DEPENDENT
+                || expr.map.choice.right_dependence == DY_CORE_MAP_DEPENDENCE_DEPENDENT
+                || core_has_error(*expr.map.choice.assumption_left.type)
+                || core_has_error(*expr.map.choice.assumption_left.expr)
+                || core_has_error(*expr.map.choice.assumption_right.type)
+                || core_has_error(*expr.map.choice.assumption_right.expr);
+        case DY_CORE_MAP_RECURSION:
+            return expr.map.recursion.dependence == DY_CORE_MAP_DEPENDENCE_DEPENDENT
+                || core_has_error(*expr.map.recursion.assumption.type)
+                || core_has_error(*expr.map.recursion.assumption.expr);
+        }
+
+        dy_bail("impossible");
     case DY_CORE_EXPR_CUSTOM:
         if (expr.custom.id == dy_uv_id) {
             return true;

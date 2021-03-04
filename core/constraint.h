@@ -24,9 +24,9 @@ struct dy_constraint {
 
 static inline bool dy_constraint_get(struct dy_core_ctx *ctx, size_t id, enum dy_polarity polarity, size_t start, struct dy_core_expr *result);
 
-static inline void dy_join_constraints(struct dy_core_ctx *ctx, size_t start1, size_t start2, enum dy_polarity polarity);
+static inline void dy_join_constraints(struct dy_core_ctx *ctx, size_t start1, size_t start2);
 
-static inline void dy_free_constraints_starting_at(struct dy_core_ctx *ctx, size_t start);
+static inline void dy_free_constraints_in_range(struct dy_core_ctx *ctx, size_t start, size_t end);
 
 bool dy_constraint_get(struct dy_core_ctx *ctx, size_t id, enum dy_polarity polarity, size_t start, struct dy_core_expr *result)
 {
@@ -36,8 +36,19 @@ bool dy_constraint_get(struct dy_core_ctx *ctx, size_t id, enum dy_polarity pola
             continue;
         }
 
-        if (!c->have_lower && !c->have_upper) {
-            dy_bail("impossible");
+        struct dy_core_expr bound;
+        if (polarity == DY_POLARITY_POSITIVE) {
+            if (!c->have_lower) {
+                return false;
+            }
+
+            bound = c->lower;
+        } else {
+            if (!c->have_upper) {
+                return false;
+            }
+
+            bound = c->upper;
         }
 
         struct dy_core_expr var_expr = {
@@ -45,50 +56,25 @@ bool dy_constraint_get(struct dy_core_ctx *ctx, size_t id, enum dy_polarity pola
             .variable_id = id
         };
 
-        if (polarity == DY_POLARITY_POSITIVE) {
-            if (!c->have_lower) {
-                return false;
-            }
-
-            struct dy_core_expr e;
-            if (dy_substitute(ctx, c->lower, id, var_expr, &e)) {
-                *result = (struct dy_core_expr){
-                    .tag = DY_CORE_EXPR_PROBLEM,
-                    .problem = {
-                        .is_implicit = true,
-                        .polarity = DY_POLARITY_NEGATIVE,
-                        .tag = DY_CORE_RECURSION,
+        struct dy_core_expr rec_bound;
+        if (dy_substitute(ctx, bound, id, var_expr, &rec_bound)) {
+            *result = (struct dy_core_expr){
+                .tag = DY_CORE_EXPR_INTRO,
+                .intro = {
+                    .tag = DY_CORE_INTRO_COMPLEX,
+                    .complex = {
+                        .tag = DY_CORE_COMPLEX_RECURSION,
                         .recursion = {
                             .id = id,
-                            .expr = dy_core_expr_new(e)
+                            .expr = dy_core_expr_new(rec_bound)
                         }
-                    }
-                };
-            } else {
-                *result = dy_core_expr_retain(ctx, c->lower);
-            }
+                    },
+                    .is_implicit = true,
+                    .polarity = dy_flip_polarity(polarity)
+                }
+            };
         } else {
-            if (!c->have_upper) {
-                return false;
-            }
-
-            struct dy_core_expr e;
-            if (dy_substitute(ctx, c->upper, id, var_expr, &e)) {
-                *result = (struct dy_core_expr){
-                    .tag = DY_CORE_EXPR_PROBLEM,
-                    .problem = {
-                        .is_implicit = true,
-                        .polarity = DY_POLARITY_POSITIVE,
-                        .tag = DY_CORE_RECURSION,
-                        .recursion = {
-                            .id = id,
-                            .expr = dy_core_expr_new(e)
-                        }
-                    }
-                };
-            } else {
-                *result = dy_core_expr_retain(ctx, c->upper);
-            }
+            *result = dy_core_expr_retain(ctx, bound);
         }
 
         return true;
@@ -97,7 +83,7 @@ bool dy_constraint_get(struct dy_core_ctx *ctx, size_t id, enum dy_polarity pola
     return false;
 }
 
-void dy_join_constraints(struct dy_core_ctx *ctx, size_t start1, size_t start2, enum dy_polarity polarity)
+void dy_join_constraints(struct dy_core_ctx *ctx, size_t start1, size_t start2)
 {
     for (size_t i = start2; i < ctx->constraints.num_elems; ++i) {
         const struct dy_constraint *c = dy_array_pos(&ctx->constraints, i);
@@ -114,14 +100,17 @@ void dy_join_constraints(struct dy_core_ctx *ctx, size_t start1, size_t start2, 
                     dy_core_expr_release(ctx, c->lower);
                 } else {
                     c2->lower = (struct dy_core_expr){
-                        .tag = DY_CORE_EXPR_PROBLEM,
-                        .problem = {
-                            .polarity = polarity,
+                        .tag = DY_CORE_EXPR_INTRO,
+                        .intro = {
                             .is_implicit = true,
-                            .tag = DY_CORE_PAIR,
-                            .pair = {
-                                .left = dy_core_expr_new(c2->lower),
-                                .right = dy_core_expr_new(c->lower)
+                            .polarity = DY_POLARITY_NEGATIVE,
+                            .tag = DY_CORE_INTRO_COMPLEX,
+                            .complex = {
+                                .tag = DY_CORE_COMPLEX_CHOICE,
+                                .choice = {
+                                    .left = dy_core_expr_new(c2->lower),
+                                    .right = dy_core_expr_new(c->lower)
+                                }
                             }
                         }
                     };
@@ -136,14 +125,17 @@ void dy_join_constraints(struct dy_core_ctx *ctx, size_t start1, size_t start2, 
                     dy_core_expr_release(ctx, c->upper);
                 } else {
                     c2->upper = (struct dy_core_expr){
-                        .tag = DY_CORE_EXPR_PROBLEM,
-                        .problem = {
-                            .polarity = polarity,
+                        .tag = DY_CORE_EXPR_INTRO,
+                        .intro = {
                             .is_implicit = true,
-                            .tag = DY_CORE_PAIR,
-                            .pair = {
-                                .left = dy_core_expr_new(c2->upper),
-                                .right = dy_core_expr_new(c->upper)
+                            .polarity = DY_POLARITY_POSITIVE,
+                            .tag = DY_CORE_INTRO_COMPLEX,
+                            .complex = {
+                                .tag = DY_CORE_COMPLEX_CHOICE,
+                                .choice = {
+                                    .left = dy_core_expr_new(c2->upper),
+                                    .right = dy_core_expr_new(c->upper)
+                                }
                             }
                         }
                     };
@@ -164,9 +156,9 @@ void dy_join_constraints(struct dy_core_ctx *ctx, size_t start1, size_t start2, 
     }
 }
 
-void dy_free_constraints_starting_at(struct dy_core_ctx *ctx, size_t start)
+void dy_free_constraints_in_range(struct dy_core_ctx *ctx, size_t start, size_t end)
 {
-    for (size_t i = ctx->constraints.num_elems; i-- > start;) {
+    for (size_t i = end; i-- > start;) {
         const struct dy_constraint *c = dy_array_pos(&ctx->constraints, i);
         if (c->have_lower) {
              dy_core_expr_release(ctx, c->lower);

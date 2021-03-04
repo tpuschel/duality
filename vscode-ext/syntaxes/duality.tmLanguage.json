@@ -20,7 +20,7 @@
 			"patterns": [
 				{
 					"name": "keyword.control.duality",
-					"match": "\\b(list|let|def|union|fun|ex|do|inf|fin|inv|max|Any|Void|String)\\b"
+					"match": "\\b(map|list|let|def|either|fun|some|do|inf|fin|inv|max|Any|Void|String|Unfold|Unwrap)\\b"
 				}
 			]
 		},

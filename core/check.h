@@ -30,15 +30,21 @@
 
 static inline bool dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, struct dy_core_expr *result);
 
-static inline bool dy_check_function(struct dy_core_ctx *ctx, struct dy_core_function function, struct dy_core_function *result);
+static inline bool dy_check_assumption(struct dy_core_ctx *ctx, struct dy_core_assumption assumption, struct dy_core_assumption *result);
 
-static inline bool dy_check_pair(struct dy_core_ctx *ctx, struct dy_core_pair pair, struct dy_core_pair *result);
+static inline bool dy_check_choice(struct dy_core_ctx *ctx, struct dy_core_choice choice, struct dy_core_choice *result);
 
-static inline bool dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, bool is_implicit, struct dy_core_recursion *result);
+static inline bool dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, struct dy_core_recursion *result);
 
-static inline bool dy_check_solution(struct dy_core_ctx *ctx, struct dy_core_solution, struct dy_core_solution *result);
+static inline bool dy_check_simple(struct dy_core_ctx *ctx, struct dy_core_simple simple, struct dy_core_simple *result);
 
-static inline bool dy_check_application(struct dy_core_ctx *ctx, struct dy_core_application application, struct dy_core_expr *result);
+static inline bool dy_check_elim(struct dy_core_ctx *ctx, struct dy_core_elim elim, struct dy_core_expr *result);
+
+static inline bool dy_check_map_assumption(struct dy_core_ctx *ctx, struct dy_core_map_assumption ass_map, struct dy_core_map_assumption *result);
+
+static inline bool dy_check_map_choice(struct dy_core_ctx *ctx, struct dy_core_map_choice choice_map, struct dy_core_map_choice *result);
+
+static inline bool dy_check_map_recursion(struct dy_core_ctx *ctx, struct dy_core_map_recursion rec_map, struct dy_core_map_recursion *result);
 
 // Doesn't return a bool since an inference context is always resolved.
 static inline struct dy_core_expr dy_check_inference_ctx(struct dy_core_ctx *ctx, struct dy_core_inference_ctx inference_ctx);
@@ -60,16 +66,6 @@ static inline bool dy_constraint_binds_id(struct dy_core_ctx *ctx, size_t constr
  */
 static inline void dy_remove_id(dy_array_t *ids, size_t id);
 
-/**
- * Removes all mentions of 'id' in 'constraint', which may involve lowering/raising the subtype/supertype bounds.
- */
-static inline void dy_remove_mentions_in_constraints(struct dy_core_ctx *ctx, size_t id, size_t start);
-
-/**
- * Removes all mentions of 'id' in 'type'.
- */
-static inline bool dy_remove_mentions_in_type(struct dy_core_ctx *ctx, size_t id, enum dy_polarity current_polarity, struct dy_core_expr type, struct dy_core_expr *result);
-
 static inline dy_array_t dy_new_ids_array(struct dy_core_ctx *ctx);
 
 static inline void dy_retire_ids_array(struct dy_core_ctx *ctx, dy_array_t array);
@@ -77,24 +73,36 @@ static inline void dy_retire_ids_array(struct dy_core_ctx *ctx, dy_array_t array
 bool dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, struct dy_core_expr *result)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_PROBLEM:
-        switch (expr.problem.tag) {
-        case DY_CORE_FUNCTION:
-            if (dy_check_function(ctx, expr.problem.function, &expr.problem.function)) {
-                *result = expr;
-                return true;
-            } else {
-                return false;
+    case DY_CORE_EXPR_INTRO:
+        switch (expr.intro.tag) {
+        case DY_CORE_INTRO_COMPLEX:
+            switch (expr.intro.complex.tag) {
+            case DY_CORE_COMPLEX_ASSUMPTION:
+                if (dy_check_assumption(ctx, expr.intro.complex.assumption, &expr.intro.complex.assumption)) {
+                    *result = expr;
+                    return true;
+                } else {
+                    return false;
+                }
+            case DY_CORE_COMPLEX_CHOICE:
+                if (dy_check_choice(ctx, expr.intro.complex.choice, &expr.intro.complex.choice)) {
+                    *result = expr;
+                    return true;
+                } else {
+                    return false;
+                }
+            case DY_CORE_COMPLEX_RECURSION:
+                if (dy_check_recursion(ctx, expr.intro.complex.recursion, &expr.intro.complex.recursion)) {
+                    *result = expr;
+                    return true;
+                } else {
+                    return false;
+                }
             }
-        case DY_CORE_PAIR:
-            if (dy_check_pair(ctx, expr.problem.pair, &expr.problem.pair)) {
-                *result = expr;
-                return true;
-            } else {
-                return false;
-            }
-        case DY_CORE_RECURSION:
-            if (dy_check_recursion(ctx, expr.problem.recursion, expr.problem.is_implicit, &expr.problem.recursion)) {
+
+            dy_bail("impossible");
+        case DY_CORE_INTRO_SIMPLE:
+            if (dy_check_simple(ctx, expr.intro.simple, &expr.intro.simple)) {
                 *result = expr;
                 return true;
             } else {
@@ -103,15 +111,34 @@ bool dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, struct dy_
         }
 
         dy_bail("impossible");
-    case DY_CORE_EXPR_SOLUTION:
-        if (dy_check_solution(ctx, expr.solution, &expr.solution)) {
-            *result = expr;
-            return true;
-        } else {
-            return false;
+    case DY_CORE_EXPR_ELIM:
+        return dy_check_elim(ctx, expr.elim, result);
+    case DY_CORE_EXPR_MAP:
+        switch (expr.map.tag) {
+        case DY_CORE_MAP_ASSUMPTION:
+            if (dy_check_map_assumption(ctx, expr.map.assumption, &expr.map.assumption)) {
+                *result = expr;
+                return true;
+            } else {
+                return false;
+            }
+        case DY_CORE_MAP_CHOICE:
+            if (dy_check_map_choice(ctx, expr.map.choice, &expr.map.choice)) {
+                *result = expr;
+                return true;
+            } else {
+                return false;
+            }
+        case DY_CORE_MAP_RECURSION:
+            if (dy_check_map_recursion(ctx, expr.map.recursion, &expr.map.recursion)) {
+                *result = expr;
+                return true;
+            } else {
+                return false;
+            }
         }
-    case DY_CORE_EXPR_APPLICATION:
-        return dy_check_application(ctx, expr.application, result);
+
+        dy_bail("impossible");
     case DY_CORE_EXPR_VARIABLE:
     case DY_CORE_EXPR_ANY:
     case DY_CORE_EXPR_VOID:
@@ -129,29 +156,29 @@ bool dy_check_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, struct dy_
     dy_bail("Impossible object type.");
 }
 
-bool dy_check_function(struct dy_core_ctx *ctx, struct dy_core_function function, struct dy_core_function *result)
+bool dy_check_assumption(struct dy_core_ctx *ctx, struct dy_core_assumption assumption, struct dy_core_assumption *result)
 {
     size_t constraint_start1 = ctx->constraints.num_elems;
     struct dy_core_expr type;
-    bool type_is_new = dy_check_expr(ctx, *function.type, &type);
+    bool type_is_new = dy_check_expr(ctx, *assumption.type, &type);
     if (!type_is_new) {
-        type = dy_core_expr_retain(ctx, *function.type);
+        type = dy_core_expr_retain(ctx, *assumption.type);
     }
 
     dy_array_add(&ctx->free_variables, &(struct dy_free_var){
-        .id = function.id,
+        .id = assumption.id,
         .type = type
     });
 
     size_t constraint_start2 = ctx->constraints.num_elems;
     struct dy_core_expr expr;
-    bool expr_is_new = dy_check_expr(ctx, *function.expr, &expr);
+    bool expr_is_new = dy_check_expr(ctx, *assumption.expr, &expr);
 
-    dy_remove_mentions_in_constraints(ctx, function.id, constraint_start2);
+    dy_remove_mentions_in_constraints(ctx, assumption.id, constraint_start2);
 
     --ctx->free_variables.num_elems;
 
-    dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_POLARITY_POSITIVE);
+    dy_join_constraints(ctx, constraint_start1, constraint_start2);
 
     if (!type_is_new && !expr_is_new) {
         dy_core_expr_release(ctx, type);
@@ -159,55 +186,55 @@ bool dy_check_function(struct dy_core_ctx *ctx, struct dy_core_function function
     }
 
     if (type_is_new) {
-        function.type = dy_core_expr_new(type);
+        assumption.type = dy_core_expr_new(type);
     } else {
         dy_core_expr_release(ctx, type);
-        dy_core_expr_retain_ptr(ctx, function.type);
+        dy_core_expr_retain_ptr(ctx, assumption.type);
     }
 
     if (expr_is_new) {
-        function.expr = dy_core_expr_new(expr);
+        assumption.expr = dy_core_expr_new(expr);
     } else {
-        dy_core_expr_retain_ptr(ctx, function.expr);
+        dy_core_expr_retain_ptr(ctx, assumption.expr);
     }
 
-    *result = function;
+    *result = assumption;
     return true;
 }
 
-bool dy_check_pair(struct dy_core_ctx *ctx, struct dy_core_pair pair, struct dy_core_pair *result)
+bool dy_check_choice(struct dy_core_ctx *ctx, struct dy_core_choice choice, struct dy_core_choice *result)
 {
     size_t constraint_start1 = ctx->constraints.num_elems;
     struct dy_core_expr left;
-    bool left_is_new = dy_check_expr(ctx, *pair.left, &left);
+    bool left_is_new = dy_check_expr(ctx, *choice.left, &left);
 
     size_t constraint_start2 = ctx->constraints.num_elems;
     struct dy_core_expr right;
-    bool right_is_new = dy_check_expr(ctx, *pair.right, &right);
+    bool right_is_new = dy_check_expr(ctx, *choice.right, &right);
 
-    dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_POLARITY_POSITIVE);
+    dy_join_constraints(ctx, constraint_start1, constraint_start2);
 
     if (!left_is_new && !right_is_new) {
         return false;
     }
 
     if (left_is_new) {
-        pair.left = dy_core_expr_new(left);
+        choice.left = dy_core_expr_new(left);
     } else {
-        dy_core_expr_retain_ptr(ctx, pair.left);
+        dy_core_expr_retain_ptr(ctx, choice.left);
     }
 
     if (right_is_new) {
-        pair.right = dy_core_expr_new(right);
+        choice.right = dy_core_expr_new(right);
     } else {
-        dy_core_expr_retain_ptr(ctx, pair.right);
+        dy_core_expr_retain_ptr(ctx, choice.right);
     }
 
-    *result = pair;
+    *result = choice;
     return true;
 }
 
-bool dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, bool is_implicit, struct dy_core_recursion *result)
+bool dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recursion, struct dy_core_recursion *result)
 {
     dy_array_add(&ctx->free_variables, &(struct dy_free_var){
         .id = recursion.id,
@@ -237,125 +264,131 @@ bool dy_check_recursion(struct dy_core_ctx *ctx, struct dy_core_recursion recurs
     return true;
 }
 
-bool dy_check_solution(struct dy_core_ctx *ctx, struct dy_core_solution solution, struct dy_core_solution *result)
+bool dy_check_simple(struct dy_core_ctx *ctx, struct dy_core_simple simple, struct dy_core_simple *result)
 {
-    if (solution.tag == DY_CORE_FUNCTION) {
+    if (simple.tag == DY_CORE_SIMPLE_PROOF) {
         size_t constraint_start1 = ctx->constraints.num_elems;
-        struct dy_core_expr expr;
-        bool expr_is_new = dy_check_expr(ctx, *solution.expr, &expr);
+        struct dy_core_expr proof;
+        bool proof_is_new = dy_check_expr(ctx, *simple.proof, &proof);
 
         size_t constraint_start2 = ctx->constraints.num_elems;
         struct dy_core_expr out;
-        bool out_is_new = dy_check_expr(ctx, *solution.out, &out);
+        bool out_is_new = dy_check_expr(ctx, *simple.out, &out);
 
-        dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_POLARITY_POSITIVE);
+        dy_join_constraints(ctx, constraint_start1, constraint_start2);
 
-        if (!expr_is_new && !out_is_new) {
+        if (!proof_is_new && !out_is_new) {
             return false;
         }
 
-        if (expr_is_new) {
-            solution.expr = dy_core_expr_new(expr);
+        if (proof_is_new) {
+            simple.proof = dy_core_expr_new(proof);
         } else {
-            dy_core_expr_retain_ptr(ctx, solution.expr);
+            dy_core_expr_retain_ptr(ctx, simple.proof);
         }
 
         if (out_is_new) {
-            solution.out = dy_core_expr_new(out);
+            simple.out = dy_core_expr_new(out);
         } else {
-            dy_core_expr_retain_ptr(ctx, solution.out);
+            dy_core_expr_retain_ptr(ctx, simple.out);
         }
 
-        *result = solution;
+        *result = simple;
         return true;
     } else {
         struct dy_core_expr out;
-        if (!dy_check_expr(ctx, *solution.out, &out)) {
+        if (!dy_check_expr(ctx, *simple.out, &out)) {
             return false;
         }
 
-        solution.out = dy_core_expr_new(out);
-        *result = solution;
+        simple.out = dy_core_expr_new(out);
+        *result = simple;
         return true;
     }
 }
 
-bool dy_check_application(struct dy_core_ctx *ctx, struct dy_core_application application, struct dy_core_expr *result)
+bool dy_check_elim(struct dy_core_ctx *ctx, struct dy_core_elim elim, struct dy_core_expr *result)
 {
     size_t recovered_negative_inference_ids_start = ctx->recovered_negative_inference_ids.num_elems;
+    size_t recovered_positive_inference_ids_start = ctx->recovered_positive_inference_ids.num_elems;
 
     size_t constraint_start1 = ctx->constraints.num_elems;
     struct dy_core_expr expr;
-    bool expr_is_new = dy_check_expr(ctx, *application.expr, &expr);
+    bool expr_is_new = dy_check_expr(ctx, *elim.expr, &expr);
     if (!expr_is_new) {
-        expr = dy_core_expr_retain(ctx, *application.expr);
+        expr = dy_core_expr_retain(ctx, *elim.expr);
     }
 
     size_t constraint_start2 = ctx->constraints.num_elems;
-    struct dy_core_solution solution;
-    bool solution_is_new = dy_check_solution(ctx, application.solution, &solution);
-    if (!solution_is_new) {
-        solution = dy_core_solution_retain(ctx, application.solution);
+    struct dy_core_simple simple;
+    bool simple_is_new = dy_check_simple(ctx, elim.simple, &simple);
+    if (!simple_is_new) {
+        simple = dy_core_simple_retain(ctx, elim.simple);
     }
 
-    dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_POLARITY_POSITIVE);
+    dy_join_constraints(ctx, constraint_start1, constraint_start2);
 
-    dy_ternary_t old_check_result = application.check_result;
+    dy_ternary_t old_check_result = elim.check_result;
     if (old_check_result == DY_MAYBE) {
         struct dy_core_expr type_of_expr = dy_type_of(ctx, expr);
 
-        struct dy_core_expr solution_expr = {
-            .tag = DY_CORE_EXPR_SOLUTION,
-            .solution = solution
+        struct dy_core_expr simple_expr = {
+            .tag = DY_CORE_EXPR_INTRO,
+            .intro = {
+                .polarity = DY_POLARITY_NEGATIVE,
+                .is_implicit = elim.is_implicit,
+                .tag = DY_CORE_INTRO_SIMPLE,
+                .simple = simple
+            }
         };
 
         constraint_start2 = ctx->constraints.num_elems;
 
         bool did_transform_expr = false;
         struct dy_core_expr new_expr;
-        application.check_result = dy_is_subtype(ctx, type_of_expr, solution_expr, expr, &new_expr, &did_transform_expr);
+        elim.check_result = dy_is_subtype(ctx, type_of_expr, simple_expr, expr, &new_expr, &did_transform_expr);
         if (did_transform_expr) {
             expr_is_new = true;
             dy_core_expr_release(ctx, expr);
             expr = new_expr;
         }
 
-        dy_join_constraints(ctx, constraint_start1, constraint_start2, DY_POLARITY_POSITIVE);
+        dy_join_constraints(ctx, constraint_start1, constraint_start2);
 
         dy_core_expr_release(ctx, type_of_expr);
     }
 
     if (expr_is_new) {
-        application.expr = dy_core_expr_new(expr);
+        elim.expr = dy_core_expr_new(expr);
     } else {
         dy_core_expr_release(ctx, expr);
-        dy_core_expr_retain_ptr(ctx, application.expr);
+        dy_core_expr_retain_ptr(ctx, elim.expr);
     }
 
-    if (solution_is_new) {
-        application.solution = solution;
+    if (simple_is_new) {
+        elim.simple = simple;
     } else {
-        dy_core_solution_release(ctx, solution);
-        dy_core_solution_retain(ctx, application.solution);
+        dy_core_simple_release(ctx, simple);
+        dy_core_simple_retain(ctx, elim.simple);
     }
 
     struct dy_core_expr app = {
-        .tag = DY_CORE_EXPR_APPLICATION,
-        .application = application
+        .tag = DY_CORE_EXPR_ELIM,
+        .elim = elim
     };
 
     bool did_eval = false;
 
-    if (application.eval_immediately) {
+    if (elim.eval_immediately) {
         struct dy_core_expr new_app;
-        if (dy_eval_app_single_step(ctx, application, &new_app)) {
+        if (dy_eval_elim_single_step(ctx, elim, &new_app)) {
             dy_core_expr_release(ctx, app);
             app = new_app;
             did_eval = true;
         }
     }
 
-    if (!expr_is_new && !solution_is_new && old_check_result == application.check_result && !did_eval) {
+    if (!expr_is_new && !simple_is_new && old_check_result == elim.check_result && !did_eval) {
         return false;
     } else {
         for (size_t i = ctx->recovered_negative_inference_ids.num_elems; i-- > recovered_negative_inference_ids_start;) {
@@ -368,12 +401,218 @@ bool dy_check_application(struct dy_core_ctx *ctx, struct dy_core_application ap
             }
         }
 
+        for (size_t i = ctx->recovered_positive_inference_ids.num_elems; i-- > recovered_positive_inference_ids_start;) {
+            size_t id = *(size_t *)dy_array_pos(&ctx->recovered_positive_inference_ids, i);
+
+            struct dy_core_expr new_app;
+            if (dy_resolve_inference_var(ctx, id, DY_POLARITY_POSITIVE, app, constraint_start1, &new_app)) {
+                dy_core_expr_release(ctx, app);
+                app = new_app;
+            }
+        }
+
         ctx->recovered_negative_inference_ids.num_elems = recovered_negative_inference_ids_start;
+        ctx->recovered_positive_inference_ids.num_elems = recovered_positive_inference_ids_start;
 
         *result = app;
 
         return true;
     }
+}
+
+bool dy_check_map_assumption(struct dy_core_ctx *ctx, struct dy_core_map_assumption ass_map, struct dy_core_map_assumption *result)
+{
+    size_t constraint_start1 = ctx->constraints.num_elems;
+    struct dy_core_expr type;
+    bool type_is_new = dy_check_expr(ctx, *ass_map.type, &type);
+    if (!type_is_new) {
+        type = dy_core_expr_retain(ctx, *ass_map.type);
+    }
+
+    dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+        .id = ass_map.id,
+        .type = type
+    });
+
+    size_t constraint_start2 = ctx->constraints.num_elems;
+    struct dy_core_assumption new_ass;
+    bool ass_is_new = dy_check_assumption(ctx, ass_map.assumption, &new_ass);
+
+    dy_remove_mentions_in_constraints(ctx, ass_map.id, constraint_start2);
+
+    --ctx->free_variables.num_elems;
+
+    dy_join_constraints(ctx, constraint_start1, constraint_start2);
+
+    bool ret = true;
+    if (!type_is_new && !ass_is_new) {
+        dy_core_expr_release(ctx, type);
+        ret = false;
+    }
+
+    if (type_is_new) {
+        ass_map.type = dy_core_expr_new(type);
+    } else {
+        dy_core_expr_release(ctx, type);
+        dy_core_expr_retain_ptr(ctx, ass_map.type);
+    }
+
+    if (ass_is_new) {
+        ass_map.assumption = new_ass;
+    } else {
+        dy_core_assumption_retain(ctx, ass_map.assumption);
+    }
+
+    if (ass_map.dependence == DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
+        dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+            .id = ass_map.id,
+            .type = *ass_map.type
+        });
+
+        dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+            .id = ass_map.assumption.id,
+            .type = *ass_map.assumption.type
+        });
+
+        struct dy_core_expr t = dy_type_of(ctx, *ass_map.assumption.expr);
+
+        if (dy_core_expr_contains_this_variable(ctx, ass_map.assumption.id, t)) {
+            ass_map.dependence = DY_CORE_MAP_DEPENDENCE_DEPENDENT;
+        } else {
+            ass_map.dependence = DY_CORE_MAP_DEPENDENCE_INDEPENDENT;
+        }
+
+        --ctx->free_variables.num_elems;
+        --ctx->free_variables.num_elems;
+
+        dy_core_expr_release(ctx, t);
+
+        ret = true;
+    }
+
+    if (ret) {
+        *result = ass_map;
+    }
+    return true;
+}
+
+bool dy_check_map_choice(struct dy_core_ctx *ctx, struct dy_core_map_choice choice_map, struct dy_core_map_choice *result)
+{
+    size_t constraint_start1 = ctx->constraints.num_elems;
+    struct dy_core_assumption left;
+    bool left_is_new = dy_check_assumption(ctx, choice_map.assumption_left, &left);
+
+    size_t constraint_start2 = ctx->constraints.num_elems;
+    struct dy_core_assumption right;
+    bool right_is_new = dy_check_assumption(ctx, choice_map.assumption_right, &right);
+
+    dy_join_constraints(ctx, constraint_start1, constraint_start2);
+
+    if (!left_is_new && !right_is_new) {
+        return false;
+    }
+
+    if (left_is_new) {
+        choice_map.assumption_left = left;
+    } else {
+        dy_core_assumption_retain(ctx, choice_map.assumption_left);
+    }
+
+    if (right_is_new) {
+        choice_map.assumption_right = right;
+    } else {
+        dy_core_assumption_retain(ctx, choice_map.assumption_right);
+    }
+
+    if (choice_map.left_dependence == DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
+        dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+            .id = choice_map.assumption_left.id,
+            .type = *choice_map.assumption_left.type
+        });
+
+        struct dy_core_expr t = dy_type_of(ctx, *choice_map.assumption_left.expr);
+
+        if (dy_core_expr_contains_this_variable(ctx, choice_map.assumption_left.id, t)) {
+            choice_map.left_dependence = DY_CORE_MAP_DEPENDENCE_DEPENDENT;
+        } else {
+            choice_map.left_dependence = DY_CORE_MAP_DEPENDENCE_INDEPENDENT;
+        }
+
+        --ctx->free_variables.num_elems;
+
+        dy_core_expr_release(ctx, t);
+    }
+
+    if (choice_map.right_dependence == DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
+        dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+            .id = choice_map.assumption_right.id,
+            .type = *choice_map.assumption_right.type
+        });
+
+        struct dy_core_expr t = dy_type_of(ctx, *choice_map.assumption_right.expr);
+
+        if (dy_core_expr_contains_this_variable(ctx, choice_map.assumption_right.id, t)) {
+            choice_map.right_dependence = DY_CORE_MAP_DEPENDENCE_DEPENDENT;
+        } else {
+            choice_map.right_dependence = DY_CORE_MAP_DEPENDENCE_INDEPENDENT;
+        }
+
+        --ctx->free_variables.num_elems;
+
+        dy_core_expr_release(ctx, t);
+    }
+
+    *result = choice_map;
+    return true;
+}
+
+bool dy_check_map_recursion(struct dy_core_ctx *ctx, struct dy_core_map_recursion rec_map, struct dy_core_map_recursion *result)
+{
+    dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+        .id = rec_map.id,
+        .type = {
+            .tag = DY_CORE_EXPR_VARIABLE,
+            .variable_id = rec_map.id
+        }
+    });
+
+    size_t constraint_start = ctx->constraints.num_elems;
+
+    struct dy_core_assumption new_ass;
+    bool ass_is_new = dy_check_assumption(ctx, rec_map.assumption, &new_ass);
+
+    dy_remove_mentions_in_constraints(ctx, rec_map.id, constraint_start);
+
+    --ctx->free_variables.num_elems;
+
+    if (!ass_is_new) {
+        return false;
+    }
+
+    rec_map.assumption = new_ass;
+
+    if (rec_map.dependence == DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
+        dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+            .id = rec_map.assumption.id,
+            .type = *rec_map.assumption.type
+        });
+
+        struct dy_core_expr t = dy_type_of(ctx, *rec_map.assumption.expr);
+
+        if (dy_core_expr_contains_this_variable(ctx, rec_map.assumption.id, t)) {
+            rec_map.dependence = DY_CORE_MAP_DEPENDENCE_DEPENDENT;
+        } else {
+            rec_map.dependence = DY_CORE_MAP_DEPENDENCE_INDEPENDENT;
+        }
+
+        --ctx->free_variables.num_elems;
+
+        dy_core_expr_release(ctx, t);
+    }
+
+    *result = rec_map;
+
+    return true;
 }
 
 struct dy_core_expr dy_check_inference_ctx(struct dy_core_ctx *ctx, struct dy_core_inference_ctx inference_ctx)
@@ -492,17 +731,20 @@ bool dy_resolve_inference_var(struct dy_core_ctx *ctx, size_t id, enum dy_polari
     if (positive && negative) {
         if (have_sub) {
             struct dy_core_expr pair = {
-                .tag = DY_CORE_EXPR_PROBLEM,
-                .problem = {
-                    .is_implicit = true,
+                .tag = DY_CORE_EXPR_INTRO,
+                .intro = {
                     .polarity = DY_POLARITY_POSITIVE,
-                    .tag = DY_CORE_PAIR,
-                    .pair = {
-                        .left = dy_core_expr_new(sub),
-                        .right = dy_core_expr_new((struct dy_core_expr){
-                            .tag = DY_CORE_EXPR_VARIABLE,
-                            .variable_id = id
-                        })
+                    .is_implicit = true,
+                    .tag = DY_CORE_INTRO_COMPLEX,
+                    .complex = {
+                        .tag = DY_CORE_COMPLEX_CHOICE,
+                        .choice = {
+                            .left = dy_core_expr_new(sub),
+                            .right = dy_core_expr_new((struct dy_core_expr){
+                                .tag = DY_CORE_EXPR_VARIABLE,
+                                .variable_id = id
+                            })
+                        }
                     }
                 }
             };
@@ -522,15 +764,18 @@ bool dy_resolve_inference_var(struct dy_core_ctx *ctx, size_t id, enum dy_polari
         }
 
         expr = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_PROBLEM,
-            .problem = {
+            .tag = DY_CORE_EXPR_INTRO,
+            .intro = {
                 .polarity = DY_POLARITY_POSITIVE,
                 .is_implicit = true,
-                .tag = DY_CORE_FUNCTION,
-                .function = {
-                    .id = id,
-                    .type = dy_core_expr_new(dy_core_expr_retain(ctx, any)),
-                    .expr = dy_core_expr_new(expr)
+                .tag = DY_CORE_INTRO_COMPLEX,
+                .complex = {
+                    .tag = DY_CORE_COMPLEX_ASSUMPTION,
+                    .assumption = {
+                        .id = id,
+                        .type = dy_core_expr_new(dy_core_expr_retain(ctx, any)),
+                        .expr = dy_core_expr_new(expr)
+                    }
                 }
             }
         };
@@ -540,7 +785,7 @@ bool dy_resolve_inference_var(struct dy_core_ctx *ctx, size_t id, enum dy_polari
         }
     }
 
-    dy_free_constraints_starting_at(ctx, constraint_start);
+    dy_free_constraints_in_range(ctx, constraint_start, ctx->constraints.num_elems);
 
     struct dy_core_expr new_expr;
     if (dy_check_expr(ctx, expr, &new_expr)) {
@@ -590,109 +835,127 @@ void dy_remove_mentions_in_constraints(struct dy_core_ctx *ctx, size_t id, size_
 bool dy_remove_mentions_in_type(struct dy_core_ctx *ctx, size_t id, enum dy_polarity current_polarity, struct dy_core_expr type, struct dy_core_expr *result)
 {
     switch (type.tag) {
-    case DY_CORE_EXPR_PROBLEM:
-        switch (type.problem.tag) {
-        case DY_CORE_FUNCTION: {
-            struct dy_core_expr t;
-            bool type_is_new = dy_remove_mentions_in_type(ctx, id, dy_flip_polarity(current_polarity), *type.problem.function.type, &t);
+    case DY_CORE_EXPR_INTRO:
+        switch (type.intro.tag) {
+        case DY_CORE_INTRO_COMPLEX:
+            switch (type.intro.complex.tag) {
+            case DY_CORE_COMPLEX_ASSUMPTION: {
+                struct dy_core_expr t;
+                bool type_is_new = dy_remove_mentions_in_type(ctx, id, dy_flip_polarity(current_polarity), *type.intro.complex.assumption.type, &t);
 
-            struct dy_core_expr expr;
-            bool expr_is_new = dy_remove_mentions_in_type(ctx, id, current_polarity, *type.problem.function.expr, &expr);
+                struct dy_core_expr expr;
+                bool expr_is_new = dy_remove_mentions_in_type(ctx, id, current_polarity, *type.intro.complex.assumption.expr, &expr);
 
-            if (!type_is_new && !expr_is_new) {
-                return false;
+                if (!type_is_new && !expr_is_new) {
+                    return false;
+                }
+
+                if (type_is_new) {
+                    type.intro.complex.assumption.type = dy_core_expr_new(t);
+                } else {
+                    dy_core_expr_retain_ptr(ctx, type.intro.complex.assumption.type);
+                }
+
+                if (expr_is_new) {
+                    type.intro.complex.assumption.expr = dy_core_expr_new(expr);
+                } else {
+                    dy_core_expr_retain_ptr(ctx, type.intro.complex.assumption.expr);
+                }
+
+                *result = type;
+                return true;
+            }
+            case DY_CORE_COMPLEX_CHOICE: {
+                struct dy_core_expr left;
+                bool left_is_new = dy_remove_mentions_in_type(ctx, id, current_polarity, *type.intro.complex.choice.left, &left);
+
+                struct dy_core_expr right;
+                bool right_is_new = dy_remove_mentions_in_type(ctx, id, current_polarity, *type.intro.complex.choice.right, &right);
+
+                if (!left_is_new && !right_is_new) {
+                    return false;
+                }
+
+                if (left_is_new) {
+                    type.intro.complex.choice.left = dy_core_expr_new(left);
+                } else {
+                    dy_core_expr_retain_ptr(ctx, type.intro.complex.choice.left);
+                }
+
+                if (right_is_new) {
+                    type.intro.complex.choice.right = dy_core_expr_new(right);
+                } else {
+                    dy_core_expr_retain_ptr(ctx, type.intro.complex.choice.right);
+                }
+
+                *result = type;
+                return true;
+            }
+            case DY_CORE_COMPLEX_RECURSION: {
+                struct dy_core_expr expr;
+                if (!dy_remove_mentions_in_type(ctx, id, current_polarity, *type.intro.complex.recursion.expr, &expr)) {
+                    return false;
+                }
+
+                type.intro.complex.recursion.expr = dy_core_expr_new(expr);
+
+                *result = type;
+                return true;
+            }
             }
 
-            if (type_is_new) {
-                type.problem.function.type = dy_core_expr_new(t);
+            dy_bail("impossible");
+        case DY_CORE_INTRO_SIMPLE:
+            if (type.intro.simple.tag == DY_CORE_SIMPLE_PROOF && dy_core_expr_contains_this_variable(ctx, id, *type.intro.simple.proof)) {
+                struct dy_core_expr fun = {
+                    .tag = DY_CORE_EXPR_INTRO,
+                    .intro = {
+                        .polarity = current_polarity == type.intro.polarity ? dy_flip_polarity(current_polarity) : current_polarity,
+                        .is_implicit = type.intro.is_implicit,
+                        .tag = DY_CORE_INTRO_COMPLEX,
+                        .complex = {
+                            .tag = DY_CORE_COMPLEX_ASSUMPTION,
+                            .assumption = {
+                                .id = ctx->running_id++,
+                                .type = dy_core_expr_new(dy_type_of(ctx, *type.intro.simple.proof)),
+                                .expr = dy_core_expr_retain_ptr(ctx, type.intro.simple.out)
+                            }
+                        }
+                    }
+                };
+
+                if (dy_remove_mentions_in_type(ctx, id, current_polarity, fun, result)) {
+                    dy_core_expr_release(ctx, fun);
+                } else {
+                    *result = fun;
+                }
+
+                return true;
             } else {
-                dy_core_expr_retain_ptr(ctx, type.problem.function.type);
+                struct dy_core_expr out;
+                if (!dy_remove_mentions_in_type(ctx, id, current_polarity, *type.intro.simple.out, &out)) {
+                    return false;
+                }
+
+                type.intro.simple.out = dy_core_expr_new(out);
+
+                *result = type;
+                return true;
             }
-
-            if (expr_is_new) {
-                type.problem.function.expr = dy_core_expr_new(expr);
-            } else {
-                dy_core_expr_retain_ptr(ctx, type.problem.function.expr);
-            }
-
-            *result = type;
-            return true;
-        }
-        case DY_CORE_PAIR: {
-            struct dy_core_expr left;
-            bool left_is_new = dy_remove_mentions_in_type(ctx, id, current_polarity, *type.problem.pair.left, &left);
-
-            struct dy_core_expr right;
-            bool right_is_new = dy_remove_mentions_in_type(ctx, id, current_polarity, *type.problem.pair.right, &right);
-
-            if (!left_is_new && !right_is_new) {
-                return false;
-            }
-
-            if (left_is_new) {
-                type.problem.pair.left = dy_core_expr_new(left);
-            } else {
-                dy_core_expr_retain_ptr(ctx, type.problem.pair.left);
-            }
-
-            if (right_is_new) {
-                type.problem.pair.right = dy_core_expr_new(right);
-            } else {
-                dy_core_expr_retain_ptr(ctx, type.problem.pair.right);
-            }
-
-            *result = type;
-            return true;
-        }
-        case DY_CORE_RECURSION: {
-            struct dy_core_expr expr;
-            if (!dy_remove_mentions_in_type(ctx, id, current_polarity, *type.problem.recursion.expr, &expr)) {
-                return false;
-            }
-
-            type.problem.recursion.expr = dy_core_expr_new(expr);
-
-            *result = type;
-            return true;
-        }
         }
 
         dy_bail("impossible");
-    case DY_CORE_EXPR_SOLUTION:
-        if (type.solution.tag == DY_CORE_FUNCTION && dy_core_expr_contains_this_variable(ctx, id, *type.solution.expr)) {
-            struct dy_core_expr fun = {
-                .tag = DY_CORE_EXPR_PROBLEM,
-                .problem = {
-                    .is_implicit = type.solution.is_implicit,
-                    .polarity = dy_flip_polarity(current_polarity),
-                    .tag = DY_CORE_FUNCTION,
-                    .function = {
-                        .id = ctx->running_id++,
-                        .type = dy_core_expr_new(dy_type_of(ctx, *type.solution.expr)),
-                        .expr = dy_core_expr_retain_ptr(ctx, type.solution.out)
-                    }
-                }
+    case DY_CORE_EXPR_ELIM:
+        if (dy_core_expr_contains_this_variable(ctx, id, type)) {
+            *result = (struct dy_core_expr){
+                .tag = DY_CORE_EXPR_ANY
             };
-
-            if (dy_remove_mentions_in_type(ctx, id, current_polarity, fun, result)) {
-                dy_core_expr_release(ctx, fun);
-            } else {
-                *result = fun;
-            }
 
             return true;
         } else {
-            struct dy_core_expr out;
-            if (!dy_remove_mentions_in_type(ctx, id, current_polarity, *type.solution.out, &out)) {
-                return false;
-            }
-
-            type.solution.out = dy_core_expr_new(out);
-
-            *result = type;
-            return true;
+            return false;
         }
-    case DY_CORE_EXPR_APPLICATION:
+    case DY_CORE_EXPR_MAP:
         if (dy_core_expr_contains_this_variable(ctx, id, type)) {
             *result = (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_ANY

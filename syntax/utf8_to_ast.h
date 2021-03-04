@@ -17,9 +17,15 @@ struct dy_utf8_to_ast_ctx {
 
 enum dy_infix_op {
     DY_INFIX_OP_STRAIGHT_ARROW,
+    DY_INFIX_OP_SQUIGGLY_ARROW,
     DY_INFIX_OP_AT,
     DY_INFIX_OP_AT_STRAIGHT_ARROW,
-    DY_INFIX_OP_NOTHING
+    DY_INFIX_OP_AT_SQUIGGLY_ARROW,
+    DY_INFIX_OP_NOTHING,
+    DY_INFIX_OP_PIPE_LEFT,
+    DY_INFIX_OP_AT_PIPE_LEFT,
+    DY_INFIX_OP_PIPE_RIGHT,
+    DY_INFIX_OP_AT_PIPE_RIGHT,
 };
 
 static inline bool dy_utf8_literal(struct dy_utf8_to_ast_ctx *ctx, dy_string_t s);
@@ -54,7 +60,7 @@ static inline bool dy_utf8_to_ast_pattern(struct dy_utf8_to_ast_ctx *ctx, struct
 
 static inline bool dy_utf8_to_ast_binding(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_binding *binding);
 
-static inline bool dy_utf8_to_ast_pattern_solution(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_pattern_solution *solution);
+static inline bool dy_utf8_to_ast_pattern_simple(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_pattern_simple *solution);
 
 static inline bool dy_utf8_to_ast_pattern_list(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_pattern_list *list);
 
@@ -86,8 +92,6 @@ static inline bool dy_utf8_to_ast_do_block_body_rest(struct dy_utf8_to_ast_ctx *
 
 static inline bool dy_utf8_to_ast_do_block_stmnt(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_do_block_stmnt *stmnt);
 
-static inline bool dy_utf8_to_ast_do_block_stmnt_equal(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_do_block_stmnt_equal *equal);
-
 static inline bool dy_utf8_to_ast_do_block_stmnt_let(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_do_block_stmnt_let *let);
 
 static inline bool dy_utf8_to_ast_do_block_stmnt_expr(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_do_block_stmnt_expr *expr);
@@ -103,6 +107,16 @@ static inline bool dy_utf8_to_ast_binding_with_type(struct dy_utf8_to_ast_ctx *c
 static inline bool dy_utf8_to_ast_binding_with_pattern(struct dy_utf8_to_ast_ctx *ctx, dy_array_t name, bool have_name, struct dy_ast_binding *binding);
 
 static inline bool dy_utf8_to_ast_index(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_argument_index *index);
+
+static inline bool dy_utf8_to_map_some(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_map_some *map_some);
+
+static inline bool dy_utf8_to_map_either(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_map_either *map_either);
+
+static inline bool dy_utf8_to_map_either_body(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_map_either_body *body);
+
+static inline bool dy_utf8_to_map_fin(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_map_fin *map_fin);
+
+static inline bool dy_utf8_to_binding_and_expr(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_binding *binding, struct dy_ast_expr *expr);
 
 bool dy_utf8_literal(struct dy_utf8_to_ast_ctx *ctx, dy_string_t s)
 {
@@ -139,17 +153,20 @@ bool dy_utf8_to_ast_variable(struct dy_utf8_to_ast_ctx *ctx, dy_array_t *var)
 
             if (dy_string_are_equal(final_var, DY_STR_LIT("list"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("let"))
-                || dy_string_are_equal(final_var, DY_STR_LIT("union"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("either"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("Void"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("Any"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("String"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("Unwrap"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("Unfold"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("max"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("inf"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("fin"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("fun"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("def"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("inv"))
-                || dy_string_are_equal(final_var, DY_STR_LIT("ex"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("some"))
+                || dy_string_are_equal(final_var, DY_STR_LIT("map"))
                 || dy_string_are_equal(final_var, DY_STR_LIT("do"))) {
                 ctx->stream.current_index = start_index;
                 return false;
@@ -379,6 +396,12 @@ bool dy_utf8_to_ast_expr_further(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_a
         struct dy_ast_expr new_right;
         bool ret = dy_utf8_to_ast_expr_further(ctx, right, right_op, &new_right);
 
+        if (!ret && right_op == DY_INFIX_OP_NOTHING) {
+            ret = dy_combine_infix(ctx, left, left_op, right, expr);
+            dy_ast_argument_release(right);
+            return ret;
+        }
+
         dy_ast_argument_release(right);
 
         if (!ret) {
@@ -426,9 +449,17 @@ bool dy_utf8_to_argument(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_argument 
         return true;
     }
 
-    if (dy_utf8_literal(ctx, DY_STR_LIT("!"))) {
+    if (dy_utf8_literal(ctx, DY_STR_LIT("Unfold"))) {
         *arg = (struct dy_ast_argument){
-            .tag = DY_AST_ARGUMENT_BANG
+            .tag = DY_AST_ARGUMENT_UNFOLD
+        };
+
+        return true;
+    }
+
+    if (dy_utf8_literal(ctx, DY_STR_LIT("Unwrap"))) {
+        *arg = (struct dy_ast_argument){
+            .tag = DY_AST_ARGUMENT_UNWRAP
         };
 
         return true;
@@ -527,7 +558,317 @@ bool dy_utf8_to_non_left_recursive_ast_expr(struct dy_utf8_to_ast_ctx *ctx, stru
         return true;
     }
 
+    struct dy_ast_map_some map_some;
+    if (dy_utf8_to_map_some(ctx, &map_some)) {
+        *expr = (struct dy_ast_expr){
+            .tag = DY_AST_EXPR_MAP_SOME,
+            .map_some = map_some
+        };
+
+        return true;
+    }
+
+    struct dy_ast_map_either map_either;
+    if (dy_utf8_to_map_either(ctx, &map_either)) {
+        *expr = (struct dy_ast_expr){
+            .tag = DY_AST_EXPR_MAP_EITHER,
+            .map_either = map_either
+        };
+
+        return true;
+    }
+
+    struct dy_ast_map_fin map_fin;
+    if (dy_utf8_to_map_fin(ctx, &map_fin)) {
+        *expr = (struct dy_ast_expr){
+            .tag = DY_AST_EXPR_MAP_FIN,
+            .map_fin = map_fin
+        };
+
+        return true;
+    }
+
     return false;
+}
+
+bool dy_utf8_to_map_some(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_map_some *map_some)
+{
+    size_t start_index = ctx->stream.current_index;
+
+    if (!dy_utf8_literal(ctx, DY_STR_LIT("map"))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    if (!dy_utf8_literal(ctx, DY_STR_LIT("some"))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    bool is_implicit = dy_utf8_literal(ctx, DY_STR_LIT("@"));
+
+    dy_skip_whitespace(ctx);
+
+    dy_array_t name = dy_array_create(sizeof(char), DY_ALIGNOF(char), 8);
+    if (!dy_utf8_to_ast_variable(ctx, &name)) {
+        dy_array_release(&name);
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    if (!dy_utf8_literal(ctx, DY_STR_LIT(":"))) {
+        dy_array_release(&name);
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    struct dy_ast_expr type;
+    if (!dy_utf8_to_ast_expr(ctx, &type)) {
+        dy_array_release(&name);
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    if (!dy_utf8_literal(ctx, DY_STR_LIT("=>"))) {
+        dy_array_release(&name);
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    struct dy_ast_binding binding;
+    struct dy_ast_expr expr;
+    if (!dy_utf8_to_binding_and_expr(ctx, &binding, &expr)) {
+        dy_array_release(&name);
+        dy_ast_expr_release(type);
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    *map_some = (struct dy_ast_map_some){
+        .name = name,
+        .is_implicit = is_implicit,
+        .type = dy_ast_expr_new(type),
+        .binding = binding,
+        .expr = dy_ast_expr_new(expr)
+    };
+
+    return true;
+}
+
+bool dy_utf8_to_map_either(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_map_either *map_either)
+{
+    size_t start_index = ctx->stream.current_index;
+
+    if (!dy_utf8_literal(ctx, DY_STR_LIT("map"))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    if (!dy_utf8_literal(ctx, DY_STR_LIT("either"))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    bool is_implicit = dy_utf8_literal(ctx, DY_STR_LIT("@"));
+
+    dy_skip_whitespace(ctx);
+
+    if (!dy_utf8_literal(ctx, DY_STR_LIT("{"))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    struct dy_ast_map_either_body body;
+    if (!dy_utf8_to_map_either_body(ctx, &body)) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    *map_either = (struct dy_ast_map_either){
+        .body = body,
+        .is_implicit = is_implicit
+    };
+
+    return true;
+}
+
+bool dy_utf8_to_map_either_body(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_map_either_body *body)
+{
+    size_t start_index = ctx->stream.current_index;
+
+    struct dy_ast_binding binding;
+    struct dy_ast_expr expr;
+    if (!dy_utf8_to_binding_and_expr(ctx, &binding, &expr)) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace_except_newline(ctx);
+
+    if (dy_utf8_literal(ctx, DY_STR_LIT("}"))) {
+        *body = (struct dy_ast_map_either_body){
+            .binding = binding,
+            .expr = dy_ast_expr_new(expr),
+            .next = NULL
+        };
+        return true;
+    }
+
+    if (dy_utf8_literal(ctx, DY_STR_LIT(","))) {
+        dy_skip_whitespace(ctx);
+
+        struct dy_ast_map_either_body next;
+        if (!dy_utf8_to_map_either_body(ctx, &next)) {
+            dy_ast_binding_release(binding);
+            dy_ast_expr_release(expr);
+            ctx->stream.current_index = start_index;
+            return false;
+        }
+
+        *body = (struct dy_ast_map_either_body){
+            .binding = binding,
+            .expr = dy_ast_expr_new(expr),
+            .next = dy_ast_map_either_body_new(next)
+        };
+
+        return true;
+    }
+
+    if (dy_utf8_literal(ctx, DY_STR_LIT("\n")) || dy_utf8_literal(ctx, DY_STR_LIT("\r\n"))) {
+        dy_skip_whitespace(ctx);
+
+        if (dy_utf8_literal(ctx, DY_STR_LIT("}"))) {
+            *body = (struct dy_ast_map_either_body){
+                .binding = binding,
+                .expr = dy_ast_expr_new(expr),
+                .next = NULL
+            };
+            return true;
+        } else {
+            struct dy_ast_map_either_body next;
+            if (!dy_utf8_to_map_either_body(ctx, &next)) {
+                dy_ast_binding_release(binding);
+                dy_ast_expr_release(expr);
+                ctx->stream.current_index = start_index;
+                return false;
+            }
+
+            *body = (struct dy_ast_map_either_body){
+                .binding = binding,
+                .expr = dy_ast_expr_new(expr),
+                .next = dy_ast_map_either_body_new(next)
+            };
+
+            return true;
+        }
+    }
+
+    dy_ast_binding_release(binding);
+    dy_ast_expr_release(expr);
+
+    ctx->stream.current_index = start_index;
+
+    return false;
+}
+
+bool dy_utf8_to_map_fin(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_map_fin *map_fin)
+{
+    size_t start_index = ctx->stream.current_index;
+
+    if (!dy_utf8_literal(ctx, DY_STR_LIT("map"))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    if (!dy_utf8_literal(ctx, DY_STR_LIT("fin"))) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    bool is_implicit = dy_utf8_literal(ctx, DY_STR_LIT("@"));
+
+    dy_skip_whitespace(ctx);
+
+    dy_array_t name = dy_array_create(sizeof(char), DY_ALIGNOF(char), 8);
+    if (!dy_utf8_to_ast_variable(ctx, &name)) {
+        dy_array_release(&name);
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    struct dy_ast_binding binding;
+    struct dy_ast_expr expr;
+    if (!dy_utf8_to_binding_and_expr(ctx, &binding, &expr)) {
+        dy_array_release(&name);
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    *map_fin = (struct dy_ast_map_fin){
+        .name = name,
+        .is_implicit = is_implicit,
+        .binding = binding,
+        .expr = dy_ast_expr_new(expr)
+    };
+
+    return true;
+}
+
+bool dy_utf8_to_binding_and_expr(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_binding *binding, struct dy_ast_expr *expr)
+{
+    size_t start_index = ctx->stream.current_index;
+
+    struct dy_ast_binding b;
+    if (!dy_utf8_to_ast_binding(ctx, &b)) {
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    if (!dy_utf8_literal(ctx, DY_STR_LIT("=>"))) {
+        dy_ast_binding_release(b);
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    dy_skip_whitespace(ctx);
+
+    struct dy_ast_expr e;
+    if (!dy_utf8_to_ast_expr(ctx, &e)) {
+        dy_ast_binding_release(b);
+        ctx->stream.current_index = start_index;
+        return false;
+    }
+
+    *binding = b;
+    *expr = e;
+
+    return true;
 }
 
 bool dy_utf8_to_ast_string(struct dy_utf8_to_ast_ctx *ctx, dy_array_t *string)
@@ -562,11 +903,29 @@ enum dy_infix_op dy_utf8_to_ast_infix_op(struct dy_utf8_to_ast_ctx *ctx)
         return DY_INFIX_OP_STRAIGHT_ARROW;
     }
 
+    if (dy_utf8_literal(ctx, DY_STR_LIT("~>"))) {
+        return DY_INFIX_OP_SQUIGGLY_ARROW;
+    }
+
+    if (dy_utf8_literal(ctx, DY_STR_LIT("|<"))) {
+        return DY_INFIX_OP_PIPE_LEFT;
+    }
+
+    if (dy_utf8_literal(ctx, DY_STR_LIT("|>"))) {
+        return DY_INFIX_OP_PIPE_RIGHT;
+    }
+
     if (dy_utf8_literal(ctx, DY_STR_LIT("@"))) {
         dy_skip_whitespace_except_newline(ctx);
 
         if (dy_utf8_literal(ctx, DY_STR_LIT("->"))) {
             return DY_INFIX_OP_AT_STRAIGHT_ARROW;
+        } else if (dy_utf8_literal(ctx, DY_STR_LIT("~>"))) {
+            return DY_INFIX_OP_AT_SQUIGGLY_ARROW;
+        } else if (dy_utf8_literal(ctx, DY_STR_LIT("|<"))) {
+            return DY_INFIX_OP_AT_PIPE_LEFT;
+        } else if (dy_utf8_literal(ctx, DY_STR_LIT("|>"))) {
+            return DY_INFIX_OP_AT_PIPE_RIGHT;
         } else {
             return DY_INFIX_OP_AT;
         }
@@ -639,6 +998,8 @@ bool dy_utf8_to_ast_list_body(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_list
         }
     }
 
+    dy_ast_expr_release(expr);
+
     ctx->stream.current_index = start_index;
 
     return false;
@@ -648,11 +1009,11 @@ bool dy_utf8_to_ast_list(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_list *lis
 {
     size_t start_index = ctx->stream.current_index;
 
-    bool is_negative;
+    bool is_either;
     if (dy_utf8_literal(ctx, DY_STR_LIT("list"))) {
-        is_negative = false;
-    } else if (dy_utf8_literal(ctx, DY_STR_LIT("union"))) {
-        is_negative = true;
+        is_either = false;
+    } else if (dy_utf8_literal(ctx, DY_STR_LIT("either"))) {
+        is_either = true;
     } else {
         ctx->stream.current_index = start_index;
         return false;
@@ -679,7 +1040,7 @@ bool dy_utf8_to_ast_list(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_list *lis
 
     *list = (struct dy_ast_list){
         .body = list_body,
-        .is_negative = is_negative,
+        .is_either = is_either,
         .is_implicit = is_implicit
     };
 
@@ -744,15 +1105,6 @@ bool dy_utf8_to_ast_file(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_do_block 
 
 bool dy_utf8_to_ast_do_block_stmnt(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_do_block_stmnt *stmnt)
 {
-    struct dy_ast_do_block_stmnt_equal equal;
-    if (dy_utf8_to_ast_do_block_stmnt_equal(ctx, &equal)) {
-        *stmnt = (struct dy_ast_do_block_stmnt){
-            .tag = DY_AST_DO_BLOCK_STMNT_EQUAL,
-            .equal = equal
-        };
-        return true;
-    }
-
     struct dy_ast_do_block_stmnt_let let;
     if (dy_utf8_to_ast_do_block_stmnt_let(ctx, &let)) {
         *stmnt = (struct dy_ast_do_block_stmnt){
@@ -868,41 +1220,6 @@ bool dy_utf8_to_ast_do_block_stmnt_def(struct dy_utf8_to_ast_ctx *ctx, struct dy
     *def = (struct dy_ast_do_block_stmnt_def){
         .name = name,
         .expr = dy_ast_expr_new(expr)
-    };
-
-    return true;
-}
-
-bool dy_utf8_to_ast_do_block_stmnt_equal(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_do_block_stmnt_equal *equal)
-{
-    size_t start_index = ctx->stream.current_index;
-
-    struct dy_ast_expr e1;
-    if (!dy_utf8_to_ast_expr(ctx, &e1)) {
-        ctx->stream.current_index = start_index;
-        return false;
-    }
-
-    dy_skip_whitespace(ctx);
-
-    if (!dy_utf8_literal(ctx, DY_STR_LIT("="))) {
-        dy_ast_expr_release(e1);
-        ctx->stream.current_index = start_index;
-        return false;
-    }
-
-    dy_skip_whitespace(ctx);
-
-    struct dy_ast_expr e2;
-    if (!dy_utf8_to_ast_expr(ctx, &e2)) {
-        dy_ast_expr_release(e1);
-        ctx->stream.current_index = start_index;
-        return false;
-    }
-
-    *equal = (struct dy_ast_do_block_stmnt_equal){
-        .left = dy_ast_expr_new(e1),
-        .right = dy_ast_expr_new(e2)
     };
 
     return true;
@@ -1024,11 +1341,11 @@ bool dy_utf8_to_ast_recursion(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_recu
 {
     size_t start_index = ctx->stream.current_index;
 
-    bool is_negative;
+    bool is_fin;
     if (dy_utf8_literal(ctx, DY_STR_LIT("inf"))) {
-        is_negative = false;
+        is_fin = false;
     } else if (dy_utf8_literal(ctx, DY_STR_LIT("fin"))) {
-        is_negative = true;
+        is_fin = true;
     } else {
         ctx->stream.current_index = start_index;
         return false;
@@ -1066,7 +1383,7 @@ bool dy_utf8_to_ast_recursion(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_recu
     *recursion = (struct dy_ast_recursion){
         .name = name,
         .expr = dy_ast_expr_new(expr),
-        .is_negative = is_negative,
+        .is_fin = is_fin,
         .is_implicit = is_implicit
     };
 
@@ -1077,11 +1394,11 @@ bool dy_utf8_to_ast_function(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_funct
 {
     size_t start_index = ctx->stream.current_index;
 
-    bool is_negative = false;
+    bool is_some = false;
     if (dy_utf8_literal(ctx, DY_STR_LIT("fun"))) {
-        is_negative = false;
-    } else if (dy_utf8_literal(ctx, DY_STR_LIT("ex"))) {
-        is_negative = true;
+        is_some = false;
+    } else if (dy_utf8_literal(ctx, DY_STR_LIT("some"))) {
+        is_some = true;
     } else {
         ctx->stream.current_index = start_index;
         return false;
@@ -1120,7 +1437,7 @@ bool dy_utf8_to_ast_function(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_funct
         .binding = binding,
         .expr = dy_ast_expr_new(expr),
         .is_implicit = is_implicit,
-        .is_negative = is_negative
+        .is_some = is_some
     };
 
     return true;
@@ -1219,11 +1536,11 @@ bool dy_utf8_to_ast_binding_with_pattern(struct dy_utf8_to_ast_ctx *ctx, dy_arra
 
 bool dy_utf8_to_ast_pattern(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_pattern *pattern)
 {
-    struct dy_ast_pattern_solution solution;
-    if (dy_utf8_to_ast_pattern_solution(ctx, &solution)) {
+    struct dy_ast_pattern_simple simple;
+    if (dy_utf8_to_ast_pattern_simple(ctx, &simple)) {
         *pattern = (struct dy_ast_pattern){
-            .tag = DY_AST_PATTERN_SOLUTION,
-            .solution = solution
+            .tag = DY_AST_PATTERN_SIMPLE,
+            .simple = simple
         };
 
         return true;
@@ -1242,7 +1559,7 @@ bool dy_utf8_to_ast_pattern(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_patter
     return false;
 }
 
-bool dy_utf8_to_ast_pattern_solution(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_pattern_solution *solution)
+bool dy_utf8_to_ast_pattern_simple(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_pattern_simple *simple)
 {
     size_t start_index = ctx->stream.current_index;
 
@@ -1258,7 +1575,7 @@ bool dy_utf8_to_ast_pattern_solution(struct dy_utf8_to_ast_ctx *ctx, struct dy_a
 
     dy_skip_whitespace(ctx);
 
-    if (!dy_utf8_literal(ctx, DY_STR_LIT("->"))) {
+    if (!dy_utf8_literal(ctx, DY_STR_LIT("~>"))) {
         dy_ast_argument_release(arg);
         ctx->stream.current_index = start_index;
         return false;
@@ -1273,7 +1590,7 @@ bool dy_utf8_to_ast_pattern_solution(struct dy_utf8_to_ast_ctx *ctx, struct dy_a
         return false;
     }
 
-    *solution = (struct dy_ast_pattern_solution){
+    *simple = (struct dy_ast_pattern_simple){
         .arg = arg,
         .binding = dy_ast_binding_new(binding),
         .is_implicit = is_implicit
@@ -1381,17 +1698,20 @@ bool dy_combine_infix(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_argument lef
 {
     switch (op) {
     case DY_INFIX_OP_STRAIGHT_ARROW:
+    case DY_INFIX_OP_SQUIGGLY_ARROW:
     case DY_INFIX_OP_AT_STRAIGHT_ARROW:
+    case DY_INFIX_OP_AT_SQUIGGLY_ARROW:
         if (right.tag != DY_AST_ARGUMENT_EXPR) {
             return false;
         }
 
         *expr = (struct dy_ast_expr){
-            .tag = DY_AST_EXPR_SOLUTION,
-            .solution = {
+            .tag = DY_AST_EXPR_SIMPLE,
+            .simple = {
                 .argument = dy_ast_argument_retain(left),
                 .expr = dy_ast_expr_retain_ptr(right.expr),
-                .is_implicit = op == DY_INFIX_OP_AT_STRAIGHT_ARROW
+                .is_implicit = op == DY_INFIX_OP_AT_STRAIGHT_ARROW || op == DY_INFIX_OP_AT_SQUIGGLY_ARROW,
+                .is_negative = op == DY_INFIX_OP_SQUIGGLY_ARROW || op == DY_INFIX_OP_AT_SQUIGGLY_ARROW
             }
         };
 
@@ -1413,6 +1733,40 @@ bool dy_combine_infix(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_argument lef
         };
 
         return true;
+    case DY_INFIX_OP_PIPE_LEFT:
+    case DY_INFIX_OP_AT_PIPE_LEFT:
+        if (left.tag != DY_AST_ARGUMENT_EXPR) {
+            return false;
+        }
+
+        *expr = (struct dy_ast_expr){
+            .tag = DY_AST_EXPR_PIPE_LEFT,
+            .pipe_left = {
+                .left = dy_ast_expr_retain_ptr(left.expr),
+                .right = dy_ast_argument_retain(right),
+                .type = NULL,
+                .is_implicit = op == DY_INFIX_OP_AT_PIPE_LEFT
+            }
+        };
+
+        return true;
+    case DY_INFIX_OP_PIPE_RIGHT:
+    case DY_INFIX_OP_AT_PIPE_RIGHT:
+        if (right.tag != DY_AST_ARGUMENT_EXPR) {
+            return false;
+        }
+
+        *expr = (struct dy_ast_expr){
+            .tag = DY_AST_EXPR_PIPE_RIGHT,
+            .pipe_right = {
+                .left = dy_ast_argument_retain(left),
+                .right = dy_ast_expr_retain_ptr(right.expr),
+                .type = NULL,
+                .is_implicit = op == DY_INFIX_OP_AT_PIPE_RIGHT
+            }
+        };
+
+        return true;
     }
 
     dy_bail("Impossible infix op.");
@@ -1420,16 +1774,20 @@ bool dy_combine_infix(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_argument lef
 
 bool dy_left_op_is_first(enum dy_infix_op left, enum dy_infix_op right)
 {
-    switch (left) {
-    case DY_INFIX_OP_AT:
-    case DY_INFIX_OP_NOTHING:
-        return true;
-    case DY_INFIX_OP_STRAIGHT_ARROW:
-    case DY_INFIX_OP_AT_STRAIGHT_ARROW:
-        return false;
-    }
+    static const int order[] = {
+        [DY_INFIX_OP_AT] = 0,
+        [DY_INFIX_OP_NOTHING] = 0,
+        [DY_INFIX_OP_PIPE_LEFT] = 1,
+        [DY_INFIX_OP_AT_PIPE_LEFT] = 1,
+        [DY_INFIX_OP_PIPE_RIGHT] = 1,
+        [DY_INFIX_OP_AT_PIPE_RIGHT] = 1,
+        [DY_INFIX_OP_STRAIGHT_ARROW] = 2,
+        [DY_INFIX_OP_SQUIGGLY_ARROW] = 2,
+        [DY_INFIX_OP_AT_STRAIGHT_ARROW] = 2,
+        [DY_INFIX_OP_AT_SQUIGGLY_ARROW] = 2
+    };
 
-    dy_bail("Impossible infix op.");
+    return order[left] <= order[right];
 }
 
 void dy_skip_whitespace(struct dy_utf8_to_ast_ctx *ctx)

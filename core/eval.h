@@ -12,41 +12,59 @@
 
 static inline bool dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value, struct dy_core_expr *result);
 
-static inline bool dy_eval_application(struct dy_core_ctx *ctx, struct dy_core_application app, bool *is_value, struct dy_core_expr *result);
+static inline bool dy_eval_elim(struct dy_core_ctx *ctx, struct dy_core_elim elim, bool *is_value, struct dy_core_expr *result);
 
-static inline bool dy_eval_solution(struct dy_core_ctx *ctx, struct dy_core_solution solution, bool *is_value, struct dy_core_solution *result);
+static inline bool dy_eval_simple(struct dy_core_ctx *ctx, struct dy_core_simple simple, bool *is_value, struct dy_core_simple *result);
 
-static inline bool dy_eval_app_single_step(struct dy_core_ctx *ctx, struct dy_core_application app, struct dy_core_expr *result);
+static inline bool dy_eval_elim_single_step(struct dy_core_ctx *ctx, struct dy_core_elim elim, struct dy_core_expr *result);
+
+static inline bool dy_eval_map_assumption_elim(struct dy_core_ctx *ctx, struct dy_core_map_assumption ass, struct dy_core_expr proof, struct dy_core_expr out, bool is_implicit, enum dy_polarity polarity, struct dy_core_expr *result);
+
+static inline bool dy_eval_map_choice_elim(struct dy_core_ctx *ctx, struct dy_core_map_choice choice, enum dy_direction direction, struct dy_core_expr out, bool is_implicit, enum dy_polarity polarity, struct dy_core_expr *result);
+
+static inline bool dy_eval_map_recursion_elim(struct dy_core_ctx *ctx, struct dy_core_map_recursion rec, struct dy_core_expr out, bool is_implicit, enum dy_polarity polarity, struct dy_core_expr *result);
 
 bool dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_value, struct dy_core_expr *result)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_PROBLEM:
-        switch (expr.problem.tag) {
-        case DY_CORE_FUNCTION: {
-            struct dy_core_expr new_type;
-            if (!dy_eval_expr(ctx, *expr.problem.function.type, is_value, &new_type)) {
+    case DY_CORE_EXPR_INTRO:
+        switch (expr.intro.tag) {
+        case DY_CORE_INTRO_COMPLEX:
+            switch (expr.intro.complex.tag) {
+            case DY_CORE_COMPLEX_ASSUMPTION: {
+                struct dy_core_expr new_type;
+                if (!dy_eval_expr(ctx, *expr.intro.complex.assumption.type, is_value, &new_type)) {
+                    return false;
+                }
+
+                expr.intro.complex.assumption.type = dy_core_expr_new(new_type);
+                dy_core_expr_retain_ptr(ctx, expr.intro.complex.assumption.expr);
+                *result = expr;
+                return true;
+            }
+            case DY_CORE_COMPLEX_CHOICE:
+                *is_value = true;
+                return false;
+            case DY_CORE_COMPLEX_RECURSION:
+                *is_value = true;
                 return false;
             }
 
-            expr.problem.function.type = dy_core_expr_new(new_type);
-            dy_core_expr_retain_ptr(ctx, expr.problem.function.expr);
-            *result = expr;
-            return true;
-        }
-        case DY_CORE_PAIR:
-            *is_value = true;
-            return false;
-        case DY_CORE_RECURSION:
-            *is_value = true;
-            return false;
+            dy_bail("impossible");
+        case DY_CORE_INTRO_SIMPLE:
+            if (dy_eval_simple(ctx, expr.intro.simple, is_value, &expr.intro.simple)) {
+                *result = expr;
+                return true;
+            } else {
+                return false;
+            }
         }
 
         dy_bail("impossible");
-    case DY_CORE_EXPR_SOLUTION:
-        return dy_eval_solution(ctx, expr.solution, is_value, &expr.solution);
-    case DY_CORE_EXPR_APPLICATION:
-        return dy_eval_application(ctx, expr.application, is_value, result);
+    case DY_CORE_EXPR_ELIM:
+        return dy_eval_elim(ctx, expr.elim, is_value, result);
+    case DY_CORE_EXPR_MAP:
+        // TODO: Actually do stuff with maps.
     case DY_CORE_EXPR_VARIABLE:
     case DY_CORE_EXPR_ANY:
     case DY_CORE_EXPR_VOID:
@@ -64,64 +82,69 @@ bool dy_eval_expr(struct dy_core_ctx *ctx, struct dy_core_expr expr, bool *is_va
     dy_bail("Impossible object type.");
 }
 
-bool dy_eval_application(struct dy_core_ctx *ctx, struct dy_core_application app, bool *is_value, struct dy_core_expr *result)
+bool dy_eval_elim(struct dy_core_ctx *ctx, struct dy_core_elim elim, bool *is_value, struct dy_core_expr *result)
 {
     bool expr_is_value;
     struct dy_core_expr new_expr;
-    bool expr_is_new = dy_eval_expr(ctx, *app.expr, &expr_is_value, &new_expr);
+    bool expr_is_new = dy_eval_expr(ctx, *elim.expr, &expr_is_value, &new_expr);
 
-    bool solution_is_value;
-    struct dy_core_solution new_solution;
-    bool solution_is_new = dy_eval_solution(ctx, app.solution, &solution_is_value, &new_solution);
+    bool simple_is_value;
+    struct dy_core_simple new_simple;
+    bool simple_is_new = dy_eval_simple(ctx, elim.simple, &simple_is_value, &new_simple);
 
-    if (!expr_is_value || !solution_is_value) {
+    if (!expr_is_value || !simple_is_value) {
         *is_value = false;
 
-        if (!expr_is_new && !solution_is_new) {
+        if (!expr_is_new && !simple_is_new) {
             return false;
         }
 
         if (expr_is_new) {
-            app.expr = dy_core_expr_new(new_expr);
+            elim.expr = dy_core_expr_new(new_expr);
         } else {
-            dy_core_expr_retain_ptr(ctx, app.expr);
+            dy_core_expr_retain_ptr(ctx, elim.expr);
         }
 
-        if (solution_is_new) {
-            app.solution = new_solution;
+        if (simple_is_new) {
+            elim.simple = new_simple;
         } else {
-            dy_core_solution_retain(ctx, app.solution);
+            dy_core_simple_retain(ctx, elim.simple);
         }
 
         *result = (struct dy_core_expr){
-            .tag = DY_CORE_EXPR_APPLICATION,
-            .application = app
+            .tag = DY_CORE_EXPR_ELIM,
+            .elim = elim
         };
         return true;
     }
 
     if (!expr_is_new) {
-        new_expr = dy_core_expr_retain(ctx, *app.expr);
+        new_expr = dy_core_expr_retain(ctx, *elim.expr);
     }
 
-    if (!solution_is_new) {
-        new_solution = dy_core_solution_retain(ctx, app.solution);
+    if (!simple_is_new) {
+        new_simple = dy_core_simple_retain(ctx, elim.simple);
     }
 
     bool did_transform = false;
     bool changed_check_result = false;
-    if (app.check_result == DY_MAYBE) {
+    if (elim.check_result == DY_MAYBE) {
         struct dy_core_expr subtype = dy_type_of(ctx, new_expr);
 
         struct dy_core_expr supertype = {
-            .tag = DY_CORE_EXPR_SOLUTION,
-            .solution = new_solution
+            .tag = DY_CORE_EXPR_INTRO,
+            .intro = {
+                .polarity = DY_POLARITY_NEGATIVE,
+                .is_implicit = elim.is_implicit,
+                .tag = DY_CORE_INTRO_SIMPLE,
+                .simple = new_simple
+            }
         };
 
-        dy_ternary_t old_check_result = app.check_result;
+        dy_ternary_t old_check_result = elim.check_result;
 
         struct dy_core_expr new_new_expr;
-        app.check_result = dy_is_subtype(ctx, subtype, supertype, new_expr, &new_new_expr, &did_transform);
+        elim.check_result = dy_is_subtype(ctx, subtype, supertype, new_expr, &new_new_expr, &did_transform);
 
         if (did_transform) {
             dy_core_expr_release(ctx, new_expr);
@@ -136,22 +159,22 @@ bool dy_eval_application(struct dy_core_ctx *ctx, struct dy_core_application app
 
         dy_core_expr_release(ctx, subtype);
 
-        changed_check_result = old_check_result != app.check_result;
+        changed_check_result = old_check_result != elim.check_result;
     }
 
-    app.expr = dy_core_expr_new(new_expr);
-    app.solution = new_solution;
+    elim.expr = dy_core_expr_new(new_expr);
+    elim.simple = new_simple;
 
     struct dy_core_expr app_expr = {
-        .tag = DY_CORE_EXPR_APPLICATION,
-        .application = app
+        .tag = DY_CORE_EXPR_ELIM,
+        .elim = elim
     };
 
     struct dy_core_expr res;
-    if (!dy_eval_app_single_step(ctx, app, &res)) {
+    if (!dy_eval_elim_single_step(ctx, elim, &res)) {
         *is_value = false;
 
-        if (!expr_is_new && !solution_is_new && !did_transform && !changed_check_result) {
+        if (!expr_is_new && !simple_is_new && !did_transform && !changed_check_result) {
             dy_core_expr_release(ctx, app_expr);
             return false;
         } else {
@@ -171,14 +194,14 @@ bool dy_eval_application(struct dy_core_ctx *ctx, struct dy_core_application app
     return true;
 }
 
-bool dy_eval_solution(struct dy_core_ctx *ctx, struct dy_core_solution solution, bool *is_value, struct dy_core_solution *result)
+bool dy_eval_simple(struct dy_core_ctx *ctx, struct dy_core_simple simple, bool *is_value, struct dy_core_simple *result)
 {
-    if (solution.tag == DY_CORE_FUNCTION) {
-        struct dy_core_expr expr;
-        if (dy_eval_expr(ctx, *solution.expr, is_value, &expr)) {
-            solution.expr = dy_core_expr_new(expr);
-            dy_core_expr_retain_ptr(ctx, solution.out);
-            *result = solution;
+    if (simple.tag == DY_CORE_SIMPLE_PROOF) {
+        struct dy_core_expr proof;
+        if (dy_eval_expr(ctx, *simple.proof, is_value, &proof)) {
+            simple.proof = dy_core_expr_new(proof);
+            dy_core_expr_retain_ptr(ctx, simple.out);
+            *result = simple;
             return true;
         } else {
             return false;
@@ -190,43 +213,189 @@ bool dy_eval_solution(struct dy_core_ctx *ctx, struct dy_core_solution solution,
     }
 }
 
-bool dy_eval_app_single_step(struct dy_core_ctx *ctx, struct dy_core_application app, struct dy_core_expr *result)
+bool dy_eval_elim_single_step(struct dy_core_ctx *ctx, struct dy_core_elim elim, struct dy_core_expr *result)
 {
-    if (app.check_result != DY_YES) {
+    if (elim.check_result != DY_YES) {
         return false;
     }
 
-    if (app.expr->tag == DY_CORE_EXPR_PROBLEM) {
-        switch (app.expr->problem.tag) {
-        case DY_CORE_FUNCTION:
-            if (!dy_substitute(ctx, *app.expr->problem.function.expr, app.expr->problem.function.id, *app.solution.expr, result)) {
-                *result = dy_core_expr_retain(ctx, *app.expr->problem.function.expr);
+    if (elim.expr->tag == DY_CORE_EXPR_INTRO) {
+        if (elim.expr->intro.tag == DY_CORE_INTRO_COMPLEX) {
+            switch (elim.expr->intro.complex.tag) {
+            case DY_CORE_COMPLEX_ASSUMPTION:
+                if (!dy_substitute(ctx, *elim.expr->intro.complex.assumption.expr, elim.expr->intro.complex.assumption.id, *elim.simple.proof, result)) {
+                    *result = dy_core_expr_retain(ctx, *elim.expr->intro.complex.assumption.expr);
+                }
+
+                return true;
+            case DY_CORE_COMPLEX_CHOICE:
+                if (elim.simple.direction == DY_LEFT) {
+                    *result = dy_core_expr_retain(ctx, *elim.expr->intro.complex.choice.left);
+                } else {
+                    *result = dy_core_expr_retain(ctx, *elim.expr->intro.complex.choice.right);
+                }
+
+                return true;
+            case DY_CORE_COMPLEX_RECURSION:
+                if (!dy_substitute(ctx, *elim.expr->intro.complex.recursion.expr, elim.expr->intro.complex.recursion.id, *elim.expr, result)) {
+                    *result = dy_core_expr_retain(ctx, *elim.expr->intro.complex.recursion.expr);
+                }
+
+                return true;
             }
 
+            dy_bail("impossible");
+        } else {
+            *result = dy_core_expr_retain(ctx, *elim.expr->intro.simple.out);
             return true;
-        case DY_CORE_PAIR:
-            if (app.solution.direction == DY_LEFT) {
-                *result = dy_core_expr_retain(ctx, *app.expr->problem.pair.left);
-            } else {
-                *result = dy_core_expr_retain(ctx, *app.expr->problem.pair.right);
-            }
+        }
+    }
 
-            return true;
-        case DY_CORE_RECURSION:
-            if (!dy_substitute(ctx, *app.expr->problem.recursion.expr, app.expr->problem.recursion.id, *app.expr, result)) {
-                *result = dy_core_expr_retain(ctx, *app.expr->problem.recursion.expr);
-            }
+    if (elim.expr->tag == DY_CORE_EXPR_MAP) {
+        if (elim.simple.proof->tag != DY_CORE_EXPR_INTRO) {
+            return false;
+        }
 
-            return true;
+        switch (elim.expr->map.tag) {
+        case DY_CORE_MAP_ASSUMPTION:
+            return dy_eval_map_assumption_elim(ctx, elim.expr->map.assumption, *elim.simple.proof->intro.simple.proof, *elim.simple.proof->intro.simple.out, elim.simple.proof->intro.is_implicit, elim.simple.proof->intro.polarity, result);
+        case DY_CORE_MAP_CHOICE:
+            return dy_eval_map_choice_elim(ctx, elim.expr->map.choice, elim.simple.proof->intro.simple.direction, *elim.simple.proof->intro.simple.out, elim.simple.proof->intro.is_implicit, elim.simple.proof->intro.polarity, result);
+        case DY_CORE_MAP_RECURSION:
+            return dy_eval_map_recursion_elim(ctx, elim.expr->map.recursion, *elim.simple.proof->intro.simple.out, elim.simple.proof->intro.is_implicit, elim.simple.proof->intro.polarity, result);
         }
 
         dy_bail("impossible");
     }
 
-    if (app.expr->tag == DY_CORE_EXPR_SOLUTION) {
-        *result = dy_core_expr_retain(ctx, *app.expr->solution.out);
-        return true;
+    return false;
+}
+
+bool dy_eval_map_assumption_elim(struct dy_core_ctx *ctx, struct dy_core_map_assumption ass, struct dy_core_expr proof, struct dy_core_expr out, bool is_implicit, enum dy_polarity polarity, struct dy_core_expr *result)
+{
+    struct dy_core_assumption subst_ass;
+    if (!dy_substitute_assumption(ctx, ass.assumption, ass.id, proof, &subst_ass)) {
+        subst_ass = dy_core_assumption_retain(ctx, ass.assumption);
     }
 
-    return false;
+    dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+        .id = subst_ass.id,
+        .type = *subst_ass.type
+    });
+
+    struct dy_core_expr type = dy_type_of(ctx, *subst_ass.expr);
+
+    ctx->free_variables.num_elems--;
+
+    struct dy_core_expr expr = {
+        .tag = DY_CORE_EXPR_INTRO,
+        .intro = {
+            .polarity = DY_POLARITY_POSITIVE,
+            .is_implicit = false,
+            .tag = DY_CORE_INTRO_COMPLEX,
+            .complex = {
+                .tag = DY_CORE_COMPLEX_ASSUMPTION,
+                .assumption = subst_ass
+            }
+        }
+    };
+
+    struct dy_core_expr new_out = {
+        .tag = DY_CORE_EXPR_ELIM,
+        .elim = {
+            .expr = dy_core_expr_new(expr),
+            .simple = {
+                .tag = DY_CORE_SIMPLE_PROOF,
+                .proof = dy_core_expr_new(dy_core_expr_retain(ctx, out)),
+                .out = dy_core_expr_new(type)
+            },
+            .is_implicit = false,
+            .check_result = DY_YES,
+            .eval_immediately = true
+        }
+    };
+
+    *result = (struct dy_core_expr){
+        .tag = DY_CORE_EXPR_INTRO,
+        .intro = {
+            .is_implicit = is_implicit,
+            .polarity = polarity,
+            .tag = DY_CORE_INTRO_SIMPLE,
+            .simple = {
+                .tag = DY_CORE_SIMPLE_PROOF,
+                .proof = dy_core_expr_new(dy_core_expr_retain(ctx, proof)),
+                .out = dy_core_expr_new(new_out)
+            }
+        }
+    };
+
+    return true;
+}
+
+bool dy_eval_map_choice_elim(struct dy_core_ctx *ctx, struct dy_core_map_choice choice, enum dy_direction direction, struct dy_core_expr out, bool is_implicit, enum dy_polarity polarity, struct dy_core_expr *result)
+{
+    struct dy_core_assumption ass;
+    if (direction == DY_LEFT) {
+        ass = dy_core_assumption_retain(ctx, choice.assumption_left);
+    } else {
+        ass = dy_core_assumption_retain(ctx, choice.assumption_right);
+    }
+
+    dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+        .id = ass.id,
+        .type = *ass.type
+    });
+
+    struct dy_core_expr type = dy_type_of(ctx, *ass.expr);
+
+    ctx->free_variables.num_elems--;
+
+    struct dy_core_expr expr = {
+        .tag = DY_CORE_EXPR_INTRO,
+        .intro = {
+            .polarity = DY_POLARITY_POSITIVE,
+            .is_implicit = false,
+            .tag = DY_CORE_INTRO_COMPLEX,
+            .complex = {
+                .tag = DY_CORE_COMPLEX_ASSUMPTION,
+                .assumption = ass
+            }
+        }
+    };
+
+    struct dy_core_expr new_out = {
+        .tag = DY_CORE_EXPR_ELIM,
+        .elim = {
+            .expr = dy_core_expr_new(expr),
+            .simple = {
+                .tag = DY_CORE_SIMPLE_PROOF,
+                .proof = dy_core_expr_new(dy_core_expr_retain(ctx, out)),
+                .out = dy_core_expr_new(type)
+            },
+            .is_implicit = false,
+            .check_result = DY_YES,
+            .eval_immediately = true
+        }
+    };
+
+    *result = (struct dy_core_expr){
+        .tag = DY_CORE_EXPR_INTRO,
+        .intro = {
+            .is_implicit = is_implicit,
+            .polarity = polarity,
+            .tag = DY_CORE_INTRO_SIMPLE,
+            .simple = {
+                .tag = DY_CORE_SIMPLE_DECISION,
+                .direction = direction,
+                .out = dy_core_expr_new(new_out)
+            }
+        }
+    };
+
+    return true;
+}
+
+bool dy_eval_map_recursion_elim(struct dy_core_ctx *ctx, struct dy_core_map_recursion rec, struct dy_core_expr out, bool is_implicit, enum dy_polarity polarity, struct dy_core_expr *result)
+{
+    dy_bail("not yet");
 }

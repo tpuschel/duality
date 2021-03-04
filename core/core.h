@@ -28,6 +28,8 @@ struct dy_core_ctx {
 
     dy_array_t recovered_negative_inference_ids;
 
+    dy_array_t recovered_positive_inference_ids;
+
     dy_array_t past_subtype_checks;
 
     dy_array_t constraints;
@@ -47,13 +49,13 @@ typedef enum dy_ternary {
 
 struct dy_core_expr;
 
-struct dy_core_function {
+struct dy_core_assumption {
     size_t id;
     struct dy_core_expr *type;
     struct dy_core_expr *expr;
 };
 
-struct dy_core_pair {
+struct dy_core_choice {
     struct dy_core_expr *left;
     struct dy_core_expr *right;
 };
@@ -63,28 +65,20 @@ struct dy_core_recursion {
     struct dy_core_expr *expr;
 };
 
-enum dy_core_tag {
-    DY_CORE_FUNCTION,
-    DY_CORE_PAIR,
-    DY_CORE_RECURSION
+enum dy_core_complex_tag {
+    DY_CORE_COMPLEX_ASSUMPTION,
+    DY_CORE_COMPLEX_CHOICE,
+    DY_CORE_COMPLEX_RECURSION
 };
 
-enum dy_polarity {
-    DY_POLARITY_POSITIVE,
-    DY_POLARITY_NEGATIVE
-};
-
-struct dy_core_problem {
+struct dy_core_complex {
     union {
-        struct dy_core_function function;
-        struct dy_core_pair pair;
+        struct dy_core_assumption assumption;
+        struct dy_core_choice choice;
         struct dy_core_recursion recursion;
     };
 
-    enum dy_core_tag tag;
-
-    enum dy_polarity polarity;
-    bool is_implicit;
+    enum dy_core_complex_tag tag;
 };
 
 enum dy_direction {
@@ -92,24 +86,96 @@ enum dy_direction {
     DY_RIGHT
 };
 
-struct dy_core_solution {
+enum dy_core_simple_tag {
+    DY_CORE_SIMPLE_PROOF,
+    DY_CORE_SIMPLE_DECISION,
+    DY_CORE_SIMPLE_UNFOLD,
+    DY_CORE_SIMPLE_UNWRAP
+};
+
+struct dy_core_simple {
     union {
-        struct dy_core_expr *expr;
+        struct dy_core_expr *proof;
         enum dy_direction direction;
     };
 
-    enum dy_core_tag tag;
+    enum dy_core_simple_tag tag;
 
     struct dy_core_expr *out;
+};
 
+enum dy_polarity {
+    DY_POLARITY_POSITIVE,
+    DY_POLARITY_NEGATIVE
+};
+
+enum dy_core_intro_tag {
+    DY_CORE_INTRO_COMPLEX,
+    DY_CORE_INTRO_SIMPLE
+};
+
+struct dy_core_intro {
+    union {
+        struct dy_core_complex complex;
+        struct dy_core_simple simple;
+    };
+
+    enum dy_core_intro_tag tag;
+
+    enum dy_polarity polarity;
     bool is_implicit;
 };
 
-struct dy_core_application {
+struct dy_core_elim {
     struct dy_core_expr *expr;
-    struct dy_core_solution solution;
+    struct dy_core_simple simple;
+    bool is_implicit;
     dy_ternary_t check_result;
     bool eval_immediately;
+};
+
+enum dy_core_map_dependence {
+    DY_CORE_MAP_DEPENDENCE_NOT_CHECKED,
+    DY_CORE_MAP_DEPENDENCE_DEPENDENT,
+    DY_CORE_MAP_DEPENDENCE_INDEPENDENT
+};
+
+struct dy_core_map_assumption {
+    size_t id;
+    struct dy_core_expr *type;
+    struct dy_core_assumption assumption;
+    enum dy_core_map_dependence dependence;
+};
+
+struct dy_core_map_choice {
+    struct dy_core_assumption assumption_left;
+    struct dy_core_assumption assumption_right;
+    enum dy_core_map_dependence left_dependence;
+    enum dy_core_map_dependence right_dependence;
+};
+
+struct dy_core_map_recursion {
+    size_t id;
+    struct dy_core_assumption assumption;
+    enum dy_core_map_dependence dependence;
+};
+
+enum dy_core_map_tag {
+    DY_CORE_MAP_ASSUMPTION,
+    DY_CORE_MAP_CHOICE,
+    DY_CORE_MAP_RECURSION
+};
+
+struct dy_core_map {
+    union {
+        struct dy_core_map_assumption assumption;
+        struct dy_core_map_choice choice;
+        struct dy_core_map_recursion recursion;
+    };
+
+    enum dy_core_map_tag tag;
+
+    bool is_implicit;
 };
 
 struct dy_core_inference_ctx {
@@ -150,9 +216,9 @@ struct dy_core_custom_shared {
 };
 
 enum dy_core_expr_tag {
-    DY_CORE_EXPR_PROBLEM,
-    DY_CORE_EXPR_SOLUTION,
-    DY_CORE_EXPR_APPLICATION,
+    DY_CORE_EXPR_INTRO,
+    DY_CORE_EXPR_ELIM,
+    DY_CORE_EXPR_MAP,
     DY_CORE_EXPR_VARIABLE,
     DY_CORE_EXPR_ANY,
     DY_CORE_EXPR_VOID,
@@ -163,9 +229,9 @@ enum dy_core_expr_tag {
 
 struct dy_core_expr {
     union {
-        struct dy_core_problem problem;
-        struct dy_core_solution solution;
-        struct dy_core_application application;
+        struct dy_core_intro intro;
+        struct dy_core_elim elim;
+        struct dy_core_map map;
         size_t variable_id;
         struct dy_core_inference_ctx inference_ctx;
         size_t inference_var_id;
@@ -201,11 +267,14 @@ static inline struct dy_core_expr *dy_core_expr_new(struct dy_core_expr expr);
 
 static inline struct dy_core_expr dy_core_expr_retain(struct dy_core_ctx *ctx, struct dy_core_expr expr);
 static inline struct dy_core_expr *dy_core_expr_retain_ptr(struct dy_core_ctx *ctx, struct dy_core_expr *expr);
-static inline struct dy_core_solution dy_core_solution_retain(struct dy_core_ctx *ctx, struct dy_core_solution solution);
+static inline struct dy_core_assumption dy_core_assumption_retain(struct dy_core_ctx *ctx, struct dy_core_assumption assumption);
+static inline struct dy_core_simple dy_core_simple_retain(struct dy_core_ctx *ctx, struct dy_core_simple simple);
+
 
 static inline void dy_core_expr_release(struct dy_core_ctx *ctx, struct dy_core_expr expr);
 static inline void dy_core_expr_release_ptr(struct dy_core_ctx *ctx, struct dy_core_expr *expr);
-static inline void dy_core_solution_release(struct dy_core_ctx *ctx, struct dy_core_solution solution);
+static inline void dy_core_assumption_release(struct dy_core_ctx *ctx, struct dy_core_assumption assumption);
+static inline void dy_core_simple_release(struct dy_core_ctx *ctx, struct dy_core_simple simple);
 
 static inline enum dy_polarity dy_flip_polarity(enum dy_polarity polarity);
 
@@ -213,11 +282,20 @@ static inline void dy_variable_appears_in_polarity(struct dy_core_ctx *ctx, stru
 
 /** Returns whether 'id' occurs in expr at all. */
 static inline bool dy_core_expr_contains_this_variable(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr expr);
+static inline bool dy_core_assumption_contains_this_variable(struct dy_core_ctx *ctx, size_t id, struct dy_core_assumption assumption);
+
+/**
+ * Removes all mentions of 'id' in 'constraint', which may involve lowering/raising the subtype/supertype bounds.
+ */
+static inline void dy_remove_mentions_in_constraints(struct dy_core_ctx *ctx, size_t id, size_t start);
+
+/**
+ * Removes all mentions of 'id' in 'type'.
+ */
+static inline bool dy_remove_mentions_in_type(struct dy_core_ctx *ctx, size_t id, enum dy_polarity current_polarity, struct dy_core_expr type, struct dy_core_expr *result);
 
 /** Appends a utf8 represention of expr to 'string'. */
 static inline void dy_core_expr_to_string(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_array_t *string);
-
-static inline void dy_core_solution_to_string(struct dy_core_ctx *ctx, struct dy_core_solution solution, dy_array_t *string);
 
 /** Helper to add a string literal to a dynamic char array. */
 static inline void add_string(dy_array_t *string, dy_string_t s);
@@ -232,29 +310,48 @@ struct dy_core_expr *dy_core_expr_new(struct dy_core_expr expr)
 struct dy_core_expr dy_core_expr_retain(struct dy_core_ctx *ctx, struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_PROBLEM:
-        switch (expr.problem.tag) {
-        case DY_CORE_FUNCTION:
-            dy_core_expr_retain_ptr(ctx, expr.problem.function.type);
-            dy_core_expr_retain_ptr(ctx, expr.problem.function.expr);
-            return expr;
-        case DY_CORE_PAIR:
-            dy_core_expr_retain_ptr(ctx, expr.problem.pair.left);
-            dy_core_expr_retain_ptr(ctx, expr.problem.pair.right);
-            return expr;
-        case DY_CORE_RECURSION:
-            dy_core_expr_retain_ptr(ctx, expr.problem.recursion.expr);
+    case DY_CORE_EXPR_INTRO:
+        switch (expr.intro.tag) {
+        case DY_CORE_INTRO_COMPLEX:
+            switch (expr.intro.complex.tag) {
+            case DY_CORE_COMPLEX_ASSUMPTION:
+                dy_core_assumption_retain(ctx, expr.intro.complex.assumption);
+                return expr;
+            case DY_CORE_COMPLEX_CHOICE:
+                dy_core_expr_retain_ptr(ctx, expr.intro.complex.choice.left);
+                dy_core_expr_retain_ptr(ctx, expr.intro.complex.choice.right);
+                return expr;
+            case DY_CORE_COMPLEX_RECURSION:
+                dy_core_expr_retain_ptr(ctx, expr.intro.complex.recursion.expr);
+                return expr;
+            }
+            dy_bail("impossible");
+        case DY_CORE_INTRO_SIMPLE:
+            dy_core_simple_retain(ctx, expr.intro.simple);
             return expr;
         }
 
         dy_bail("impossible");
-    case DY_CORE_EXPR_SOLUTION:
-        dy_core_solution_retain(ctx, expr.solution);
+    case DY_CORE_EXPR_ELIM:
+        dy_core_expr_retain_ptr(ctx, expr.elim.expr);
+        dy_core_simple_retain(ctx, expr.elim.simple);
         return expr;
-    case DY_CORE_EXPR_APPLICATION:
-        dy_core_expr_retain_ptr(ctx, expr.application.expr);
-        dy_core_solution_retain(ctx, expr.application.solution);
-        return expr;
+    case DY_CORE_EXPR_MAP:
+        switch (expr.map.tag) {
+        case DY_CORE_MAP_ASSUMPTION:
+            dy_core_expr_retain_ptr(ctx, expr.map.assumption.type);
+            dy_core_assumption_retain(ctx, expr.map.assumption.assumption);
+            return expr;
+        case DY_CORE_MAP_CHOICE:
+            dy_core_assumption_retain(ctx, expr.map.choice.assumption_left);
+            dy_core_assumption_retain(ctx, expr.map.choice.assumption_right);
+            return expr;
+        case DY_CORE_MAP_RECURSION:
+            dy_core_assumption_retain(ctx, expr.map.recursion.assumption);
+            return expr;
+        }
+
+        dy_bail("impossible");
     case DY_CORE_EXPR_VARIABLE:
     case DY_CORE_EXPR_ANY:
     case DY_CORE_EXPR_VOID:
@@ -278,43 +375,70 @@ struct dy_core_expr *dy_core_expr_retain_ptr(struct dy_core_ctx *ctx, struct dy_
     return dy_rc_retain(expr, DY_ALIGNOF(struct dy_core_expr));
 }
 
-struct dy_core_solution dy_core_solution_retain(struct dy_core_ctx *ctx, struct dy_core_solution solution)
+struct dy_core_assumption dy_core_assumption_retain(struct dy_core_ctx *ctx, struct dy_core_assumption assumption)
 {
-    if (solution.tag == DY_CORE_FUNCTION) {
-        dy_core_expr_retain_ptr(ctx, solution.expr);
+    dy_core_expr_retain_ptr(ctx, assumption.type);
+    dy_core_expr_retain_ptr(ctx, assumption.expr);
+    return assumption;
+}
+
+struct dy_core_simple dy_core_simple_retain(struct dy_core_ctx *ctx, struct dy_core_simple simple)
+{
+    if (simple.tag == DY_CORE_SIMPLE_PROOF) {
+        dy_core_expr_retain_ptr(ctx, simple.proof);
     }
 
-    dy_core_expr_retain_ptr(ctx, solution.out);
-
-    return solution;
+    dy_core_expr_retain_ptr(ctx, simple.out);
+    return simple;
 }
 
 void dy_core_expr_release(struct dy_core_ctx *ctx, struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_PROBLEM:
-        switch (expr.problem.tag) {
-        case DY_CORE_FUNCTION:
-            dy_core_expr_release_ptr(ctx, expr.problem.function.type);
-            dy_core_expr_release_ptr(ctx, expr.problem.function.expr);
-            return;
-        case DY_CORE_PAIR:
-            dy_core_expr_release_ptr(ctx, expr.problem.pair.left);
-            dy_core_expr_release_ptr(ctx, expr.problem.pair.right);
-            return;
-        case DY_CORE_RECURSION:
-            dy_core_expr_release_ptr(ctx, expr.problem.recursion.expr);
+    case DY_CORE_EXPR_INTRO:
+        switch (expr.intro.tag) {
+        case DY_CORE_INTRO_COMPLEX:
+            switch (expr.intro.complex.tag) {
+            case DY_CORE_COMPLEX_ASSUMPTION:
+                dy_core_expr_release_ptr(ctx, expr.intro.complex.assumption.type);
+                dy_core_expr_release_ptr(ctx, expr.intro.complex.assumption.expr);
+                return;
+            case DY_CORE_COMPLEX_CHOICE:
+                dy_core_expr_release_ptr(ctx, expr.intro.complex.choice.left);
+                dy_core_expr_release_ptr(ctx, expr.intro.complex.choice.right);
+                return;
+            case DY_CORE_COMPLEX_RECURSION:
+                dy_core_expr_release_ptr(ctx, expr.intro.complex.recursion.expr);
+                return;
+            }
+
+            dy_bail("impossible");
+        case DY_CORE_INTRO_SIMPLE:
+            dy_core_simple_release(ctx, expr.intro.simple);
             return;
         }
 
         dy_bail("impossible");
-    case DY_CORE_EXPR_SOLUTION:
-        dy_core_solution_release(ctx, expr.solution);
+    case DY_CORE_EXPR_ELIM:
+        dy_core_expr_release_ptr(ctx, expr.elim.expr);
+        dy_core_simple_release(ctx, expr.elim.simple);
         return;
-    case DY_CORE_EXPR_APPLICATION:
-        dy_core_expr_release_ptr(ctx, expr.application.expr);
-        dy_core_solution_release(ctx, expr.application.solution);
-        return;
+    case DY_CORE_EXPR_MAP:
+        switch (expr.map.tag) {
+        case DY_CORE_MAP_ASSUMPTION:
+            dy_core_expr_release_ptr(ctx, expr.map.assumption.type);
+            dy_core_assumption_release(ctx, expr.map.assumption.assumption);
+            return;
+        case DY_CORE_MAP_CHOICE:
+            dy_core_assumption_release(ctx, expr.map.choice.assumption_left);
+            dy_core_assumption_release(ctx, expr.map.choice.assumption_right);
+            return;
+        case DY_CORE_MAP_RECURSION:
+            dy_core_assumption_release(ctx, expr.map.recursion.assumption);
+            return;
+        }
+
+        dy_bail("impossible");
     case DY_CORE_EXPR_VARIABLE:
     case DY_CORE_EXPR_ANY:
     case DY_CORE_EXPR_VOID:
@@ -341,12 +465,19 @@ void dy_core_expr_release_ptr(struct dy_core_ctx *ctx, struct dy_core_expr *expr
     }
 }
 
-void dy_core_solution_release(struct dy_core_ctx *ctx, struct dy_core_solution solution)
+void dy_core_assumption_release(struct dy_core_ctx *ctx, struct dy_core_assumption assumption)
 {
-    if (solution.tag == DY_CORE_FUNCTION) {
-        dy_core_expr_release_ptr(ctx, solution.expr);
+    dy_core_expr_release_ptr(ctx, assumption.type);
+    dy_core_expr_release_ptr(ctx, assumption.expr);
+}
+
+void dy_core_simple_release(struct dy_core_ctx *ctx, struct dy_core_simple simple)
+{
+    if (simple.tag == DY_CORE_SIMPLE_PROOF) {
+        dy_core_expr_release_ptr(ctx, simple.proof);
     }
-    dy_core_expr_release_ptr(ctx, solution.out);
+
+    dy_core_expr_release_ptr(ctx, simple.out);
 }
 
 enum dy_polarity dy_flip_polarity(enum dy_polarity polarity)
@@ -364,32 +495,38 @@ enum dy_polarity dy_flip_polarity(enum dy_polarity polarity)
 void dy_variable_appears_in_polarity(struct dy_core_ctx *ctx, struct dy_core_expr expr, size_t id, enum dy_polarity current_polarity, bool *positive, bool *negative)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_PROBLEM:
-        switch (expr.problem.tag) {
-        case DY_CORE_FUNCTION:
-            dy_variable_appears_in_polarity(ctx, *expr.problem.function.type, id, dy_flip_polarity(current_polarity), positive, negative);
-            if (*positive && *negative) {
+    case DY_CORE_EXPR_INTRO:
+        switch (expr.intro.tag) {
+        case DY_CORE_INTRO_COMPLEX:
+            switch (expr.intro.complex.tag) {
+            case DY_CORE_COMPLEX_ASSUMPTION:
+                dy_variable_appears_in_polarity(ctx, *expr.intro.complex.assumption.type, id, dy_flip_polarity(current_polarity), positive, negative);
+                if (*positive && *negative) {
+                    return;
+                }
+                dy_variable_appears_in_polarity(ctx, *expr.intro.complex.assumption.expr, id, current_polarity, positive, negative);
+                return;
+            case DY_CORE_COMPLEX_CHOICE:
+                dy_variable_appears_in_polarity(ctx, *expr.intro.complex.choice.left, id, current_polarity, positive, negative);
+                if (*positive && *negative) {
+                    return;
+                }
+                dy_variable_appears_in_polarity(ctx, *expr.intro.complex.choice.right, id, current_polarity, positive, negative);
+                return;
+            case DY_CORE_COMPLEX_RECURSION:
+                dy_variable_appears_in_polarity(ctx, *expr.intro.complex.recursion.expr, id, current_polarity, positive, negative);
                 return;
             }
-            dy_variable_appears_in_polarity(ctx, *expr.problem.function.expr, id, current_polarity, positive, negative);
-            return;
-        case DY_CORE_PAIR:
-            dy_variable_appears_in_polarity(ctx, *expr.problem.pair.left, id, current_polarity, positive, negative);
-            if (*positive && *negative) {
-                return;
-            }
-            dy_variable_appears_in_polarity(ctx, *expr.problem.pair.right, id, current_polarity, positive, negative);
-            return;
-        case DY_CORE_RECURSION:
-            dy_variable_appears_in_polarity(ctx, *expr.problem.recursion.expr, id, current_polarity, positive, negative);
+
+            dy_bail("impossible");
+        case DY_CORE_INTRO_SIMPLE:
+            dy_variable_appears_in_polarity(ctx, *expr.intro.simple.out, id, current_polarity, positive, negative);
             return;
         }
 
         dy_bail("Impossible");
-    case DY_CORE_EXPR_SOLUTION:
-        dy_variable_appears_in_polarity(ctx, *expr.solution.out, id, current_polarity, positive, negative);
-        return;
-    case DY_CORE_EXPR_APPLICATION:
+    case DY_CORE_EXPR_ELIM:
+    case DY_CORE_EXPR_MAP:
         return;
     case DY_CORE_EXPR_VARIABLE:
         if (expr.variable_id == id) {
@@ -429,46 +566,67 @@ void dy_variable_appears_in_polarity(struct dy_core_ctx *ctx, struct dy_core_exp
 bool dy_core_expr_contains_this_variable(struct dy_core_ctx *ctx, size_t id, struct dy_core_expr expr)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_PROBLEM:
-        switch (expr.problem.tag) {
-        case DY_CORE_FUNCTION:
-            if (dy_core_expr_contains_this_variable(ctx, id, *expr.problem.function.type)) {
+    case DY_CORE_EXPR_INTRO:
+        switch (expr.intro.tag) {
+        case DY_CORE_INTRO_COMPLEX:
+            switch (expr.intro.complex.tag) {
+            case DY_CORE_COMPLEX_ASSUMPTION:
+                return dy_core_assumption_contains_this_variable(ctx, id, expr.intro.complex.assumption);
+            case DY_CORE_COMPLEX_CHOICE:
+                return dy_core_expr_contains_this_variable(ctx, id, *expr.intro.complex.choice.left)
+                    || dy_core_expr_contains_this_variable(ctx, id, *expr.intro.complex.choice.right);
+            case DY_CORE_COMPLEX_RECURSION:
+                if (expr.intro.complex.recursion.id == id) {
+                    return false;
+                }
+
+                return dy_core_expr_contains_this_variable(ctx, id, *expr.intro.complex.recursion.expr);
+            }
+
+            dy_bail("impossible");
+        case DY_CORE_INTRO_SIMPLE:
+            if (expr.intro.simple.tag == DY_CORE_SIMPLE_PROOF && dy_core_expr_contains_this_variable(ctx, id, *expr.intro.simple.proof)) {
                 return true;
             }
 
-            if (expr.problem.function.id == id) {
-                return false;
-            }
-
-            return dy_core_expr_contains_this_variable(ctx, id, *expr.problem.function.expr);
-        case DY_CORE_PAIR:
-            return dy_core_expr_contains_this_variable(ctx, id, *expr.problem.pair.left)
-                || dy_core_expr_contains_this_variable(ctx, id, *expr.problem.pair.right);
-        case DY_CORE_RECURSION:
-            if (expr.problem.recursion.id == id) {
-                return false;
-            }
-
-            return dy_core_expr_contains_this_variable(ctx, id, *expr.problem.recursion.expr);
+            return dy_core_expr_contains_this_variable(ctx, id, *expr.intro.simple.out);
         }
 
         dy_bail("Impossible object type.");
-    case DY_CORE_EXPR_SOLUTION:
-        if (expr.solution.tag == DY_CORE_FUNCTION && dy_core_expr_contains_this_variable(ctx, id, *expr.solution.expr)) {
+    case DY_CORE_EXPR_ELIM:
+        if (dy_core_expr_contains_this_variable(ctx, id, *expr.elim.expr)) {
             return true;
         }
 
-        return dy_core_expr_contains_this_variable(ctx, id, *expr.solution.out);
-    case DY_CORE_EXPR_APPLICATION:
-        if (dy_core_expr_contains_this_variable(ctx, id, *expr.application.expr)) {
+        if (expr.elim.simple.tag == DY_CORE_SIMPLE_PROOF && dy_core_expr_contains_this_variable(ctx, id, *expr.elim.simple.proof)) {
             return true;
         }
 
-        if (expr.application.solution.tag == DY_CORE_FUNCTION && dy_core_expr_contains_this_variable(ctx, id, *expr.application.solution.expr)) {
-            return true;
+        return dy_core_expr_contains_this_variable(ctx, id, *expr.elim.simple.out);
+    case DY_CORE_EXPR_MAP:
+        switch (expr.map.tag) {
+        case DY_CORE_MAP_ASSUMPTION:
+            if (dy_core_expr_contains_this_variable(ctx, id, *expr.map.assumption.type)) {
+                return true;
+            }
+
+            if (expr.map.assumption.id == id) {
+                return false;
+            }
+
+            return dy_core_assumption_contains_this_variable(ctx, id, expr.map.assumption.assumption);
+        case DY_CORE_MAP_CHOICE:
+            return dy_core_assumption_contains_this_variable(ctx, id, expr.map.choice.assumption_left)
+                || dy_core_assumption_contains_this_variable(ctx, id, expr.map.choice.assumption_right);
+        case DY_CORE_MAP_RECURSION:
+            if (expr.map.recursion.id == id) {
+                return false;
+            }
+
+            return dy_core_assumption_contains_this_variable(ctx, id, expr.map.recursion.assumption);
         }
 
-        return dy_core_expr_contains_this_variable(ctx, id, *expr.application.solution.out);
+        dy_bail("impossible");
     case DY_CORE_EXPR_VARIABLE:
         return expr.variable_id == id;
     case DY_CORE_EXPR_INFERENCE_VAR:
@@ -491,122 +649,265 @@ bool dy_core_expr_contains_this_variable(struct dy_core_ctx *ctx, size_t id, str
     dy_bail("Impossible object type.");
 }
 
+bool dy_core_assumption_contains_this_variable(struct dy_core_ctx *ctx, size_t id, struct dy_core_assumption assumption)
+{
+    if (dy_core_expr_contains_this_variable(ctx, id, *assumption.type)) {
+        return true;
+    }
+
+    if (assumption.id == id) {
+        return false;
+    }
+
+    return dy_core_expr_contains_this_variable(ctx, id, *assumption.expr);
+}
+
 void dy_core_expr_to_string(struct dy_core_ctx *ctx, struct dy_core_expr expr, dy_array_t *string)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_PROBLEM:
-        switch (expr.problem.tag) {
-        case DY_CORE_FUNCTION:
-            if (expr.problem.polarity == DY_POLARITY_POSITIVE) {
-                add_string(string, DY_STR_LIT("fun "));
+    case DY_CORE_EXPR_INTRO:
+        switch (expr.intro.tag) {
+        case DY_CORE_INTRO_COMPLEX:
+            switch (expr.intro.complex.tag) {
+            case DY_CORE_COMPLEX_ASSUMPTION:
+                if (expr.intro.polarity == DY_POLARITY_POSITIVE) {
+                    add_string(string, DY_STR_LIT("fun "));
+                } else {
+                    add_string(string, DY_STR_LIT("some "));
+                }
+
+                if (expr.intro.is_implicit) {
+                    add_string(string, DY_STR_LIT("@ "));
+                }
+
+                if (dy_core_expr_contains_this_variable(ctx, expr.intro.complex.assumption.id, *expr.intro.complex.assumption.expr)) {
+                    add_size_t_decimal(string, expr.intro.complex.assumption.id);
+                    add_string(string, DY_STR_LIT(" "));
+                }
+
+                add_string(string, DY_STR_LIT(": "));
+
+                dy_core_expr_to_string(ctx, *expr.intro.complex.assumption.type, string);
+
+                add_string(string, DY_STR_LIT(" => "));
+
+                dy_core_expr_to_string(ctx, *expr.intro.complex.assumption.expr, string);
+                return;
+            case DY_CORE_COMPLEX_CHOICE:
+                if (expr.intro.polarity == DY_POLARITY_POSITIVE) {
+                    add_string(string, DY_STR_LIT("list "));
+                } else {
+                    add_string(string, DY_STR_LIT("either "));
+                }
+
+                if (expr.intro.is_implicit) {
+                    add_string(string, DY_STR_LIT("@ "));
+                }
+
+                add_string(string, DY_STR_LIT("{ "));
+
+                dy_core_expr_to_string(ctx, *expr.intro.complex.choice.left, string);
+
+                add_string(string, DY_STR_LIT(", "));
+
+                dy_core_expr_to_string(ctx, *expr.intro.complex.choice.right, string);
+
+                add_string(string, DY_STR_LIT(" }"));
+                return;
+            case DY_CORE_COMPLEX_RECURSION:
+                if (expr.intro.polarity == DY_POLARITY_POSITIVE) {
+                    add_string(string, DY_STR_LIT("inf "));
+                } else {
+                    add_string(string, DY_STR_LIT("fin "));
+                }
+
+                if (expr.intro.is_implicit) {
+                    add_string(string, DY_STR_LIT("@ "));
+                }
+
+                add_size_t_decimal(string, expr.intro.complex.recursion.id);
+
+                add_string(string, DY_STR_LIT(" = "));
+
+                dy_core_expr_to_string(ctx, *expr.intro.complex.recursion.expr, string);
+                return;
+            }
+
+            dy_bail("impossible");
+        case DY_CORE_INTRO_SIMPLE:
+            switch (expr.intro.simple.tag) {
+            case DY_CORE_SIMPLE_PROOF:
+                add_string(string, DY_STR_LIT("("));
+                dy_core_expr_to_string(ctx, *expr.intro.simple.proof, string);
+                add_string(string, DY_STR_LIT(")"));
+                break;
+            case DY_CORE_SIMPLE_DECISION:
+                if (expr.intro.simple.direction == DY_LEFT) {
+                    add_string(string, DY_STR_LIT("L"));
+                } else {
+                    add_string(string, DY_STR_LIT("R"));
+                }
+                break;
+            case DY_CORE_SIMPLE_UNFOLD:
+                add_string(string, DY_STR_LIT("Unfold"));
+                break;
+            case DY_CORE_SIMPLE_UNWRAP:
+                add_string(string, DY_STR_LIT("Unwrap"));
+                break;
+            }
+
+            if (expr.intro.polarity == DY_POLARITY_POSITIVE) {
+                if (expr.intro.is_implicit) {
+                    add_string(string, DY_STR_LIT(" @-> "));
+                } else {
+                    add_string(string, DY_STR_LIT(" -> "));
+                }
             } else {
-                add_string(string, DY_STR_LIT("ex "));
+                if (expr.intro.is_implicit) {
+                    add_string(string, DY_STR_LIT(" @~> "));
+                } else {
+                    add_string(string, DY_STR_LIT(" ~> "));
+                }
             }
 
-            if (expr.problem.is_implicit) {
-                add_string(string, DY_STR_LIT("@ "));
-            }
-
-            if (dy_core_expr_contains_this_variable(ctx, expr.problem.function.id, *expr.problem.function.expr)) {
-                add_size_t_decimal(string, expr.problem.function.id);
-                add_string(string, DY_STR_LIT(" "));
-            }
-
-            add_string(string, DY_STR_LIT(": "));
-
-            dy_core_expr_to_string(ctx, *expr.problem.function.type, string);
-
-            add_string(string, DY_STR_LIT(" => "));
-
-            dy_core_expr_to_string(ctx, *expr.problem.function.expr, string);
-            return;
-        case DY_CORE_PAIR:
-            if (expr.problem.polarity == DY_POLARITY_POSITIVE) {
-                add_string(string, DY_STR_LIT("list "));
-            } else {
-                add_string(string, DY_STR_LIT("union "));
-            }
-
-            if (expr.problem.is_implicit) {
-                add_string(string, DY_STR_LIT("@ "));
-            }
-
-            add_string(string, DY_STR_LIT("{ "));
-
-            dy_core_expr_to_string(ctx, *expr.problem.pair.left, string);
-
-            add_string(string, DY_STR_LIT(", "));
-
-            dy_core_expr_to_string(ctx, *expr.problem.pair.right, string);
-
-            add_string(string, DY_STR_LIT(" }"));
-            return;
-        case DY_CORE_RECURSION:
-            if (expr.problem.polarity == DY_POLARITY_POSITIVE) {
-                add_string(string, DY_STR_LIT("inf "));
-            } else {
-                add_string(string, DY_STR_LIT("fin "));
-            }
-
-            if (expr.problem.is_implicit) {
-                add_string(string, DY_STR_LIT("@ "));
-            }
-
-            add_size_t_decimal(string, expr.problem.recursion.id);
-
-            add_string(string, DY_STR_LIT(" = "));
-
-            dy_core_expr_to_string(ctx, *expr.problem.recursion.expr, string);
+            dy_core_expr_to_string(ctx, *expr.intro.simple.out, string);
             return;
         }
 
         dy_bail("impossible");
-    case DY_CORE_EXPR_SOLUTION:
-        dy_core_solution_to_string(ctx, expr.solution, string);
-        return;
-    case DY_CORE_EXPR_APPLICATION:
+    case DY_CORE_EXPR_ELIM:
         add_string(string, DY_STR_LIT("("));
-        dy_core_expr_to_string(ctx, *expr.application.expr, string);
+        dy_core_expr_to_string(ctx, *expr.elim.expr, string);
         add_string(string, DY_STR_LIT(")"));
 
-        if (expr.application.solution.is_implicit) {
+        if (expr.elim.is_implicit) {
             add_string(string, DY_STR_LIT(" @ "));
         } else {
             add_string(string, DY_STR_LIT(" "));
         }
 
-        switch (expr.application.solution.tag) {
-        case DY_CORE_FUNCTION:
+        switch (expr.elim.simple.tag) {
+        case DY_CORE_SIMPLE_PROOF:
             add_string(string, DY_STR_LIT("("));
-            dy_core_expr_to_string(ctx, *expr.application.solution.expr, string);
+            dy_core_expr_to_string(ctx, *expr.elim.simple.proof, string);
             add_string(string, DY_STR_LIT(")"));
             break;
-        case DY_CORE_PAIR:
-            if (expr.application.solution.direction == DY_LEFT) {
+        case DY_CORE_SIMPLE_DECISION:
+            if (expr.elim.simple.direction == DY_LEFT) {
                 add_string(string, DY_STR_LIT("L"));
             } else {
                 add_string(string, DY_STR_LIT("R"));
             }
             break;
-        case DY_CORE_RECURSION:
-            add_string(string, DY_STR_LIT("!"));
+        case DY_CORE_SIMPLE_UNFOLD:
+            add_string(string, DY_STR_LIT("Unfold"));
+            break;
+        case DY_CORE_SIMPLE_UNWRAP:
+            add_string(string, DY_STR_LIT("Unwrap"));
             break;
         }
 
         add_string(string, DY_STR_LIT(" : "));
 
-        if (expr.application.eval_immediately) {
+        if (expr.elim.eval_immediately) {
             add_string(string, DY_STR_LIT("$$$ "));
         }
 
-        if (expr.application.check_result == DY_NO) {
+        if (expr.elim.check_result == DY_NO) {
             add_string(string, DY_STR_LIT("FAIL "));
-        } else if (expr.application.check_result == DY_MAYBE) {
+        } else if (expr.elim.check_result == DY_MAYBE) {
             add_string(string, DY_STR_LIT("MAYBE "));
         }
 
-        dy_core_expr_to_string(ctx, *expr.application.solution.out, string);
+        dy_core_expr_to_string(ctx, *expr.elim.simple.out, string);
         return;
+    case DY_CORE_EXPR_MAP:
+        switch (expr.map.tag) {
+        case DY_CORE_MAP_ASSUMPTION:
+            add_string(string, DY_STR_LIT("map some "));
+
+            if (expr.map.is_implicit) {
+                add_string(string, DY_STR_LIT("@ "));
+            }
+
+            add_size_t_decimal(string, expr.map.assumption.id);
+
+            add_string(string, DY_STR_LIT(" : "));
+
+            dy_core_expr_to_string(ctx, *expr.map.assumption.type, string);
+
+            add_string(string, DY_STR_LIT(" => "));
+
+            add_size_t_decimal(string, expr.map.assumption.assumption.id);
+
+            add_string(string, DY_STR_LIT(" : "));
+
+            dy_core_expr_to_string(ctx, *expr.map.assumption.assumption.type, string);
+
+            add_string(string, DY_STR_LIT(" => "));
+
+            dy_core_expr_to_string(ctx, *expr.map.assumption.assumption.expr, string);
+
+            return;
+        case DY_CORE_MAP_CHOICE:
+            add_string(string, DY_STR_LIT("map either "));
+
+            if (expr.map.is_implicit) {
+                add_string(string, DY_STR_LIT("@ "));
+            }
+
+            add_string(string, DY_STR_LIT("{ "));
+
+            add_size_t_decimal(string, expr.map.choice.assumption_left.id);
+
+            add_string(string, DY_STR_LIT(" : "));
+
+            dy_core_expr_to_string(ctx, *expr.map.choice.assumption_left.type, string);
+
+            add_string(string, DY_STR_LIT(" => "));
+
+            dy_core_expr_to_string(ctx, *expr.map.choice.assumption_left.expr, string);
+
+            add_string(string, DY_STR_LIT(", "));
+
+            add_size_t_decimal(string, expr.map.choice.assumption_right.id);
+
+            add_string(string, DY_STR_LIT(" : "));
+
+            dy_core_expr_to_string(ctx, *expr.map.choice.assumption_right.type, string);
+
+            add_string(string, DY_STR_LIT(" => "));
+
+            dy_core_expr_to_string(ctx, *expr.map.choice.assumption_right.expr, string);
+
+            add_string(string, DY_STR_LIT(" }"));
+
+            return;
+        case DY_CORE_MAP_RECURSION:
+            add_string(string, DY_STR_LIT("map fin "));
+
+            if (expr.map.is_implicit) {
+                add_string(string, DY_STR_LIT("@ "));
+            }
+
+            add_size_t_decimal(string, expr.map.recursion.id);
+
+            add_string(string, DY_STR_LIT(" = "));
+
+            add_size_t_decimal(string, expr.map.recursion.assumption.id);
+
+            add_string(string, DY_STR_LIT(" : "));
+
+            dy_core_expr_to_string(ctx, *expr.map.recursion.assumption.type, string);
+
+            add_string(string, DY_STR_LIT(" => "));
+
+            dy_core_expr_to_string(ctx, *expr.map.recursion.assumption.expr, string);
+
+            return;
+        }
+
+        dy_bail("impossible");
     case DY_CORE_EXPR_VARIABLE:
         add_size_t_decimal(string, expr.variable_id);
         return;
@@ -646,35 +947,6 @@ void dy_core_expr_to_string(struct dy_core_ctx *ctx, struct dy_core_expr expr, d
     }
 
     dy_bail("Impossible object type.");
-}
-
-void dy_core_solution_to_string(struct dy_core_ctx *ctx, struct dy_core_solution solution, dy_array_t *string)
-{
-    switch (solution.tag) {
-    case DY_CORE_FUNCTION:
-        add_string(string, DY_STR_LIT("("));
-        dy_core_expr_to_string(ctx, *solution.expr, string);
-        add_string(string, DY_STR_LIT(")"));
-        break;
-    case DY_CORE_PAIR:
-        if (solution.direction == DY_LEFT) {
-            add_string(string, DY_STR_LIT("L"));
-        } else {
-            add_string(string, DY_STR_LIT("R"));
-        }
-        break;
-    case DY_CORE_RECURSION:
-        add_string(string, DY_STR_LIT("!"));
-        break;
-    }
-
-    if (solution.is_implicit) {
-        add_string(string, DY_STR_LIT(" @-> "));
-    } else {
-        add_string(string, DY_STR_LIT(" -> "));
-    }
-
-    dy_core_expr_to_string(ctx, *solution.out, string);
 }
 
 void add_string(dy_array_t *string, dy_string_t s)

@@ -13,7 +13,8 @@
 enum dy_ast_argument_tag {
     DY_AST_ARGUMENT_EXPR,
     DY_AST_ARGUMENT_INDEX,
-    DY_AST_ARGUMENT_BANG
+    DY_AST_ARGUMENT_UNFOLD,
+    DY_AST_ARGUMENT_UNWRAP
 };
 
 struct dy_ast_argument_index {
@@ -30,7 +31,7 @@ struct dy_ast_argument {
     enum dy_ast_argument_tag tag;
 };
 
-struct dy_ast_pattern_solution {
+struct dy_ast_pattern_simple {
     struct dy_ast_argument arg;
     struct dy_ast_binding *binding;
     bool is_implicit;
@@ -47,13 +48,13 @@ struct dy_ast_pattern_list {
 };
 
 enum dy_ast_pattern_tag {
-    DY_AST_PATTERN_SOLUTION,
+    DY_AST_PATTERN_SIMPLE,
     DY_AST_PATTERN_LIST
 };
 
 struct dy_ast_pattern {
     union {
-        struct dy_ast_pattern_solution solution;
+        struct dy_ast_pattern_simple simple;
         struct dy_ast_pattern_list list;
     };
 
@@ -81,13 +82,13 @@ struct dy_ast_function {
     struct dy_ast_binding binding;
     struct dy_ast_expr *expr;
     bool is_implicit;
-    bool is_negative;
+    bool is_some;
 };
 
 struct dy_ast_recursion {
     dy_array_t name;
     struct dy_ast_expr *expr;
-    bool is_negative;
+    bool is_fin;
     bool is_implicit;
 };
 
@@ -98,7 +99,7 @@ struct dy_ast_list_body {
 
 struct dy_ast_list {
     struct dy_ast_list_body body;
-    bool is_negative;
+    bool is_either;
     bool is_implicit;
 };
 
@@ -113,11 +114,6 @@ struct dy_ast_do_block_stmnt_let {
     bool is_inverted;
 };
 
-struct dy_ast_do_block_stmnt_equal {
-    struct dy_ast_expr *left;
-    struct dy_ast_expr *right;
-};
-
 struct dy_ast_do_block_stmnt_def {
     dy_array_t name;
     struct dy_ast_expr *expr;
@@ -126,7 +122,6 @@ struct dy_ast_do_block_stmnt_def {
 enum dy_ast_do_block_stmnt_tag {
     DY_AST_DO_BLOCK_STMNT_EXPR,
     DY_AST_DO_BLOCK_STMNT_LET,
-    DY_AST_DO_BLOCK_STMNT_EQUAL,
     DY_AST_DO_BLOCK_STMNT_DEF,
 };
 
@@ -134,7 +129,6 @@ struct dy_ast_do_block_stmnt {
     union {
         struct dy_ast_do_block_stmnt_expr expr;
         struct dy_ast_do_block_stmnt_let let;
-        struct dy_ast_do_block_stmnt_equal equal;
         struct dy_ast_do_block_stmnt_def def;
     };
 
@@ -153,8 +147,42 @@ struct dy_ast_juxtaposition {
     bool is_implicit;
 };
 
-struct dy_ast_solution {
+struct dy_ast_pipe_right {
+    struct dy_ast_argument left;
+    struct dy_ast_expr *right;
+    struct dy_ast_expr *type; // Can be NULL.
+    bool is_implicit;
+};
+
+struct dy_ast_simple {
     struct dy_ast_argument argument;
+    struct dy_ast_expr *expr;
+    bool is_implicit;
+    bool is_negative;
+};
+
+struct dy_ast_map_some {
+    dy_array_t name;
+    struct dy_ast_expr *type;
+    struct dy_ast_binding binding;
+    struct dy_ast_expr *expr;
+    bool is_implicit;
+};
+
+struct dy_ast_map_either_body {
+    struct dy_ast_binding binding;
+    struct dy_ast_expr *expr;
+    struct dy_ast_map_either_body *next; // Can be NULL.
+};
+
+struct dy_ast_map_either {
+    struct dy_ast_map_either_body body;
+    bool is_implicit;
+};
+
+struct dy_ast_map_fin {
+    dy_array_t name;
+    struct dy_ast_binding binding;
     struct dy_ast_expr *expr;
     bool is_implicit;
 };
@@ -170,7 +198,12 @@ enum dy_ast_expr_tag {
     DY_AST_EXPR_ANY,
     DY_AST_EXPR_VOID,
     DY_AST_EXPR_JUXTAPOSITION,
-    DY_AST_EXPR_SOLUTION
+    DY_AST_EXPR_PIPE_LEFT,
+    DY_AST_EXPR_PIPE_RIGHT,
+    DY_AST_EXPR_SIMPLE,
+    DY_AST_EXPR_MAP_SOME,
+    DY_AST_EXPR_MAP_EITHER,
+    DY_AST_EXPR_MAP_FIN
 };
 
 struct dy_ast_expr {
@@ -182,7 +215,12 @@ struct dy_ast_expr {
         struct dy_ast_do_block do_block;
         dy_array_t string;
         struct dy_ast_juxtaposition juxtaposition;
-        struct dy_ast_solution solution;
+        struct dy_ast_juxtaposition pipe_left;
+        struct dy_ast_pipe_right pipe_right;
+        struct dy_ast_simple simple;
+        struct dy_ast_map_some map_some;
+        struct dy_ast_map_either map_either;
+        struct dy_ast_map_fin map_fin;
     };
 
     enum dy_ast_expr_tag tag;
@@ -252,6 +290,15 @@ static inline void dy_ast_binding_release(struct dy_ast_binding binding);
 static inline void dy_ast_binding_release_ptr(struct dy_ast_binding *binding);
 
 
+static inline struct dy_ast_map_either_body *dy_ast_map_either_body_new(struct dy_ast_map_either_body map_either_body);
+
+static inline struct dy_ast_map_either_body dy_ast_map_either_body_retain(struct dy_ast_map_either_body map_either_body);
+static inline struct dy_ast_map_either_body *dy_ast_map_either_body_retain_ptr(struct dy_ast_map_either_body *map_either_body);
+
+static inline void dy_ast_map_either_body_release(struct dy_ast_map_either_body map_either_body);
+static inline void dy_ast_map_either_body_release_ptr(struct dy_ast_map_either_body *map_either_body);
+
+
 struct dy_ast_expr *dy_ast_expr_new(struct dy_ast_expr expr)
 {
     return dy_rc_new(&expr, sizeof(expr), DY_ALIGNOF(struct dy_ast_expr));
@@ -285,15 +332,37 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
     case DY_AST_EXPR_STRING_TYPE:
         return expr;
     case DY_AST_EXPR_JUXTAPOSITION:
+    case DY_AST_EXPR_PIPE_LEFT:
         dy_ast_expr_retain_ptr(expr.juxtaposition.left);
         dy_ast_argument_retain(expr.juxtaposition.right);
         if (expr.juxtaposition.type) {
             dy_ast_expr_retain_ptr(expr.juxtaposition.type);
         }
         return expr;
-    case DY_AST_EXPR_SOLUTION:
-        dy_ast_argument_retain(expr.solution.argument);
-        dy_ast_expr_retain_ptr(expr.solution.expr);
+    case DY_AST_EXPR_PIPE_RIGHT:
+        dy_ast_argument_retain(expr.pipe_right.left);
+        dy_ast_expr_retain_ptr(expr.pipe_right.right);
+        if (expr.pipe_right.type) {
+            dy_ast_expr_retain_ptr(expr.pipe_right.type);
+        }
+        return expr;
+    case DY_AST_EXPR_SIMPLE:
+        dy_ast_argument_retain(expr.simple.argument);
+        dy_ast_expr_retain_ptr(expr.simple.expr);
+        return expr;
+    case DY_AST_EXPR_MAP_SOME:
+        dy_array_retain(&expr.map_some.name);
+        dy_ast_expr_retain_ptr(expr.map_some.type);
+        dy_ast_binding_retain(expr.map_some.binding);
+        dy_ast_expr_retain_ptr(expr.map_some.expr);
+        return expr;
+    case DY_AST_EXPR_MAP_EITHER:
+        dy_ast_map_either_body_retain(expr.map_either.body);
+        return expr;
+    case DY_AST_EXPR_MAP_FIN:
+        dy_array_retain(&expr.map_fin.name);
+        dy_ast_binding_retain(expr.map_fin.binding);
+        dy_ast_expr_retain_ptr(expr.map_fin.expr);
         return expr;
     }
 
@@ -333,15 +402,37 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
     case DY_AST_EXPR_STRING_TYPE:
         return;
     case DY_AST_EXPR_JUXTAPOSITION:
+    case DY_AST_EXPR_PIPE_LEFT:
         dy_ast_expr_release_ptr(expr.juxtaposition.left);
         dy_ast_argument_release(expr.juxtaposition.right);
         if (expr.juxtaposition.type) {
             dy_ast_expr_release_ptr(expr.juxtaposition.type);
         }
         return;
-    case DY_AST_EXPR_SOLUTION:
-        dy_ast_argument_release(expr.solution.argument);
-        dy_ast_expr_release_ptr(expr.solution.expr);
+    case DY_AST_EXPR_PIPE_RIGHT:
+        dy_ast_argument_release(expr.pipe_right.left);
+        dy_ast_expr_release_ptr(expr.pipe_right.right);
+        if (expr.pipe_right.type) {
+            dy_ast_expr_release_ptr(expr.pipe_right.type);
+        }
+        return;
+    case DY_AST_EXPR_SIMPLE:
+        dy_ast_argument_release(expr.simple.argument);
+        dy_ast_expr_release_ptr(expr.simple.expr);
+        return;
+    case DY_AST_EXPR_MAP_SOME:
+        dy_array_release(&expr.map_some.name);
+        dy_ast_expr_release_ptr(expr.map_some.type);
+        dy_ast_binding_release(expr.map_some.binding);
+        dy_ast_expr_release_ptr(expr.map_some.expr);
+        return;
+    case DY_AST_EXPR_MAP_EITHER:
+        dy_ast_map_either_body_release(expr.map_either.body);
+        return;
+    case DY_AST_EXPR_MAP_FIN:
+        dy_array_release(&expr.map_fin.name);
+        dy_ast_binding_release(expr.map_fin.binding);
+        dy_ast_expr_release_ptr(expr.map_fin.expr);
         return;
     }
 
@@ -365,9 +456,9 @@ struct dy_ast_pattern *dy_ast_pattern_new(struct dy_ast_pattern pattern)
 struct dy_ast_pattern dy_ast_pattern_retain(struct dy_ast_pattern pattern)
 {
     switch (pattern.tag) {
-    case DY_AST_PATTERN_SOLUTION:
-        dy_ast_argument_retain(pattern.solution.arg);
-        dy_ast_binding_retain_ptr(pattern.solution.binding);
+    case DY_AST_PATTERN_SIMPLE:
+        dy_ast_argument_retain(pattern.simple.arg);
+        dy_ast_binding_retain_ptr(pattern.simple.binding);
         return pattern;
     case DY_AST_PATTERN_LIST:
         dy_ast_pattern_list_body_retain(pattern.list.body);
@@ -385,9 +476,9 @@ struct dy_ast_pattern *dy_ast_pattern_retain_ptr(struct dy_ast_pattern *pattern)
 void dy_ast_pattern_release(struct dy_ast_pattern pattern)
 {
     switch (pattern.tag) {
-    case DY_AST_PATTERN_SOLUTION:
-        dy_ast_argument_release(pattern.solution.arg);
-        dy_ast_binding_release_ptr(pattern.solution.binding);
+    case DY_AST_PATTERN_SIMPLE:
+        dy_ast_argument_release(pattern.simple.arg);
+        dy_ast_binding_release_ptr(pattern.simple.binding);
         return;
     case DY_AST_PATTERN_LIST:
         dy_ast_pattern_list_body_release(pattern.list.body);
@@ -454,10 +545,6 @@ struct dy_ast_do_block_stmnt dy_ast_do_block_stmnt_retain(struct dy_ast_do_block
         dy_ast_binding_retain(stmnt.let.binding);
         dy_ast_expr_retain_ptr(stmnt.let.expr);
         return stmnt;
-    case DY_AST_DO_BLOCK_STMNT_EQUAL:
-        dy_ast_expr_retain_ptr(stmnt.equal.left);
-        dy_ast_expr_retain_ptr(stmnt.equal.right);
-        return stmnt;
     case DY_AST_DO_BLOCK_STMNT_DEF:
         dy_array_retain(&stmnt.def.name);
         dy_ast_expr_retain_ptr(stmnt.def.expr);
@@ -477,10 +564,6 @@ void dy_ast_do_block_stmnt_release(struct dy_ast_do_block_stmnt stmnt)
     case DY_AST_DO_BLOCK_STMNT_LET:
         dy_ast_binding_release(stmnt.let.binding);
         dy_ast_expr_release_ptr(stmnt.let.expr);
-        return;
-    case DY_AST_DO_BLOCK_STMNT_EQUAL:
-        dy_ast_expr_release_ptr(stmnt.equal.left);
-        dy_ast_expr_release_ptr(stmnt.equal.right);
         return;
     case DY_AST_DO_BLOCK_STMNT_DEF:
         dy_array_release(&stmnt.def.name);
@@ -635,5 +718,43 @@ void dy_ast_binding_release_ptr(struct dy_ast_binding *binding)
     struct dy_ast_binding b = *binding;
     if (dy_rc_release(binding, DY_ALIGNOF(struct dy_ast_binding)) == 0) {
         dy_ast_binding_release(b);
+    }
+}
+
+struct dy_ast_map_either_body *dy_ast_map_either_body_new(struct dy_ast_map_either_body map_either_body)
+{
+    return dy_rc_new(&map_either_body, sizeof(map_either_body), DY_ALIGNOF(struct dy_ast_map_either_body));
+}
+
+struct dy_ast_map_either_body dy_ast_map_either_body_retain(struct dy_ast_map_either_body map_either_body)
+{
+    dy_ast_binding_retain(map_either_body.binding);
+    dy_ast_expr_retain_ptr(map_either_body.expr);
+    if (map_either_body.next) {
+        dy_ast_map_either_body_retain_ptr(map_either_body.next);
+    }
+
+    return map_either_body;
+}
+
+struct dy_ast_map_either_body *dy_ast_map_either_body_retain_ptr(struct dy_ast_map_either_body *map_either_body)
+{
+    return dy_rc_retain(map_either_body, DY_ALIGNOF(struct dy_ast_map_either_body));
+}
+
+void dy_ast_map_either_body_release(struct dy_ast_map_either_body map_either_body)
+{
+    dy_ast_binding_release(map_either_body.binding);
+    dy_ast_expr_release_ptr(map_either_body.expr);
+    if (map_either_body.next) {
+        dy_ast_map_either_body_release_ptr(map_either_body.next);
+    }
+}
+
+void dy_ast_map_either_body_release_ptr(struct dy_ast_map_either_body *map_either_body)
+{
+    struct dy_ast_map_either_body b = *map_either_body;
+    if (dy_rc_release(map_either_body, DY_ALIGNOF(struct dy_ast_map_either_body)) == 0) {
+        dy_ast_map_either_body_release(b);
     }
 }

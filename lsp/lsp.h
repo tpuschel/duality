@@ -89,7 +89,7 @@ static inline void process_document(struct dy_lsp_ctx *ctx, struct document *doc
 static inline void null_stream(dy_array_t *buffer, void *env);
 static inline bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, size_t *byte_offset);
 static inline bool produce_diagnostics(struct dy_core_ctx *ctx, const dy_array_t *text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json);
-static inline bool produce_solution_diagnostics(struct dy_core_ctx *ctx, const dy_array_t *text_sources, struct dy_core_solution solution, dy_string_t text, dy_array_t *json);
+static inline bool produce_solution_diagnostics(struct dy_core_ctx *ctx, const dy_array_t *text_sources, struct dy_core_simple simple, dy_string_t text, dy_array_t *json);
 static inline void compute_lsp_range(dy_string_t text, struct dy_range range, dy_array_t *json);
 static inline void make_diagnostic(dy_string_t text, struct dy_range range, long severity, dy_string_t message, dy_array_t *json);
 static inline void diagnostics_params(struct dy_core_ctx *ctx, dy_string_t uri, const dy_array_t *text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json);
@@ -490,6 +490,7 @@ void dy_lsp_did_open(dy_lsp_ctx_t *ctx, dy_string_t uri, dy_string_t text)
             .running_id = 0,
             .captured_inference_vars = dy_array_create(sizeof(struct dy_captured_inference_var), DY_ALIGNOF(struct dy_captured_inference_var), 1),
             .recovered_negative_inference_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 8),
+            .recovered_positive_inference_ids = dy_array_create(sizeof(size_t), DY_ALIGNOF(size_t), 8),
             .past_subtype_checks = dy_array_create(sizeof(struct dy_core_past_subtype_check), DY_ALIGNOF(struct dy_core_past_subtype_check), 64),
             .free_variables = dy_array_create(sizeof(struct dy_free_var), DY_ALIGNOF(struct dy_free_var), 64),
             .equal_variables = dy_array_create(sizeof(struct dy_equal_variables), DY_ALIGNOF(struct dy_equal_variables), 64),
@@ -836,28 +837,31 @@ bool compute_byte_offset(dy_string_t text, long line_offset, long utf16_offset, 
 bool produce_diagnostics(struct dy_core_ctx *ctx, const dy_array_t *text_sources, struct dy_core_expr expr, dy_string_t text, dy_array_t *json)
 {
     switch (expr.tag) {
-    case DY_CORE_EXPR_PROBLEM:
-        switch (expr.problem.tag) {
-        case DY_CORE_FUNCTION: {
-            bool b1 = produce_diagnostics(ctx, text_sources, *expr.problem.function.type, text, json);
-            bool b2 = produce_diagnostics(ctx, text_sources, *expr.problem.function.expr, text, json);
-            return b1 && b2;
-        }
-        case DY_CORE_PAIR: {
-            bool b1 = produce_diagnostics(ctx, text_sources, *expr.problem.pair.left, text, json);
-            bool b2 = produce_diagnostics(ctx, text_sources, *expr.problem.pair.right, text, json);
-            return b1 && b2;
-        }
-        case DY_CORE_RECURSION:
-            return produce_diagnostics(ctx, text_sources, *expr.problem.recursion.expr, text, json);
-        }
+    case DY_CORE_EXPR_INTRO:
+        switch (expr.intro.tag) {
+        case DY_CORE_INTRO_COMPLEX:
+            switch (expr.intro.complex.tag) {
+            case DY_CORE_COMPLEX_ASSUMPTION: {
+                bool b1 = produce_diagnostics(ctx, text_sources, *expr.intro.complex.assumption.type, text, json);
+                bool b2 = produce_diagnostics(ctx, text_sources, *expr.intro.complex.assumption.expr, text, json);
+                return b1 && b2;
+            }
+            case DY_CORE_COMPLEX_CHOICE: {
+                bool b1 = produce_diagnostics(ctx, text_sources, *expr.intro.complex.choice.left, text, json);
+                bool b2 = produce_diagnostics(ctx, text_sources, *expr.intro.complex.choice.right, text, json);
+                return b1 && b2;
+            }
+            case DY_CORE_COMPLEX_RECURSION:
+                return produce_diagnostics(ctx, text_sources, *expr.intro.complex.recursion.expr, text, json);
+            }
 
-        dy_bail("impossible");
-    case DY_CORE_EXPR_SOLUTION:
-        return produce_solution_diagnostics(ctx, text_sources, expr.solution, text, json);
-    case DY_CORE_EXPR_APPLICATION: {
-            bool b1 = produce_diagnostics(ctx, text_sources, *expr.application.expr, text, json);
-            bool b2 = produce_solution_diagnostics(ctx, text_sources, expr.application.solution, text, json);
+            dy_bail("impossible");
+        case DY_CORE_INTRO_SIMPLE:
+            return produce_solution_diagnostics(ctx, text_sources, expr.intro.simple, text, json);
+        }
+    case DY_CORE_EXPR_ELIM: {
+            bool b1 = produce_diagnostics(ctx, text_sources, *expr.elim.expr, text, json);
+            bool b2 = produce_solution_diagnostics(ctx, text_sources, expr.elim.simple, text, json);
             return b1 && b2;
         }
     case DY_CORE_EXPR_VARIABLE:
@@ -865,6 +869,8 @@ bool produce_diagnostics(struct dy_core_ctx *ctx, const dy_array_t *text_sources
     case DY_CORE_EXPR_VOID:
     case DY_CORE_EXPR_INFERENCE_VAR:
         return true;
+    case DY_CORE_EXPR_MAP:
+        dy_bail("not yet");
     case DY_CORE_EXPR_CUSTOM:
         // TODO: Add diagnostics callback to custom exprs.
         return true;
@@ -875,14 +881,14 @@ bool produce_diagnostics(struct dy_core_ctx *ctx, const dy_array_t *text_sources
     dy_bail("impossible");
 }
 
-bool produce_solution_diagnostics(struct dy_core_ctx *ctx, const dy_array_t *text_sources, struct dy_core_solution solution, dy_string_t text, dy_array_t *json)
+bool produce_solution_diagnostics(struct dy_core_ctx *ctx, const dy_array_t *text_sources, struct dy_core_simple simple, dy_string_t text, dy_array_t *json)
 {
-    if (solution.tag == DY_CORE_FUNCTION) {
-        bool b1 = produce_diagnostics(ctx, text_sources, *solution.expr, text, json);
-        bool b2 = produce_diagnostics(ctx, text_sources, *solution.out, text, json);
+    if (simple.tag == DY_CORE_SIMPLE_PROOF) {
+        bool b1 = produce_diagnostics(ctx, text_sources, *simple.proof, text, json);
+        bool b2 = produce_diagnostics(ctx, text_sources, *simple.out, text, json);
         return b1 && b2;
     } else {
-        return produce_diagnostics(ctx, text_sources, *solution.out, text, json);
+        return produce_diagnostics(ctx, text_sources, *simple.out, text, json);
     }
 }
 
