@@ -45,7 +45,7 @@ static inline struct dy_core_expr dy_ast_list_to_core(struct dy_ast_to_core_ctx 
 
 static inline struct dy_core_expr dy_ast_recursion_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_recursion recursion);
 
-static inline struct dy_core_expr dy_ast_solution_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_simple solution);
+static inline struct dy_core_expr dy_ast_simple_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_simple solution);
 
 static inline struct dy_core_expr dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_juxtaposition juxtaposition);
 
@@ -112,7 +112,7 @@ struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct d
     case DY_AST_EXPR_RECURSION:
         return dy_ast_recursion_to_core(ctx, expr.recursion);
     case DY_AST_EXPR_SIMPLE:
-        return dy_ast_solution_to_core(ctx, expr.simple);
+        return dy_ast_simple_to_core(ctx, expr.simple);
     case DY_AST_EXPR_JUXTAPOSITION:
         return dy_ast_juxtaposition_to_core(ctx, expr.juxtaposition);
     case DY_AST_EXPR_DO_BLOCK:
@@ -181,7 +181,7 @@ struct dy_core_expr dy_ast_recursion_to_core(struct dy_ast_to_core_ctx *ctx, str
     };
 }
 
-struct dy_core_expr dy_ast_solution_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_simple simple)
+struct dy_core_expr dy_ast_simple_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_simple simple)
 {
     struct dy_core_expr out = dy_ast_expr_to_core(ctx, *simple.expr);
 
@@ -193,7 +193,7 @@ struct dy_core_expr dy_ast_solution_to_core(struct dy_ast_to_core_ctx *ctx, stru
             .tag = DY_CORE_EXPR_INTRO,
             .intro = {
                 .is_implicit = simple.is_implicit,
-                .polarity = DY_POLARITY_NEGATIVE,
+                .polarity = simple.is_negative ? DY_POLARITY_NEGATIVE : DY_POLARITY_POSITIVE,
                 .tag = DY_CORE_INTRO_SIMPLE,
                 .simple = {
                     .tag = DY_CORE_SIMPLE_PROOF,
@@ -212,7 +212,7 @@ struct dy_core_expr dy_ast_solution_to_core(struct dy_ast_to_core_ctx *ctx, stru
                 .tag = DY_CORE_EXPR_INTRO,
                 .intro = {
                     .is_implicit = simple.is_implicit,
-                    .polarity = DY_POLARITY_NEGATIVE,
+                    .polarity = simple.is_negative ? DY_POLARITY_NEGATIVE : DY_POLARITY_POSITIVE,
                     .tag = DY_CORE_INTRO_SIMPLE,
                     .simple = {
                         .tag = DY_CORE_SIMPLE_DECISION,
@@ -227,7 +227,7 @@ struct dy_core_expr dy_ast_solution_to_core(struct dy_ast_to_core_ctx *ctx, stru
             e = (struct dy_core_expr){
                 .tag = DY_CORE_EXPR_INTRO,
                 .intro = {
-                    .polarity = DY_POLARITY_NEGATIVE,
+                    .polarity = simple.is_negative ? DY_POLARITY_NEGATIVE : DY_POLARITY_POSITIVE,
                     .is_implicit = simple.is_implicit,
                     .tag = DY_CORE_INTRO_SIMPLE,
                     .simple = {
@@ -245,7 +245,7 @@ struct dy_core_expr dy_ast_solution_to_core(struct dy_ast_to_core_ctx *ctx, stru
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_INTRO,
             .intro = {
-                .polarity = DY_POLARITY_NEGATIVE,
+                .polarity = simple.is_negative ? DY_POLARITY_NEGATIVE : DY_POLARITY_POSITIVE,
                 .is_implicit = simple.is_implicit,
                 .tag = DY_CORE_INTRO_SIMPLE,
                 .simple = {
@@ -258,7 +258,7 @@ struct dy_core_expr dy_ast_solution_to_core(struct dy_ast_to_core_ctx *ctx, stru
         return (struct dy_core_expr){
             .tag = DY_CORE_EXPR_INTRO,
             .intro = {
-                .polarity = DY_POLARITY_NEGATIVE,
+                .polarity = simple.is_negative ? DY_POLARITY_NEGATIVE : DY_POLARITY_POSITIVE,
                 .is_implicit = simple.is_implicit,
                 .tag = DY_CORE_INTRO_SIMPLE,
                 .simple = {
