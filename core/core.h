@@ -500,7 +500,7 @@ void dy_variable_appears_in_polarity(struct dy_core_ctx *ctx, struct dy_core_exp
         case DY_CORE_INTRO_COMPLEX:
             switch (expr.intro.complex.tag) {
             case DY_CORE_COMPLEX_ASSUMPTION:
-                dy_variable_appears_in_polarity(ctx, *expr.intro.complex.assumption.type, id, dy_flip_polarity(current_polarity), positive, negative);
+                dy_variable_appears_in_polarity(ctx, *expr.intro.complex.assumption.type, id, expr.intro.polarity == DY_POLARITY_POSITIVE ? dy_flip_polarity(current_polarity) : current_polarity, positive, negative);
                 if (*positive && *negative) {
                     return;
                 }

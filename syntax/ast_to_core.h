@@ -494,6 +494,21 @@ struct dy_core_expr dy_ast_string_to_core(struct dy_ast_to_core_ctx *ctx, const 
 
 struct dy_core_expr dy_ast_map_some_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_map_some map_some)
 {
+    size_t inference_id1 = ctx->running_id++;
+    bool have_inference_id1 = false;
+
+    struct dy_core_expr type;
+    if (map_some.type) {
+        type = dy_ast_expr_to_core(ctx, *map_some.type);
+    } else {
+        have_inference_id1 = true;
+
+        type = (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_INFERENCE_VAR,
+            .inference_var_id = inference_id1
+        };
+    }
+
     size_t replacement_id = ctx->running_id++;
 
     dy_array_add(&ctx->variable_replacements, &(struct dy_variable_replacement){
@@ -501,11 +516,9 @@ struct dy_core_expr dy_ast_map_some_to_core(struct dy_ast_to_core_ctx *ctx, stru
         .replacement_id = replacement_id
     });
 
-    struct dy_core_expr type = dy_ast_expr_to_core(ctx, *map_some.type);
-
-    size_t inference_id;
-    bool have_inference_id = false;
-    struct dy_core_assumption ass = dy_construct_bare_function(ctx, map_some.binding, *map_some.expr, &inference_id, &have_inference_id);
+    size_t inference_id2;
+    bool have_inference_id2 = false;
+    struct dy_core_assumption ass = dy_construct_bare_function(ctx, map_some.binding, *map_some.expr, &inference_id2, &have_inference_id2);
 
     ctx->variable_replacements.num_elems--;
 
@@ -523,18 +536,29 @@ struct dy_core_expr dy_ast_map_some_to_core(struct dy_ast_to_core_ctx *ctx, stru
         }
     };
 
-    if (!have_inference_id) {
-        return map;
+    if (have_inference_id2) {
+        map = (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_INFERENCE_CTX,
+            .inference_ctx = {
+                .id = inference_id2,
+                .polarity = DY_POLARITY_NEGATIVE,
+                .expr = dy_core_expr_new(map)
+            }
+        };
     }
 
-    return (struct dy_core_expr){
-        .tag = DY_CORE_EXPR_INFERENCE_CTX,
-        .inference_ctx = {
-            .id = inference_id,
-            .polarity = DY_POLARITY_NEGATIVE,
-            .expr = dy_core_expr_new(map)
-        }
-    };
+    if (have_inference_id1) {
+        map = (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_INFERENCE_CTX,
+            .inference_ctx = {
+                .id = inference_id1,
+                .polarity = DY_POLARITY_NEGATIVE,
+                .expr = dy_core_expr_new(map)
+            }
+        };
+    }
+
+    return map;
 }
 
 struct dy_core_expr dy_ast_map_either_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_map_either map_either)

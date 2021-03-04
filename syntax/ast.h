@@ -156,7 +156,7 @@ struct dy_ast_simple {
 
 struct dy_ast_map_some {
     dy_array_t name;
-    struct dy_ast_expr *type;
+    struct dy_ast_expr *type; // Can be NULL.
     struct dy_ast_binding binding;
     struct dy_ast_expr *expr;
     bool is_implicit;
@@ -333,7 +333,9 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
         return expr;
     case DY_AST_EXPR_MAP_SOME:
         dy_array_retain(&expr.map_some.name);
-        dy_ast_expr_retain_ptr(expr.map_some.type);
+        if (expr.map_some.type) {
+            dy_ast_expr_retain_ptr(expr.map_some.type);
+        }
         dy_ast_binding_retain(expr.map_some.binding);
         dy_ast_expr_retain_ptr(expr.map_some.expr);
         return expr;
@@ -395,7 +397,9 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
         return;
     case DY_AST_EXPR_MAP_SOME:
         dy_array_release(&expr.map_some.name);
-        dy_ast_expr_release_ptr(expr.map_some.type);
+        if (expr.map_some.type) {
+            dy_ast_expr_release_ptr(expr.map_some.type);
+        }
         dy_ast_binding_release(expr.map_some.binding);
         dy_ast_expr_release_ptr(expr.map_some.expr);
         return;
