@@ -31,6 +31,13 @@
 static inline dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype, struct dy_core_expr supertype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
 
+static inline dy_ternary_t dy_complex_are_subtypes(struct dy_core_ctx *ctx, struct dy_core_intro subtype, struct dy_core_intro supertype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+
+static inline dy_ternary_t dy_complex_is_subtype_of_simple(struct dy_core_ctx *ctx, struct dy_core_intro subtype, struct dy_core_intro supertype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+
+static inline dy_ternary_t dy_simple_is_subtype_of_complex(struct dy_core_ctx *ctx, struct dy_core_intro subtype, struct dy_core_intro supertype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
+
+
 static inline dy_ternary_t dy_positive_assumptions_are_subtypes(struct dy_core_ctx *ctx, struct dy_core_assumption subtype, struct dy_core_assumption supertype, bool is_implicit, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
 
 static inline dy_ternary_t dy_positive_choices_are_subtypes(struct dy_core_ctx *ctx, struct dy_core_choice subtype, struct dy_core_choice supertype, bool is_implicit, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr);
@@ -98,36 +105,11 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
         }
 
         if (subtype.intro.tag == DY_CORE_INTRO_COMPLEX && supertype.intro.tag == DY_CORE_INTRO_COMPLEX) {
-            if (subtype.intro.polarity == DY_POLARITY_POSITIVE && supertype.intro.polarity == DY_POLARITY_NEGATIVE) {
-                return DY_NO;
-            }
-
-            if (subtype.intro.complex.tag != supertype.intro.complex.tag) {
-                return DY_NO;
-            }
-
-            if (subtype.intro.polarity == DY_POLARITY_POSITIVE) {
-                switch (subtype.intro.complex.tag) {
-                case DY_CORE_COMPLEX_ASSUMPTION:
-                    return dy_positive_assumptions_are_subtypes(ctx, subtype.intro.complex.assumption, supertype.intro.complex.assumption, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-                case DY_CORE_COMPLEX_CHOICE:
-                    return dy_positive_choices_are_subtypes(ctx, subtype.intro.complex.choice, supertype.intro.complex.choice, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-                case DY_CORE_COMPLEX_RECURSION:
-                    return dy_positive_recursions_are_subtypes(ctx, subtype.intro.complex.recursion, supertype.intro.complex.recursion, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-                }
-
-                dy_bail("impossible");
+            dy_ternary_t res = dy_complex_are_subtypes(ctx, subtype.intro, supertype.intro, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+            if (res == DY_NO) {
+                goto try_implicit_coercions;
             } else {
-                switch (subtype.intro.complex.tag) {
-                case DY_CORE_COMPLEX_ASSUMPTION:
-                    return dy_negative_assumptions_are_subtypes(ctx, subtype.intro.complex.assumption, supertype.intro.complex.assumption, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-                case DY_CORE_COMPLEX_CHOICE:
-                    return dy_negative_choices_are_subtypes(ctx, subtype.intro.complex.choice, supertype.intro.complex.choice, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-                case DY_CORE_COMPLEX_RECURSION:
-                    return dy_negative_recursions_are_subtypes(ctx, subtype.intro.complex.recursion, supertype.intro.complex.recursion, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-                }
-
-                dy_bail("impossible");
+                return res;
             }
         }
 
@@ -155,64 +137,21 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
         }
 
         if (subtype.intro.tag == DY_CORE_INTRO_COMPLEX && supertype.intro.tag == DY_CORE_INTRO_SIMPLE) {
-            if (supertype.intro.polarity != DY_POLARITY_NEGATIVE) {
-                return DY_NO;
+            dy_ternary_t res = dy_complex_is_subtype_of_simple(ctx, subtype.intro, supertype.intro, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+            if (res == DY_NO) {
+                goto try_implicit_coercions;
+            } else {
+                return res;
             }
-
-            if (supertype.intro.simple.tag == DY_CORE_SIMPLE_UNWRAP) {
-                if (subtype.intro.polarity != DY_POLARITY_NEGATIVE) {
-                    return DY_NO;
-                }
-
-                switch (subtype.intro.complex.tag) {
-                case DY_CORE_COMPLEX_ASSUMPTION:
-                    return dy_negative_assumption_is_subtype_of_unwrap(ctx, subtype.intro.complex.assumption, *supertype.intro.simple.out, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-                case DY_CORE_COMPLEX_CHOICE:
-                    return dy_negative_choice_is_subtype_of_unwrap(ctx, subtype.intro.complex.choice, *supertype.intro.simple.out, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-                case DY_CORE_COMPLEX_RECURSION:
-                    return dy_negative_recursion_is_subtype_of_unwrap(ctx, subtype.intro.complex.recursion, *supertype.intro.simple.out, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-                }
-
-                dy_bail("impossible");
-            }
-
-            if (subtype.intro.polarity != DY_POLARITY_POSITIVE) {
-                return DY_NO;
-            }
-
-            if (subtype.intro.complex.tag == DY_CORE_COMPLEX_ASSUMPTION && supertype.intro.simple.tag == DY_CORE_SIMPLE_PROOF) {
-                return dy_assumption_is_subtype_of_proof(ctx, subtype.intro.complex.assumption, supertype.intro.simple, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-            }
-
-            if (subtype.intro.complex.tag == DY_CORE_COMPLEX_CHOICE && supertype.intro.simple.tag == DY_CORE_SIMPLE_DECISION) {
-                return dy_choice_is_subtype_of_decision(ctx, subtype.intro.complex.choice, supertype.intro.simple, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-            }
-
-            if (subtype.intro.complex.tag == DY_CORE_COMPLEX_RECURSION && supertype.intro.simple.tag == DY_CORE_SIMPLE_UNFOLD) {
-                return dy_recursion_is_subtype_of_unfold(ctx, subtype.intro.complex.recursion, *supertype.intro.simple.out, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-            }
-
-            return DY_NO;
         }
 
         if (subtype.intro.tag == DY_CORE_INTRO_SIMPLE && supertype.intro.tag == DY_CORE_INTRO_COMPLEX) {
-            if (subtype.intro.polarity != DY_POLARITY_POSITIVE && supertype.intro.polarity != DY_POLARITY_NEGATIVE) {
-                return DY_NO;
+            dy_ternary_t res = dy_simple_is_subtype_of_complex(ctx, subtype.intro, supertype.intro, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+            if (res == DY_NO) {
+                goto try_implicit_coercions;
+            } else {
+                return res;
             }
-
-            if (subtype.intro.simple.tag == DY_CORE_SIMPLE_PROOF && supertype.intro.complex.tag == DY_CORE_COMPLEX_ASSUMPTION) {
-                return dy_proof_is_subtype_of_assumption(ctx, subtype.intro.simple, supertype.intro.complex.assumption, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-            }
-
-            if (subtype.intro.simple.tag == DY_CORE_SIMPLE_DECISION && supertype.intro.complex.tag == DY_CORE_COMPLEX_CHOICE) {
-                return dy_decision_is_subtype_of_choice(ctx, subtype.intro.simple, supertype.intro.complex.choice, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-            }
-
-            if (subtype.intro.simple.tag == DY_CORE_SIMPLE_UNFOLD && supertype.intro.complex.tag == DY_CORE_COMPLEX_RECURSION) {
-                return dy_unfold_is_subtype_of_recursion(ctx, *subtype.intro.simple.out, supertype.intro.complex.recursion, subtype.intro.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
-            }
-
-            return DY_NO;
         }
 
         dy_bail("impossible");
@@ -303,6 +242,7 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
         return DY_MAYBE;
     }
 
+try_implicit_coercions:
     if (subtype.tag == DY_CORE_EXPR_INTRO && subtype.intro.tag == DY_CORE_INTRO_COMPLEX && subtype.intro.is_implicit && subtype.intro.polarity == DY_POLARITY_POSITIVE) {
         switch (subtype.intro.complex.tag) {
         case DY_CORE_COMPLEX_ASSUMPTION:
@@ -327,6 +267,104 @@ dy_ternary_t dy_is_subtype(struct dy_core_ctx *ctx, struct dy_core_expr subtype,
         }
 
         dy_bail("impossible");
+    }
+
+    return DY_NO;
+}
+
+dy_ternary_t dy_complex_are_subtypes(struct dy_core_ctx *ctx, struct dy_core_intro subtype, struct dy_core_intro supertype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
+{
+    if (subtype.polarity == DY_POLARITY_POSITIVE && supertype.polarity == DY_POLARITY_NEGATIVE) {
+        return DY_NO;
+    }
+
+    if (subtype.complex.tag != supertype.complex.tag) {
+        return DY_NO;
+    }
+
+    if (subtype.polarity == DY_POLARITY_POSITIVE) {
+        switch (subtype.complex.tag) {
+        case DY_CORE_COMPLEX_ASSUMPTION:
+            return dy_positive_assumptions_are_subtypes(ctx, subtype.complex.assumption, supertype.complex.assumption, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        case DY_CORE_COMPLEX_CHOICE:
+            return dy_positive_choices_are_subtypes(ctx, subtype.complex.choice, supertype.complex.choice, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        case DY_CORE_COMPLEX_RECURSION:
+            return dy_positive_recursions_are_subtypes(ctx, subtype.complex.recursion, supertype.complex.recursion, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        }
+
+        dy_bail("impossible");
+    } else {
+        switch (subtype.complex.tag) {
+        case DY_CORE_COMPLEX_ASSUMPTION:
+            return dy_negative_assumptions_are_subtypes(ctx, subtype.complex.assumption, supertype.complex.assumption, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        case DY_CORE_COMPLEX_CHOICE:
+            return dy_negative_choices_are_subtypes(ctx, subtype.complex.choice, supertype.complex.choice, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        case DY_CORE_COMPLEX_RECURSION:
+            return dy_negative_recursions_are_subtypes(ctx, subtype.complex.recursion, supertype.complex.recursion, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        }
+
+        dy_bail("impossible");
+    }
+}
+
+dy_ternary_t dy_complex_is_subtype_of_simple(struct dy_core_ctx *ctx, struct dy_core_intro subtype, struct dy_core_intro supertype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
+{
+    if (supertype.polarity != DY_POLARITY_NEGATIVE) {
+        return DY_NO;
+    }
+
+    if (supertype.simple.tag == DY_CORE_SIMPLE_UNWRAP) {
+        if (subtype.polarity != DY_POLARITY_NEGATIVE) {
+            return DY_NO;
+        }
+
+        switch (subtype.complex.tag) {
+        case DY_CORE_COMPLEX_ASSUMPTION:
+            return dy_negative_assumption_is_subtype_of_unwrap(ctx, subtype.complex.assumption, *supertype.simple.out, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        case DY_CORE_COMPLEX_CHOICE:
+            return dy_negative_choice_is_subtype_of_unwrap(ctx, subtype.complex.choice, *supertype.simple.out, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        case DY_CORE_COMPLEX_RECURSION:
+            return dy_negative_recursion_is_subtype_of_unwrap(ctx, subtype.complex.recursion, *supertype.simple.out, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+        }
+
+        dy_bail("impossible");
+    }
+
+    if (subtype.polarity != DY_POLARITY_POSITIVE) {
+        return DY_NO;
+    }
+
+    if (subtype.complex.tag == DY_CORE_COMPLEX_ASSUMPTION && supertype.simple.tag == DY_CORE_SIMPLE_PROOF) {
+        return dy_assumption_is_subtype_of_proof(ctx, subtype.complex.assumption, supertype.simple, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+    }
+
+    if (subtype.complex.tag == DY_CORE_COMPLEX_CHOICE && supertype.simple.tag == DY_CORE_SIMPLE_DECISION) {
+        return dy_choice_is_subtype_of_decision(ctx, subtype.complex.choice, supertype.simple, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+    }
+
+    if (subtype.complex.tag == DY_CORE_COMPLEX_RECURSION && supertype.simple.tag == DY_CORE_SIMPLE_UNFOLD) {
+        return dy_recursion_is_subtype_of_unfold(ctx, subtype.complex.recursion, *supertype.simple.out, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+    }
+
+    return DY_NO;
+}
+
+dy_ternary_t dy_simple_is_subtype_of_complex(struct dy_core_ctx *ctx, struct dy_core_intro subtype, struct dy_core_intro supertype, struct dy_core_expr subtype_expr, struct dy_core_expr *new_subtype_expr, bool *did_transform_subtype_expr)
+{
+    if (subtype.polarity != DY_POLARITY_POSITIVE && supertype.polarity != DY_POLARITY_NEGATIVE) {
+        return DY_NO;
+    }
+
+    if (subtype.simple.tag == DY_CORE_SIMPLE_PROOF && supertype.complex.tag == DY_CORE_COMPLEX_ASSUMPTION) {
+        return dy_proof_is_subtype_of_assumption(ctx, subtype.simple, supertype.complex.assumption, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+    }
+
+    if (subtype.simple.tag == DY_CORE_SIMPLE_DECISION && supertype.complex.tag == DY_CORE_COMPLEX_CHOICE) {
+        return dy_decision_is_subtype_of_choice(ctx, subtype.simple, supertype.complex.choice, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
+    }
+
+    if (subtype.simple.tag == DY_CORE_SIMPLE_UNFOLD && supertype.complex.tag == DY_CORE_COMPLEX_RECURSION) {
+        return dy_unfold_is_subtype_of_recursion(ctx, *subtype.simple.out, supertype.complex.recursion, subtype.is_implicit, subtype_expr, new_subtype_expr, did_transform_subtype_expr);
     }
 
     return DY_NO;
