@@ -22,10 +22,6 @@ enum dy_infix_op {
     DY_INFIX_OP_AT_STRAIGHT_ARROW,
     DY_INFIX_OP_AT_SQUIGGLY_ARROW,
     DY_INFIX_OP_NOTHING,
-    DY_INFIX_OP_PIPE_LEFT,
-    DY_INFIX_OP_AT_PIPE_LEFT,
-    DY_INFIX_OP_PIPE_RIGHT,
-    DY_INFIX_OP_AT_PIPE_RIGHT,
 };
 
 static inline bool dy_utf8_literal(struct dy_utf8_to_ast_ctx *ctx, dy_string_t s);
@@ -907,14 +903,6 @@ enum dy_infix_op dy_utf8_to_ast_infix_op(struct dy_utf8_to_ast_ctx *ctx)
         return DY_INFIX_OP_SQUIGGLY_ARROW;
     }
 
-    if (dy_utf8_literal(ctx, DY_STR_LIT("|<"))) {
-        return DY_INFIX_OP_PIPE_LEFT;
-    }
-
-    if (dy_utf8_literal(ctx, DY_STR_LIT("|>"))) {
-        return DY_INFIX_OP_PIPE_RIGHT;
-    }
-
     if (dy_utf8_literal(ctx, DY_STR_LIT("@"))) {
         dy_skip_whitespace_except_newline(ctx);
 
@@ -922,10 +910,6 @@ enum dy_infix_op dy_utf8_to_ast_infix_op(struct dy_utf8_to_ast_ctx *ctx)
             return DY_INFIX_OP_AT_STRAIGHT_ARROW;
         } else if (dy_utf8_literal(ctx, DY_STR_LIT("~>"))) {
             return DY_INFIX_OP_AT_SQUIGGLY_ARROW;
-        } else if (dy_utf8_literal(ctx, DY_STR_LIT("|<"))) {
-            return DY_INFIX_OP_AT_PIPE_LEFT;
-        } else if (dy_utf8_literal(ctx, DY_STR_LIT("|>"))) {
-            return DY_INFIX_OP_AT_PIPE_RIGHT;
         } else {
             return DY_INFIX_OP_AT;
         }
@@ -1735,40 +1719,6 @@ bool dy_combine_infix(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_argument lef
         };
 
         return true;
-    case DY_INFIX_OP_PIPE_LEFT:
-    case DY_INFIX_OP_AT_PIPE_LEFT:
-        if (left.tag != DY_AST_ARGUMENT_EXPR) {
-            return false;
-        }
-
-        *expr = (struct dy_ast_expr){
-            .tag = DY_AST_EXPR_PIPE_LEFT,
-            .pipe_left = {
-                .left = dy_ast_expr_retain_ptr(left.expr),
-                .right = dy_ast_argument_retain(right),
-                .type = NULL,
-                .is_implicit = op == DY_INFIX_OP_AT_PIPE_LEFT
-            }
-        };
-
-        return true;
-    case DY_INFIX_OP_PIPE_RIGHT:
-    case DY_INFIX_OP_AT_PIPE_RIGHT:
-        if (right.tag != DY_AST_ARGUMENT_EXPR) {
-            return false;
-        }
-
-        *expr = (struct dy_ast_expr){
-            .tag = DY_AST_EXPR_PIPE_RIGHT,
-            .pipe_right = {
-                .left = dy_ast_argument_retain(left),
-                .right = dy_ast_expr_retain_ptr(right.expr),
-                .type = NULL,
-                .is_implicit = op == DY_INFIX_OP_AT_PIPE_RIGHT
-            }
-        };
-
-        return true;
     }
 
     dy_bail("Impossible infix op.");
@@ -1776,20 +1726,18 @@ bool dy_combine_infix(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_argument lef
 
 bool dy_left_op_is_first(enum dy_infix_op left, enum dy_infix_op right)
 {
-    static const int order[] = {
-        [DY_INFIX_OP_AT] = 0,
-        [DY_INFIX_OP_NOTHING] = 0,
-        [DY_INFIX_OP_PIPE_LEFT] = 1,
-        [DY_INFIX_OP_AT_PIPE_LEFT] = 1,
-        [DY_INFIX_OP_PIPE_RIGHT] = 1,
-        [DY_INFIX_OP_AT_PIPE_RIGHT] = 1,
-        [DY_INFIX_OP_STRAIGHT_ARROW] = 2,
-        [DY_INFIX_OP_SQUIGGLY_ARROW] = 2,
-        [DY_INFIX_OP_AT_STRAIGHT_ARROW] = 2,
-        [DY_INFIX_OP_AT_SQUIGGLY_ARROW] = 2
-    };
+    switch (left) {
+    case DY_INFIX_OP_NOTHING:
+    case DY_INFIX_OP_AT:
+        return true;
+    case DY_INFIX_OP_STRAIGHT_ARROW:
+    case DY_INFIX_OP_SQUIGGLY_ARROW:
+    case DY_INFIX_OP_AT_STRAIGHT_ARROW:
+    case DY_INFIX_OP_AT_SQUIGGLY_ARROW:
+        return false;
+    }
 
-    return order[left] <= order[right];
+    dy_bail("impossible");
 }
 
 void dy_skip_whitespace(struct dy_utf8_to_ast_ctx *ctx)

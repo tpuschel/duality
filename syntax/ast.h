@@ -147,13 +147,6 @@ struct dy_ast_juxtaposition {
     bool is_implicit;
 };
 
-struct dy_ast_pipe_right {
-    struct dy_ast_argument left;
-    struct dy_ast_expr *right;
-    struct dy_ast_expr *type; // Can be NULL.
-    bool is_implicit;
-};
-
 struct dy_ast_simple {
     struct dy_ast_argument argument;
     struct dy_ast_expr *expr;
@@ -198,8 +191,6 @@ enum dy_ast_expr_tag {
     DY_AST_EXPR_ANY,
     DY_AST_EXPR_VOID,
     DY_AST_EXPR_JUXTAPOSITION,
-    DY_AST_EXPR_PIPE_LEFT,
-    DY_AST_EXPR_PIPE_RIGHT,
     DY_AST_EXPR_SIMPLE,
     DY_AST_EXPR_MAP_SOME,
     DY_AST_EXPR_MAP_EITHER,
@@ -215,8 +206,6 @@ struct dy_ast_expr {
         struct dy_ast_do_block do_block;
         dy_array_t string;
         struct dy_ast_juxtaposition juxtaposition;
-        struct dy_ast_juxtaposition pipe_left;
-        struct dy_ast_pipe_right pipe_right;
         struct dy_ast_simple simple;
         struct dy_ast_map_some map_some;
         struct dy_ast_map_either map_either;
@@ -332,18 +321,10 @@ struct dy_ast_expr dy_ast_expr_retain(struct dy_ast_expr expr)
     case DY_AST_EXPR_STRING_TYPE:
         return expr;
     case DY_AST_EXPR_JUXTAPOSITION:
-    case DY_AST_EXPR_PIPE_LEFT:
         dy_ast_expr_retain_ptr(expr.juxtaposition.left);
         dy_ast_argument_retain(expr.juxtaposition.right);
         if (expr.juxtaposition.type) {
             dy_ast_expr_retain_ptr(expr.juxtaposition.type);
-        }
-        return expr;
-    case DY_AST_EXPR_PIPE_RIGHT:
-        dy_ast_argument_retain(expr.pipe_right.left);
-        dy_ast_expr_retain_ptr(expr.pipe_right.right);
-        if (expr.pipe_right.type) {
-            dy_ast_expr_retain_ptr(expr.pipe_right.type);
         }
         return expr;
     case DY_AST_EXPR_SIMPLE:
@@ -402,18 +383,10 @@ void dy_ast_expr_release(struct dy_ast_expr expr)
     case DY_AST_EXPR_STRING_TYPE:
         return;
     case DY_AST_EXPR_JUXTAPOSITION:
-    case DY_AST_EXPR_PIPE_LEFT:
         dy_ast_expr_release_ptr(expr.juxtaposition.left);
         dy_ast_argument_release(expr.juxtaposition.right);
         if (expr.juxtaposition.type) {
             dy_ast_expr_release_ptr(expr.juxtaposition.type);
-        }
-        return;
-    case DY_AST_EXPR_PIPE_RIGHT:
-        dy_ast_argument_release(expr.pipe_right.left);
-        dy_ast_expr_release_ptr(expr.pipe_right.right);
-        if (expr.pipe_right.type) {
-            dy_ast_expr_release_ptr(expr.pipe_right.type);
         }
         return;
     case DY_AST_EXPR_SIMPLE:

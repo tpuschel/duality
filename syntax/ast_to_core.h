@@ -49,8 +49,6 @@ static inline struct dy_core_expr dy_ast_solution_to_core(struct dy_ast_to_core_
 
 static inline struct dy_core_expr dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_juxtaposition juxtaposition);
 
-static inline struct dy_core_expr dy_ast_pipe_right_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_pipe_right pipe_right);
-
 static inline struct dy_core_expr dy_ast_do_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block do_block);
 
 static inline struct dy_core_expr dy_ast_variable_to_core(struct dy_ast_to_core_ctx *ctx, const dy_array_t *variable);
@@ -117,10 +115,6 @@ struct dy_core_expr dy_ast_expr_to_core(struct dy_ast_to_core_ctx *ctx, struct d
         return dy_ast_solution_to_core(ctx, expr.simple);
     case DY_AST_EXPR_JUXTAPOSITION:
         return dy_ast_juxtaposition_to_core(ctx, expr.juxtaposition);
-    case DY_AST_EXPR_PIPE_LEFT:
-        return dy_ast_juxtaposition_to_core(ctx, expr.pipe_left);
-    case DY_AST_EXPR_PIPE_RIGHT:
-        return dy_ast_pipe_right_to_core(ctx, expr.pipe_right);
     case DY_AST_EXPR_DO_BLOCK:
         return dy_ast_do_block_to_core(ctx, expr.do_block);
     case DY_AST_EXPR_VARIABLE:
@@ -289,19 +283,6 @@ struct dy_core_expr dy_ast_juxtaposition_to_core(struct dy_ast_to_core_ctx *ctx,
     struct dy_core_expr type = dy_ast_expr_to_core(ctx, *juxtaposition.type);
 
     return dy_convert_argument_app(ctx, left, juxtaposition.right, juxtaposition.is_implicit, type);
-}
-
-struct dy_core_expr dy_ast_pipe_right_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_pipe_right pipe_right)
-{
-    struct dy_core_expr right = dy_ast_expr_to_core(ctx, *pipe_right.right);
-
-    if (!pipe_right.type) {
-        return dy_convert_argument_app_without_type(ctx, right, pipe_right.left, pipe_right.is_implicit);
-    }
-
-    struct dy_core_expr type = dy_ast_expr_to_core(ctx, *pipe_right.type);
-
-    return dy_convert_argument_app(ctx, right, pipe_right.left, pipe_right.is_implicit, type);
 }
 
 struct dy_core_expr dy_ast_do_block_to_core(struct dy_ast_to_core_ctx *ctx, struct dy_ast_do_block do_block)
