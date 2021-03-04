@@ -682,10 +682,11 @@ void dy_core_expr_to_string(struct dy_core_ctx *ctx, struct dy_core_expr expr, d
 
                 if (dy_core_expr_contains_this_variable(ctx, expr.intro.complex.assumption.id, *expr.intro.complex.assumption.expr)) {
                     add_size_t_decimal(string, expr.intro.complex.assumption.id);
-                    add_string(string, DY_STR_LIT(" "));
+                } else {
+                    add_string(string, DY_STR_LIT("_"));
                 }
 
-                add_string(string, DY_STR_LIT(": "));
+                add_string(string, DY_STR_LIT(" : "));
 
                 dy_core_expr_to_string(ctx, *expr.intro.complex.assumption.type, string);
 
@@ -725,7 +726,11 @@ void dy_core_expr_to_string(struct dy_core_ctx *ctx, struct dy_core_expr expr, d
                     add_string(string, DY_STR_LIT("@ "));
                 }
 
-                add_size_t_decimal(string, expr.intro.complex.recursion.id);
+                if (dy_core_expr_contains_this_variable(ctx, expr.intro.complex.recursion.id, *expr.intro.complex.recursion.expr)) {
+                    add_size_t_decimal(string, expr.intro.complex.recursion.id);
+                } else {
+                    add_string(string, DY_STR_LIT("_"));
+                }
 
                 add_string(string, DY_STR_LIT(" = "));
 

@@ -1461,8 +1461,10 @@ bool dy_utf8_to_ast_binding(struct dy_utf8_to_ast_ctx *ctx, struct dy_ast_bindin
 
     if (dy_utf8_to_ast_variable(ctx, &name)) {
         have_name = true;
-    } else {
+    } else if (dy_utf8_literal(ctx, DY_STR_LIT("_"))) {
         have_name = false;
+    } else {
+        return false;
     }
 
     dy_skip_whitespace(ctx);
