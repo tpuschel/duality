@@ -234,6 +234,8 @@ dy_ternary_t dy_maps_are_equal(struct dy_core_ctx *ctx, struct dy_core_map f1, s
     case DY_CORE_MAP_RECURSION:
         return dy_map_recursion_are_equal(ctx, f1.recursion, f2.recursion);
     }
+
+    dy_bail("impossible");
 }
 
 dy_ternary_t dy_map_assumption_are_equal(struct dy_core_ctx *ctx, struct dy_core_map_assumption ass1, struct dy_core_map_assumption ass2)
