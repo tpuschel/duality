@@ -49,6 +49,13 @@ static inline bool dy_check_map_recursion(struct dy_core_ctx *ctx, struct dy_cor
 // Doesn't return a bool since an inference context is always resolved.
 static inline struct dy_core_expr dy_check_inference_ctx(struct dy_core_ctx *ctx, struct dy_core_inference_ctx inference_ctx);
 
+
+static inline bool dy_check_map_assumption_dependence(struct dy_core_ctx *ctx, struct dy_core_map_assumption map,struct dy_core_map_assumption *result);
+
+static inline bool dy_check_map_choice_dependence(struct dy_core_ctx *ctx, struct dy_core_map_choice map, struct dy_core_map_choice *result);
+
+static inline bool dy_check_map_recursion_dependence(struct dy_core_ctx *ctx, struct dy_core_map_recursion map, struct dy_core_map_recursion *result);
+
 /**
  * Collects the id of every constraint that mentions 'id' and is not mutually recursive with it.
  * If the size of 'ids' isn't changed upon returning, 'id' is "free" and can be resolved.
@@ -444,10 +451,9 @@ bool dy_check_map_assumption(struct dy_core_ctx *ctx, struct dy_core_map_assumpt
 
     dy_join_constraints(ctx, constraint_start1, constraint_start2);
 
-    bool ret = true;
     if (!type_is_new && !ass_is_new) {
         dy_core_expr_release(ctx, type);
-        ret = false;
+        return dy_check_map_assumption_dependence(ctx, ass_map, result);
     }
 
     if (type_is_new) {
@@ -463,36 +469,15 @@ bool dy_check_map_assumption(struct dy_core_ctx *ctx, struct dy_core_map_assumpt
         dy_core_assumption_retain(ctx, ass_map.assumption);
     }
 
-    if (ass_map.dependence == DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
-        dy_array_add(&ctx->free_variables, &(struct dy_free_var){
-            .id = ass_map.id,
-            .type = *ass_map.type
-        });
+    struct dy_core_map_assumption new_ass_map;
+    if (dy_check_map_assumption_dependence(ctx, ass_map, &new_ass_map)) {
+        dy_core_expr_release_ptr(ctx, ass_map.type);
+        dy_core_assumption_release(ctx, ass_map.assumption);
 
-        dy_array_add(&ctx->free_variables, &(struct dy_free_var){
-            .id = ass_map.assumption.id,
-            .type = *ass_map.assumption.type
-        });
-
-        struct dy_core_expr t = dy_type_of(ctx, *ass_map.assumption.expr);
-
-        if (dy_core_expr_contains_this_variable(ctx, ass_map.assumption.id, t)) {
-            ass_map.dependence = DY_CORE_MAP_DEPENDENCE_DEPENDENT;
-        } else {
-            ass_map.dependence = DY_CORE_MAP_DEPENDENCE_INDEPENDENT;
-        }
-
-        --ctx->free_variables.num_elems;
-        --ctx->free_variables.num_elems;
-
-        dy_core_expr_release(ctx, t);
-
-        ret = true;
+        ass_map = new_ass_map;
     }
 
-    if (ret) {
-        *result = ass_map;
-    }
+    *result = ass_map;
     return true;
 }
 
@@ -509,7 +494,7 @@ bool dy_check_map_choice(struct dy_core_ctx *ctx, struct dy_core_map_choice choi
     dy_join_constraints(ctx, constraint_start1, constraint_start2);
 
     if (!left_is_new && !right_is_new) {
-        return false;
+        return dy_check_map_choice_dependence(ctx, choice_map, result);
     }
 
     if (left_is_new) {
@@ -524,42 +509,12 @@ bool dy_check_map_choice(struct dy_core_ctx *ctx, struct dy_core_map_choice choi
         dy_core_assumption_retain(ctx, choice_map.assumption_right);
     }
 
-    if (choice_map.left_dependence == DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
-        dy_array_add(&ctx->free_variables, &(struct dy_free_var){
-            .id = choice_map.assumption_left.id,
-            .type = *choice_map.assumption_left.type
-        });
+    struct dy_core_map_choice new_choice_map;
+    if (dy_check_map_choice_dependence(ctx, choice_map, &new_choice_map)) {
+        dy_core_assumption_release(ctx, choice_map.assumption_left);
+        dy_core_assumption_release(ctx, choice_map.assumption_right);
 
-        struct dy_core_expr t = dy_type_of(ctx, *choice_map.assumption_left.expr);
-
-        if (dy_core_expr_contains_this_variable(ctx, choice_map.assumption_left.id, t)) {
-            choice_map.left_dependence = DY_CORE_MAP_DEPENDENCE_DEPENDENT;
-        } else {
-            choice_map.left_dependence = DY_CORE_MAP_DEPENDENCE_INDEPENDENT;
-        }
-
-        --ctx->free_variables.num_elems;
-
-        dy_core_expr_release(ctx, t);
-    }
-
-    if (choice_map.right_dependence == DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
-        dy_array_add(&ctx->free_variables, &(struct dy_free_var){
-            .id = choice_map.assumption_right.id,
-            .type = *choice_map.assumption_right.type
-        });
-
-        struct dy_core_expr t = dy_type_of(ctx, *choice_map.assumption_right.expr);
-
-        if (dy_core_expr_contains_this_variable(ctx, choice_map.assumption_right.id, t)) {
-            choice_map.right_dependence = DY_CORE_MAP_DEPENDENCE_DEPENDENT;
-        } else {
-            choice_map.right_dependence = DY_CORE_MAP_DEPENDENCE_INDEPENDENT;
-        }
-
-        --ctx->free_variables.num_elems;
-
-        dy_core_expr_release(ctx, t);
+        choice_map = new_choice_map;
     }
 
     *result = choice_map;
@@ -586,28 +541,16 @@ bool dy_check_map_recursion(struct dy_core_ctx *ctx, struct dy_core_map_recursio
     --ctx->free_variables.num_elems;
 
     if (!ass_is_new) {
-        return false;
+        return dy_check_map_recursion_dependence(ctx, rec_map, result);
     }
 
     rec_map.assumption = new_ass;
 
-    if (rec_map.dependence == DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
-        dy_array_add(&ctx->free_variables, &(struct dy_free_var){
-            .id = rec_map.assumption.id,
-            .type = *rec_map.assumption.type
-        });
+    struct dy_core_map_recursion new_rec_map;
+    if (dy_check_map_recursion_dependence(ctx, rec_map, &new_rec_map)) {
+        dy_core_assumption_release(ctx, rec_map.assumption);
 
-        struct dy_core_expr t = dy_type_of(ctx, *rec_map.assumption.expr);
-
-        if (dy_core_expr_contains_this_variable(ctx, rec_map.assumption.id, t)) {
-            rec_map.dependence = DY_CORE_MAP_DEPENDENCE_DEPENDENT;
-        } else {
-            rec_map.dependence = DY_CORE_MAP_DEPENDENCE_INDEPENDENT;
-        }
-
-        --ctx->free_variables.num_elems;
-
-        dy_core_expr_release(ctx, t);
+        rec_map = new_rec_map;
     }
 
     *result = rec_map;
@@ -631,6 +574,125 @@ struct dy_core_expr dy_check_inference_ctx(struct dy_core_ctx *ctx, struct dy_co
     }
 
     return expr;
+}
+
+bool dy_check_map_assumption_dependence(struct dy_core_ctx *ctx, struct dy_core_map_assumption map, struct dy_core_map_assumption *result)
+{
+    if (map.dependence != DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
+        return false;
+    }
+
+    dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+        .id = map.id,
+        .type = *map.type
+    });
+
+    dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+        .id = map.assumption.id,
+        .type = *map.assumption.type
+    });
+
+    struct dy_core_expr t = dy_type_of(ctx, *map.assumption.expr);
+
+    if (dy_core_expr_contains_this_variable(ctx, map.assumption.id, t)) {
+        map.dependence = DY_CORE_MAP_DEPENDENCE_DEPENDENT;
+    } else {
+        map.dependence = DY_CORE_MAP_DEPENDENCE_INDEPENDENT;
+    }
+
+    --ctx->free_variables.num_elems;
+    --ctx->free_variables.num_elems;
+
+    dy_core_expr_release(ctx, t);
+
+    dy_core_expr_retain_ptr(ctx, map.type);
+    dy_core_assumption_retain(ctx, map.assumption);
+
+    *result = map;
+
+    return true;
+}
+
+bool dy_check_map_choice_dependence(struct dy_core_ctx *ctx, struct dy_core_map_choice map, struct dy_core_map_choice *result)
+{
+    if (map.left_dependence != DY_CORE_MAP_DEPENDENCE_NOT_CHECKED && map.right_dependence != DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
+        return false;
+    }
+
+    if (map.left_dependence == DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
+        dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+            .id = map.assumption_left.id,
+            .type = *map.assumption_left.type
+        });
+
+        struct dy_core_expr t = dy_type_of(ctx, *map.assumption_left.expr);
+
+        if (dy_core_expr_contains_this_variable(ctx, map.assumption_left.id, t)) {
+            map.left_dependence = DY_CORE_MAP_DEPENDENCE_DEPENDENT;
+        } else {
+            map.left_dependence = DY_CORE_MAP_DEPENDENCE_INDEPENDENT;
+        }
+
+        --ctx->free_variables.num_elems;
+
+        dy_core_expr_release(ctx, t);
+    }
+
+    if (map.right_dependence == DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
+        dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+            .id = map.assumption_right.id,
+            .type = *map.assumption_right.type
+        });
+
+        struct dy_core_expr t = dy_type_of(ctx, *map.assumption_right.expr);
+
+        if (dy_core_expr_contains_this_variable(ctx, map.assumption_right.id, t)) {
+            map.right_dependence = DY_CORE_MAP_DEPENDENCE_DEPENDENT;
+        } else {
+            map.right_dependence = DY_CORE_MAP_DEPENDENCE_INDEPENDENT;
+        }
+
+        --ctx->free_variables.num_elems;
+
+        dy_core_expr_release(ctx, t);
+    }
+
+    dy_core_assumption_retain(ctx, map.assumption_left);
+    dy_core_assumption_retain(ctx, map.assumption_right);
+
+    *result = map;
+
+    return true;
+}
+
+bool dy_check_map_recursion_dependence(struct dy_core_ctx *ctx, struct dy_core_map_recursion map, struct dy_core_map_recursion *result)
+{
+    if (map.dependence != DY_CORE_MAP_DEPENDENCE_NOT_CHECKED) {
+        return false;
+    }
+
+    dy_array_add(&ctx->free_variables, &(struct dy_free_var){
+        .id = map.assumption.id,
+        .type = *map.assumption.type
+    });
+
+    struct dy_core_expr t = dy_type_of(ctx, *map.assumption.expr);
+
+    if (dy_core_expr_contains_this_variable(ctx, map.assumption.id, t)) {
+        map.dependence = DY_CORE_MAP_DEPENDENCE_DEPENDENT;
+    } else {
+        map.dependence = DY_CORE_MAP_DEPENDENCE_INDEPENDENT;
+    }
+
+    --ctx->free_variables.num_elems;
+
+    dy_core_expr_release(ctx, t);
+
+    dy_core_assumption_retain(ctx, map.assumption);
+
+    *result = map;
+
+    return true;
 }
 
 void dy_collect_capturing_inference_vars(struct dy_core_ctx *ctx, size_t id, size_t constraint_start, dy_array_t *ids)
