@@ -505,6 +505,7 @@ void dy_lsp_did_open(dy_lsp_ctx_t *ctx, dy_string_t uri, dy_string_t text)
     dy_def_register(&doc.core_ctx.custom_shared);
     dy_string_register(&doc.core_ctx.custom_shared);
     dy_string_type_register(&doc.core_ctx.custom_shared);
+    dy_print_register(&doc.core_ctx.constraints);
 
     process_document(ctx, &doc);
 

@@ -10,6 +10,7 @@
 #include "string.h"
 #include "def.h"
 #include "unbound_variable.h"
+#include "print.h"
 
 #include "../core/core.h"
 
@@ -450,6 +451,38 @@ struct dy_core_expr dy_ast_variable_to_core(struct dy_ast_to_core_ctx *ctx, cons
                 .variable_id = replacement->replacement_id
             };
         }
+    }
+
+    if (dy_string_are_equal(s, DY_STR_LIT("print"))) {
+        size_t id = ctx->running_id++;
+
+        return (struct dy_core_expr){
+            .tag = DY_CORE_EXPR_INTRO,
+            .intro = {
+                .polarity = DY_POLARITY_POSITIVE,
+                .is_implicit = false,
+                .tag = DY_CORE_INTRO_COMPLEX,
+                .complex = {
+                    .tag = DY_CORE_COMPLEX_ASSUMPTION,
+                    .assumption = {
+                        .id = id,
+                        .type = dy_core_expr_new((struct dy_core_expr){
+                            .tag = DY_CORE_EXPR_CUSTOM,
+                            .custom = dy_string_type_create()
+                        }),
+                        .expr = dy_core_expr_new((struct dy_core_expr){
+                            .tag = DY_CORE_EXPR_CUSTOM,
+                            .custom = dy_print_create((struct dy_print_data){
+                                .expr = {
+                                    .tag = DY_CORE_EXPR_VARIABLE,
+                                    .variable_id = id
+                                }
+                            })
+                        })
+                    }
+                }
+            }
+        };
     }
 
     dy_array_retain(variable);

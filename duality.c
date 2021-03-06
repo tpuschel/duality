@@ -67,6 +67,7 @@ int main(int argc, const char *argv[])
     dy_def_register(&custom_shared);
     dy_string_register(&custom_shared);
     dy_string_type_register(&custom_shared);
+    dy_print_register(&custom_shared);
 
     struct dy_ast_to_core_ctx ast_to_core_ctx = {
         .running_id = 0,
